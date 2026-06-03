@@ -26,6 +26,7 @@
   margin: 0 0 var(--s-16); max-width: 60ch; line-height: 1.7;
 }
 .karte-head .position b { color: var(--fg); font-weight: var(--w-bold); font-style: italic; }
+.karte-head .overview { font-size: 0.93rem; line-height: 1.75; color: var(--fg-sub); margin-top: 0.5rem; max-width: 52ch; }
 .spec-tags { display: flex; gap: var(--s-8); flex-wrap: wrap; }
 .spec-tags .tag .k { color: var(--fg-mute); }
 .spec-tags .tag .v { color: var(--fg); }
@@ -232,6 +233,9 @@
           </div>
           <h1><span class="mark"></span>{{ k.name }}</h1>
           <p class="position">「<b>{{ k.positioning }}</b>」</p>
+          {% if k.overview %}
+          <p class="overview">{{ k.overview | emph }}</p>
+          {% endif %}
           <div class="spec-tags">
             <span class="tag"><span class="k">種類</span><span class="v">{{ k.kind_ja }}</span></span>
             <span class="tag"><span class="k">ドメイン</span><span class="v">{{ k.domain_ja }}</span></span>

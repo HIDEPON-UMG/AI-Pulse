@@ -177,6 +177,8 @@ def validate_entity(d: dict) -> dict:
     _validate_history(d, ctx)
     _validate_comparison(d, ctx)
     _validate_future(d, ctx)
+    if "overview" in d and not (isinstance(d["overview"], str) and d["overview"]):
+        raise SchemaError(f"{ctx}: overview は非空文字列")
     return d
 
 

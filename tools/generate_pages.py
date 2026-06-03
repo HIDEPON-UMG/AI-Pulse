@@ -179,6 +179,7 @@ def _karte(ent: dict, all_events: list[dict]) -> dict:
         "history": ent.get("history") or [],
         "comparison": comparison,
         "future": modules.get("future") or [],
+        "overview": ent.get("overview") or None,
     }
 
 
