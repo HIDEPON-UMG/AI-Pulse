@@ -133,7 +133,13 @@
 .rel-node .flow { font-family: var(--font-mono); font-size: var(--t-label); color: var(--rc); display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; }
 .rel-node .flow .arr { font-size: 15px; }
 .rel-node .target { text-align: right; }
-.rel-node .target .note { font-family: var(--font-body); font-size: var(--t-sm); color: var(--fg-sub); }
+.rel-node .target .note { font-family: var(--font-body); font-size: var(--t-sm); color: var(--fg-sub); margin-top: 3px; }
+.rel-node .target .note .since { color: var(--rc); font-weight: var(--w-med); }
+.rel-node .rel-models { font-family: var(--font-mono); font-size: 11px; color: var(--fg-sub); margin-top: 4px; line-height: 1.5; }
+.rel-node .rel-models .k { color: var(--fg-mute); margin-right: 6px; }
+.rel-node .rel-models .k::after { content: "："; }
+.rel-node .rel-src { display: inline-flex; margin-top: 6px; font-family: var(--font-mono); font-size: 10.5px; color: var(--rc); text-decoration: none; border-bottom: 1px solid color-mix(in oklab, var(--rc) 40%, transparent); }
+.rel-node .rel-src:hover { border-bottom-color: var(--rc); }
 .rc-capital { --rc: var(--rel-capital); }
 .rc-tech { --rc: var(--rel-tech); }
 .rc-rival { --rc: var(--rel-rival); }
@@ -327,9 +333,14 @@
           <div class="rel-map">
             {% for r in k.relations %}
             <div class="rel-node {{ r.cls }}">
-              <div class="ent">{{ k.name }}<span class="sub">本エンティティ</span></div>
+              <div class="ent">{{ k.name }}</div>
               <div class="flow"><span class="arr">{{ r.arr }}</span>{{ r.label }}</div>
-              <div class="target"><div class="ent" style="font-weight:700">{{ r.company }}</div>{% if r.note %}<div class="note">{{ r.note }}</div>{% endif %}</div>
+              <div class="target">
+                <div class="ent" style="font-weight:700">{{ r.company }}</div>
+                {% if r.note %}<div class="note">{% if r.since %}<span class="since">{{ r.since }}より</span> {% endif %}{{ r.note }}</div>{% endif %}
+                {% if r.models %}<div class="rel-models"><span class="k">利用可能モデル</span>{{ r.models | join(' / ') }}</div>{% endif %}
+                {% if r.url %}<a class="rel-src" href="{{ r.url }}" target="_blank" rel="noopener noreferrer">出典 ↗</a>{% endif %}
+              </div>
             </div>
             {% endfor %}
           </div>
@@ -396,12 +407,7 @@
     </div>
   </div>
 
-  <footer class="app-foot">
-    <div class="wrap">
-      <span class="label">設計意図 / DESIGN INTENT</span>
-      <p class="intent">1サービス=1ページ。左に「比較・関係・将来」の分析、右に「採用判断・確信度・出典」の結論を固定し、忙しい開発者が結論から逆引きできる構成。関係性は4色で意味を即読でき、◎○△の記号スケールが定性評価を一目で揃えます。</p>
-    </div>
-  </footer>
+  {% include "_footer.html.j2" %}
 </main>
 
 <script src="app.js"></script>

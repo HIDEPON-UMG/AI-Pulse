@@ -69,6 +69,9 @@ a.entry:hover h3 { color: var(--accent); }
   .escore { padding-left: var(--s-8); }
   .escore .num { font-size: 21px; }
 }
+/* (3) アーカイブのカテゴリタグは一覧密度を優先して約 2/3 に縮小 */
+.entry .cat-badge { font-size: 8.5px; padding: 2px 6px; gap: 4px; }
+.entry .cat-badge .gly { font-size: 8px; }
 </style>
 </head>
 <body>
@@ -143,12 +146,7 @@ a.entry:hover h3 { color: var(--accent); }
     <div class="empty">該当するニュースがありません。フィルタを解除してください。</div>
   </div>
 
-  <footer class="app-foot">
-    <div class="wrap">
-      <span class="label">設計意図 / DESIGN INTENT</span>
-      <p class="intent">左の日付レールを固定軸に時間を遡る縦タイムライン。各エントリの左罫をカテゴリ色で塗り、フィルタ時は該当色だけが線として残るため、「いつ・どの領域が動いたか」のリズムが視覚化されます。</p>
-    </div>
-  </footer>
+  {% include "_footer.html.j2" %}
 </main>
 
 <script src="app.js"></script>

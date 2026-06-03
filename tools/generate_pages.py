@@ -10,11 +10,13 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 import shutil
 import sys
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from markupsafe import Markup, escape
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # tools/ を import path に載せる
@@ -130,6 +132,8 @@ def _karte(ent: dict, all_events: list[dict]) -> dict:
         rels.append({
             "company": r.get("company", ""), "note": r.get("note", ""),
             "cls": cls, "label": label, "arr": arr,
+            "since": r.get("since", ""), "models": r.get("models") or [],
+            "url": r.get("url", ""),
         })
     rec = ent.get("recommendation") or {}
     rec_rows = [
@@ -229,15 +233,42 @@ def _copy_assets() -> int:
     return n
 
 
+# News-Grasp 流の軽量強調記法（**太字** / __下線__ / ==マーカー==）。
+# 適用順は外側の長い記法から。`escape` 済みテキストにだけ置換するため XSS 不可。
+_EMPH_RULES = (
+    (re.compile(r"==(.+?)=="), r"<mark>\1</mark>"),
+    (re.compile(r"\*\*(.+?)\*\*"), r"<b>\1</b>"),
+    (re.compile(r"__(.+?)__"), r"<u>\1</u>"),
+)
+
+
+def emph(text: str) -> Markup:
+    """本文の軽量強調記法を安全な HTML に変換する Jinja フィルタ。
+
+    先に HTML エスケープしてから記法→タグへ置換するので、データ側に < や " が
+    混入しても無害（autoescape と同じ安全性を保ちつつ強調だけ通す）。記法が無ければ
+    エスケープ済みプレーン文字列をそのまま返す。
+    """
+    if not text:
+        return Markup("")
+    s = str(escape(text))
+    for rx, rep in _EMPH_RULES:
+        s = rx.sub(rep, s)
+    return Markup(s)
+
+
 def make_env() -> Environment:
     """全テンプレ共通の Jinja 環境。autoescape=True で値を自動エスケープし、
-    <script> へ値を出す時だけ |tojson を使う（XSS / JSON 破損を 1 箇所で封じる）。"""
-    return Environment(
+    <script> へ値を出す時だけ |tojson を使う（XSS / JSON 破損を 1 箇所で封じる）。
+    本文の軽量強調は `emph` フィルタが escape→記法置換の順で安全に通す。"""
+    env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=True,
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    env.filters["emph"] = emph
+    return env
 
 
 def generate(out_dir: Path = OUT_DIR) -> dict:

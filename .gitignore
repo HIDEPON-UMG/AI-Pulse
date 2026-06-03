@@ -5,4 +5,5 @@ _meta/local-config.json
 _meta/jobs/
 tests/_tmp*/
 docs/specs/_verify_*.png
+.e2e/
 site/

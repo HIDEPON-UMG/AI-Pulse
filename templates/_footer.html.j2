@@ -1,0 +1,15 @@
+<footer class="app-foot">
+  <div class="wrap">
+    <nav class="foot-nav" aria-label="フッターナビゲーション">
+      <a href="index.html"{% if page == 'feed' %} aria-current="page"{% endif %}>フィード</a>
+      <a href="archive.html"{% if page == 'archive' %} aria-current="page"{% endif %}>アーカイブ</a>
+      <span class="foot-brand">AI<b>-</b>Pulse</span>
+    </nav>
+    {% if kartes %}
+    <div class="foot-cats">
+      <span class="k">カルテ</span>
+      {% for k in kartes %}<a href="karte-{{ k.id }}.html">{{ k.name }}</a>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</footer>

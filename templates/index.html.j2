@@ -119,6 +119,25 @@
 .story .metric[data-tip]:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 /* (C) カルテ更新バッジ */
 .story .upd-badge { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .08em; font-weight: 700; color: var(--accent-fg); background: var(--accent); padding: 1px 5px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+/* (2) News-Grasp 流の本文強調（**太字** / __下線__ / ==マーカー==） */
+.story .summary-points b, .story .summary b { color: var(--fg); font-weight: 700; }
+.story .summary-points u, .story .summary u { text-decoration: underline; text-decoration-color: var(--cat); text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
+.story .summary-points mark, .story .summary mark { background: color-mix(in oklab, var(--cat) 24%, transparent); color: var(--fg); padding: 0 3px; border-radius: 2px; }
+/* (5) 判断理由トグル（デフォルト閉じ・クリックで開く。3指標バーのホバーtooltipは併存） */
+.story .why { margin-top: 10px; }
+.story .why > summary {
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px; width: max-content;
+  font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute);
+  list-style: none; user-select: none; transition: color .15s;
+}
+.story .why > summary:hover { color: var(--cat); }
+.story .why > summary::-webkit-details-marker { display: none; }
+.story .why > summary .ic { display: inline-block; transition: transform .15s ease; }
+.story .why[open] > summary .ic { transform: rotate(180deg); }
+.story .why-list { margin: 8px 0 2px; display: grid; gap: 7px; border-left: 2px solid var(--border-strong); padding-left: var(--s-16); }
+.story .why-list > div { display: grid; grid-template-columns: 36px 1fr; gap: var(--s-8); align-items: start; }
+.story .why-list dt { font-family: var(--font-mono); font-size: 10.5px; color: var(--cat); padding-top: 2px; }
+.story .why-list dd { margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--fg-sub); }
 </style>
 </head>
 <body>
@@ -164,7 +183,7 @@
 
     <ul class="feed">
       {% for s in feed %}
-      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a'))location.href='{{ s.karte }}'"{% endif %}>
+      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a,details'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a,details'))location.href='{{ s.karte }}'"{% endif %}>
         <div class="score">
           <div class="num">{{ s.score }}</div>
           <div class="lbl">SCORE</div>
@@ -176,8 +195,18 @@
             <div class="metrics"><span class="metric" data-level="{{ s.importance }}"{% if s.rationale.importance %} data-tip="{{ s.rationale.importance }}" tabindex="0"{% endif %}><b>重要</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.impact }}"{% if s.rationale.impact %} data-tip="{{ s.rationale.impact }}" tabindex="0"{% endif %}><b>影響</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.buzz }}"{% if s.rationale.buzz %} data-tip="{{ s.rationale.buzz }}" tabindex="0"{% endif %}><b>話題</b><span class="bars"><i></i><i></i><i></i></span></span></div>
           </div>
           <h2>{{ s.headline }}</h2>
-          {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary }}</p>{% endif %}
+          {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p | emph }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary | emph }}</p>{% endif %}
           <span class="src">出典 <b style="color:var(--fg-sub);font-weight:500">{{ s.source }}</b> · <span class="tier">{{ s.tier_label }}</span>{% if s.source_url %} · <a href="{{ s.source_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--cat)">記事を開く ↗</a>{% endif %}</span>
+          {% if s.rationale and (s.rationale.importance or s.rationale.impact or s.rationale.buzz) %}
+          <details class="why">
+            <summary><span class="ic">▾</span> 判断理由（重要・影響・話題）</summary>
+            <dl class="why-list">
+              {% if s.rationale.importance %}<div><dt>重要</dt><dd>{{ s.rationale.importance }}</dd></div>{% endif %}
+              {% if s.rationale.impact %}<div><dt>影響</dt><dd>{{ s.rationale.impact }}</dd></div>{% endif %}
+              {% if s.rationale.buzz %}<div><dt>話題</dt><dd>{{ s.rationale.buzz }}</dd></div>{% endif %}
+            </dl>
+          </details>
+          {% endif %}
         </div>
         <div class="aside">
           <img class="thumb" alt="" />
@@ -189,12 +218,7 @@
     <div class="empty">該当するニュースがありません。フィルタを解除してください。</div>
   </div>
 
-  <footer class="app-foot">
-    <div class="wrap">
-      <span class="label">設計意図 / DESIGN INTENT</span>
-      <p class="intent">ダーク基調は端末的な先進性を、明朝の本文は新聞的な信頼感を担保。6カテゴリに固有色+グリフを割り当てることで、読者は色とマークだけで一覧を瞬時に分類でき、硬質な角丸0と等幅の数値が高密度でも迷わない階層をつくります。</p>
-    </div>
-  </footer>
+  {% include "_footer.html.j2" %}
 </main>
 
 <script src="app.js"></script>
