@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<title>AI-Pulse — 新着フィード</title>
+{% include "_head.html.j2" %}
+<style>
+/* ---- Feed-specific ---- */
+.feed-head { padding: var(--s-32) 0 var(--s-24); border-bottom: 1px solid var(--border); }
+.feed-head .kicker { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; }
+.feed-head h1 {
+  font-weight: var(--w-bold); font-size: clamp(32px, 4.8vw, 54px); letter-spacing: -0.02em;
+  margin: var(--s-16) 0 var(--s-8); text-wrap: balance;
+}
+.feed-head .lead { color: var(--fg-sub); max-width: 64ch; margin: 0; font-size: var(--t-sm); }
+.dateline { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--imp-high); display: inline-block; box-shadow: 0 0 8px var(--imp-high); }
+.count-pill {
+  font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute);
+  border: 1px solid var(--border); padding: 4px 9px; border-radius: var(--r-sm); white-space: nowrap;
+}
+.count-pill b { color: var(--accent); font-weight: var(--w-bold); }
+
+/* feed list */
+.feed { list-style: none; margin: 0; padding: var(--s-8) 0 0; }
+.story {
+  display: grid; grid-template-columns: 92px 1fr 184px;
+  gap: var(--s-24); align-items: start;
+  padding: var(--s-24) var(--s-16); margin: 0 calc(var(--s-16) * -1);
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 2px solid transparent;
+  transition: background .16s, border-color .16s;
+}
+.story:hover {
+  background: var(--bg-elev);
+  border-left-color: var(--cat);
+}
+.story[data-href] { cursor: pointer; }
+.story .score { padding-top: 2px; }
+.story .score .num { font-family: var(--font-mono); font-weight: 700; font-size: 30px; line-height: 1; color: var(--cat); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.story .score .lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: .18em; color: var(--fg-mute); margin-top: 4px; }
+.story .score .date { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-mute); margin-top: 14px; line-height: 1.35; }
+.story .score .date span { display: block; font-size: 10px; margin-top: 1px; opacity: .8; }
+.story .metrics { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.story .metric { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-sub); }
+.story .metric b { font-weight: 500; color: var(--fg-mute); }
+.story .metric .bars { display: inline-flex; gap: 2px; }
+.story .metric .bars i { width: 4px; height: 11px; background: var(--border-strong); display: block; }
+.story .metric[data-level="高"] .bars i { background: var(--mc); }
+.story .metric[data-level="中"] .bars i:nth-child(-n+2) { background: var(--mc); }
+.story .metric[data-level="低"] .bars i:nth-child(1) { background: var(--mc); }
+.story .metric[data-level="高"] { --mc: var(--imp-high); }
+.story .metric[data-level="中"] { --mc: var(--imp-mid); }
+.story .metric[data-level="低"] { --mc: var(--imp-low); }
+.story .body { min-width: 0; }
+.story .meta-row { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; margin-bottom: var(--s-8); }
+.story h2 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 20px;
+  letter-spacing: -0.01em; line-height: 1.4; margin: 0 0 6px; color: var(--fg);
+  text-wrap: pretty;
+}
+.story:hover h2 { color: var(--accent); }
+.story .summary {
+  margin: 0; color: var(--fg-sub); font-size: var(--t-sm); line-height: 1.75;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.story .src { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); }
+.story .src .tier { color: var(--cat); font-weight: var(--w-med); }
+.story .aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; width: 184px; }
+.story .thumb {
+  width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
+  background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.story .karte-link {
+  font-family: var(--font-mono); font-size: 11px; color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  padding: 4px 9px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px;
+  transition: background .15s; white-space: nowrap;
+}
+.story .karte-link:hover { background: var(--accent-weak); }
+.story .karte-link .arr { transition: transform .15s; }
+.story:hover .karte-link .arr { transform: translateX(2px); }
+
+@media (max-width: 720px) {
+  .story { grid-template-columns: 1fr; gap: var(--s-8); }
+  .story .aside { width: 100%; flex-direction: column; align-items: stretch; order: -1; gap: 10px; }
+  .story .thumb { aspect-ratio: 16 / 9; }
+  .story .karte-link { align-self: flex-start; }
+  .story .score { display: flex; align-items: baseline; gap: 10px; }
+  .story .score .lbl { align-self: center; margin: 0; }
+  .story .score .date { margin: 0 0 0 auto; }
+}
+
+/* lead feature (first story bigger) */
+.story.feature { grid-template-columns: 92px 1fr 240px; background: var(--bg-elev); border-left-color: var(--cat); border-radius: var(--r-sm); }
+.story.feature h2 { font-size: 26px; }
+.story.feature .aside { width: 240px; }
+@media (max-width: 720px) { .story.feature { grid-template-columns: 1fr; } .story.feature .aside { width: 100%; } }
+/* search */
+.search-row { max-width: var(--maxw); margin: 0 auto; padding: 11px var(--s-24) 0; }
+.search { display: flex; align-items: center; gap: 9px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 12px; max-width: 480px; color: var(--fg-mute); transition: border-color .15s; }
+.search:focus-within { border-color: var(--accent); color: var(--fg-sub); }
+.search input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg); font-family: var(--font-body); font-size: 14px; min-width: 0; }
+.search input::placeholder { color: var(--fg-mute); }
+.empty { display: none; padding: var(--s-48) 0; text-align: center; color: var(--fg-mute); font-family: var(--font-mono); font-size: var(--t-sm); }
+
+/* (D) 箇条書きサマリ */
+.story .summary-points { margin: 4px 0 0; padding: 0; list-style: none; }
+.story .summary-points li { position: relative; padding-left: 1.1em; color: var(--fg-sub); font-size: var(--t-sm); line-height: 1.6; margin: 4px 0; }
+.story .summary-points li::before { content: "—"; position: absolute; left: 0; color: var(--cat); }
+/* (D) 3指標バーのホバー/フォーカスで判断根拠をツールチップ表示 */
+.story .metric[data-tip] { position: relative; cursor: help; }
+.story .metric[data-tip]:hover::after, .story .metric[data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 7px); z-index: 30;
+  width: max-content; max-width: 270px; white-space: normal;
+  background: var(--bg-elev-2); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  padding: 8px 11px; font-family: var(--font-body); font-size: 12px; line-height: 1.6;
+  color: var(--fg-sub); box-shadow: var(--shadow-1); pointer-events: none;
+}
+.story .metric[data-tip]:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+/* (C) カルテ更新バッジ */
+.story .upd-badge { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .08em; font-weight: 700; color: var(--accent-fg); background: var(--accent); padding: 1px 5px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+{% include "_header.html.j2" %}
+
+<main class="app-main">
+  <div class="wrap">
+    <div class="feed-head">
+      <div class="kicker">
+        <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
+        <span class="label">新着フィード / TIME-ORDERED</span>
+      </div>
+      <h1 data-digest>今日、生成AIで何が起きたか。</h1>
+      <p class="lead">時系列のニュース入口。色とグリフでカテゴリを瞬時に分類し、気になった項目は「分析カルテ」へ深掘りできます。</p>
+    </div>
+  </div>
+
+  <!-- Category filter -->
+  <div class="chip-bar">
+    <div class="search-row">
+      <label class="search">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="6" cy="6" r="4.3"></circle><line x1="9.5" y1="9.5" x2="13" y2="13"></line></svg>
+        <input type="search" data-search placeholder="キーワードで絞り込む（見出し・要約・出典）" aria-label="キーワード検索" />
+      </label>
+    </div>
+    <div class="chip-row" data-filter-bar>
+      <button class="chip all" type="button">All</button>
+      <button class="chip" data-cat="model"  aria-pressed="false"><span class="gly">◆</span>モデル/LLM</button>
+      <button class="chip" data-cat="editor" aria-pressed="false"><span class="gly">▲</span>AIエディタ・コーディング</button>
+      <button class="chip" data-cat="media"  aria-pressed="false"><span class="gly">◎</span>画像・動画・音声生成</button>
+      <button class="chip" data-cat="agent"  aria-pressed="false"><span class="gly">■</span>エージェント・ツール</button>
+      <button class="chip" data-cat="infra"  aria-pressed="false"><span class="gly">▶</span>インフラ・チップ</button>
+      <button class="chip" data-cat="policy" aria-pressed="false"><span class="gly">✦</span>規制・資金・業界</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--s-16) var(--s-16) 0;">
+      <span class="label">最新の動き</span>
+      <span class="count-pill"><b data-count>{{ "%02d"|format(feed_count) }}</b> / {{ "%02d"|format(feed_count) }} 件を表示</span>
+    </div>
+
+    <ul class="feed">
+      {% for s in feed %}
+      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a'))location.href='{{ s.karte }}'"{% endif %}>
+        <div class="score">
+          <div class="num">{{ s.score }}</div>
+          <div class="lbl">SCORE</div>
+          <div class="date">{{ s.date_md }}<span>{{ s.date_rel }}</span></div>
+        </div>
+        <div class="body">
+          <div class="meta-row">
+            <span class="cat-badge"><span class="gly">{{ s.glyph }}</span> {{ s.cat_label }}</span>
+            <div class="metrics"><span class="metric" data-level="{{ s.importance }}"{% if s.rationale.importance %} data-tip="{{ s.rationale.importance }}" tabindex="0"{% endif %}><b>重要</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.impact }}"{% if s.rationale.impact %} data-tip="{{ s.rationale.impact }}" tabindex="0"{% endif %}><b>影響</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.buzz }}"{% if s.rationale.buzz %} data-tip="{{ s.rationale.buzz }}" tabindex="0"{% endif %}><b>話題</b><span class="bars"><i></i><i></i><i></i></span></span></div>
+          </div>
+          <h2>{{ s.headline }}</h2>
+          {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary }}</p>{% endif %}
+          <span class="src">出典 <b style="color:var(--fg-sub);font-weight:500">{{ s.source }}</b> · <span class="tier">{{ s.tier_label }}</span>{% if s.source_url %} · <a href="{{ s.source_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--cat)">記事を開く ↗</a>{% endif %}</span>
+        </div>
+        <div class="aside">
+          <img class="thumb" alt="" />
+          {% if s.karte %}<a class="karte-link" href="{{ s.karte }}">{% if s.karte_updated %}<span class="upd-badge">UPDATE</span>{% endif %}{% if s.feature %}カルテを見る{% else %}関連カルテ{% endif %} <span class="arr">→</span></a>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="empty">該当するニュースがありません。フィルタを解除してください。</div>
+  </div>
+
+  <footer class="app-foot">
+    <div class="wrap">
+      <span class="label">設計意図 / DESIGN INTENT</span>
+      <p class="intent">ダーク基調は端末的な先進性を、明朝の本文は新聞的な信頼感を担保。6カテゴリに固有色+グリフを割り当てることで、読者は色とマークだけで一覧を瞬時に分類でき、硬質な角丸0と等幅の数値が高密度でも迷わない階層をつくります。</p>
+    </div>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

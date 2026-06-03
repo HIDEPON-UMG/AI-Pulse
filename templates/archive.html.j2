@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<title>AI-Pulse — アーカイブ</title>
+{% include "_head.html.j2" %}
+<style>
+.arc-head { padding: var(--s-32) 0 var(--s-24); }
+.arc-head .kicker { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; }
+.arc-head h1 { font-weight: var(--w-black); font-size: var(--t-h1); letter-spacing: -0.02em; margin: var(--s-16) 0 6px; }
+.arc-head .lead { color: var(--fg-sub); font-size: var(--t-sm); margin: 0; }
+
+/* timeline */
+.timeline { padding: var(--s-16) 0 0; }
+.date-group { display: grid; grid-template-columns: 116px 1fr; gap: var(--s-24); }
+@media (max-width: 640px) { .date-group { grid-template-columns: 64px 1fr; gap: var(--s-16); } }
+
+/* left date rail */
+.rail { position: relative; }
+.rail .stick { position: sticky; top: calc(var(--header-h) + 78px); padding-bottom: var(--s-32); }
+.rail .day { font-family: var(--font-mono); font-weight: var(--w-bold); font-size: 33px; color: var(--fg); line-height: 1; }
+.rail .ym { font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); margin-top: 4px; }
+.rail .dow { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute); margin-top: 2px; }
+
+/* content column with vertical line */
+.entries { position: relative; padding: 0 0 var(--s-32) var(--s-24); border-left: 1px solid var(--border); }
+.entries::before {
+  content: ""; position: absolute; left: -5px; top: 6px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--cat, var(--accent));
+  box-shadow: 0 0 0 4px var(--bg);
+}
+.date-group:first-child .entries::before { background: var(--cat); box-shadow: 0 0 10px var(--cat), 0 0 0 4px var(--bg); }
+
+/* entry */
+.entry {
+  display: grid; grid-template-columns: 1fr auto; gap: var(--s-16); align-items: center;
+  padding: 14px var(--s-16); margin-bottom: 10px;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-left: 2px solid var(--cat); border-radius: var(--r-sm);
+  transition: background .15s, transform .15s;
+}
+.entry-main { min-width: 0; }
+/* 点数は各記事タイルの右端に。日付レール（左）の日付と混同しないよう色とフォントで差別化 */
+.escore {
+  align-self: stretch; display: flex; flex-direction: column; justify-content: center;
+  text-align: right; white-space: nowrap; padding-left: var(--s-16);
+  border-left: 1px solid var(--border-soft); font-family: var(--font-mono);
+}
+.escore .num { font-weight: 700; font-size: 26px; line-height: 1; color: var(--cat); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.escore .lbl { font-size: 8.5px; letter-spacing: .16em; color: var(--fg-mute); margin-top: 4px; }
+a.entry:hover { background: var(--bg-elev-2); transform: translateX(2px); }
+.entry .top { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; margin-bottom: 6px; }
+.entry h3 { font-family: var(--font-head); font-weight: var(--w-med); font-size: 16px; margin: 0 0 4px; color: var(--fg); line-height: 1.45; }
+a.entry:hover h3 { color: var(--accent); }
+.entry .src { font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); }
+.entry .src .tier { color: var(--cat); }
+.entry .time { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); }
+
+/* empty state */
+.empty { display: none; padding: var(--s-48) 0; text-align: center; color: var(--fg-mute); font-family: var(--font-mono); font-size: var(--t-sm); }
+.search-row { max-width: var(--maxw); margin: 0 auto; padding: 11px var(--s-24) 0; }
+.search { display:flex; align-items:center; gap:9px; background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 12px; max-width:480px; color:var(--fg-mute); transition:border-color .15s; }
+.search:focus-within { border-color:var(--accent); color:var(--fg-sub); }
+.search input { flex:1; background:transparent; border:0; outline:0; color:var(--fg); font-family:var(--font-body); font-size:14px; min-width:0; }
+.search input::placeholder { color:var(--fg-mute); }
+/* モバイル: スコア列を縮めて見出し幅を確保（基底 .escore より後に置き確実に上書き） */
+@media (max-width: 640px) {
+  .entry { gap: var(--s-8); }
+  .escore { padding-left: var(--s-8); }
+  .escore .num { font-size: 21px; }
+}
+</style>
+</head>
+<body>
+
+{% include "_header.html.j2" %}
+
+<main class="app-main">
+  <div class="wrap">
+    <div class="arc-head">
+      <div class="kicker"><span class="label">アーカイブ / TIMELINE</span></div>
+      <h1>過去ニュースのタイムライン</h1>
+      <p class="lead">日付レールに沿って時系列を遡る。カテゴリで絞り込むと、その文脈だけの流れが見えます。</p>
+    </div>
+  </div>
+
+  <!-- filter -->
+  <div class="chip-bar">
+    <div class="search-row">
+      <label class="search">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="6" cy="6" r="4.3"></circle><line x1="9.5" y1="9.5" x2="13" y2="13"></line></svg>
+        <input type="search" data-search placeholder="キーワードで絞り込む（見出し・出典）" aria-label="キーワード検索" />
+      </label>
+    </div>
+    <div class="chip-row" data-filter-bar>
+      <button class="chip all" type="button">All</button>
+      <button class="chip" data-cat="model"  aria-pressed="false"><span class="gly">◆</span>モデル/LLM</button>
+      <button class="chip" data-cat="editor" aria-pressed="false"><span class="gly">▲</span>AIエディタ・コーディング</button>
+      <button class="chip" data-cat="media"  aria-pressed="false"><span class="gly">◎</span>画像・動画・音声生成</button>
+      <button class="chip" data-cat="agent"  aria-pressed="false"><span class="gly">■</span>エージェント・ツール</button>
+      <button class="chip" data-cat="infra"  aria-pressed="false"><span class="gly">▶</span>インフラ・チップ</button>
+      <button class="chip" data-cat="policy" aria-pressed="false"><span class="gly">✦</span>規制・資金・業界</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--s-16) 0 var(--s-8);">
+      <span class="label">{{ range_label }}</span>
+      <span class="count-pill"><b data-count>{{ "%02d"|format(archive_count) }}</b> 件</span>
+    </div>
+
+    <div class="timeline">
+      {% for g in groups %}
+      <section class="date-group" data-date-group>
+        <div class="rail"><div class="stick"><div class="day">{{ g.day }}</div><div class="ym">{{ g.ym }}</div><div class="dow">{{ g.dow }}</div></div></div>
+        <div class="entries" data-cat="{{ g.cat }}">
+          {% for e in g.entries %}
+          {% if e.karte %}
+          <a class="entry" data-filter-item data-cat="{{ e.cat }}" href="{{ e.karte }}">
+            <div class="entry-main">
+              <div class="top"><span class="cat-badge"><span class="gly">{{ e.glyph }}</span> {{ e.cat_label }}</span></div>
+              <h3>{{ e.headline }}</h3>
+              <div class="src">{{ e.source }} · <span class="tier">{{ e.tier_label }}</span></div>
+            </div>
+            <div class="escore"><span class="num">{{ e.score }}</span><span class="lbl">SCORE</span></div>
+          </a>
+          {% else %}
+          <div class="entry" data-filter-item data-cat="{{ e.cat }}">
+            <div class="entry-main">
+              <div class="top"><span class="cat-badge"><span class="gly">{{ e.glyph }}</span> {{ e.cat_label }}</span></div>
+              <h3>{{ e.headline }}</h3>
+              <div class="src">{{ e.source }} · <span class="tier">{{ e.tier_label }}</span></div>
+            </div>
+            <div class="escore"><span class="num">{{ e.score }}</span><span class="lbl">SCORE</span></div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+
+    <div class="empty">該当するニュースがありません。フィルタを解除してください。</div>
+  </div>
+
+  <footer class="app-foot">
+    <div class="wrap">
+      <span class="label">設計意図 / DESIGN INTENT</span>
+      <p class="intent">左の日付レールを固定軸に時間を遡る縦タイムライン。各エントリの左罫をカテゴリ色で塗り、フィルタ時は該当色だけが線として残るため、「いつ・どの領域が動いたか」のリズムが視覚化されます。</p>
+    </div>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

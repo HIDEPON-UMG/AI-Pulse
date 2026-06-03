@@ -1,0 +1,20 @@
+<header class="app-header">
+  <a class="brand" href="index.html" aria-label="AI-Pulse ホーム">
+    <svg class="logo" viewBox="0 0 32 32" width="40" height="40" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="29" height="29" rx="7.5" fill="var(--accent)"></rect>
+      <path class="ekg" d="M4.5 16.5 H10 L12.5 9 L16.5 23.5 L20 16.5 H27.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"></path>
+    </svg>
+    <span class="name">AI<b>-</b>Pulse</span>
+  </a>
+  <nav class="app-nav">
+    <a href="index.html"{% if page == 'feed' %} aria-current="page"{% endif %}>フィード</a>
+    <a href="archive.html"{% if page == 'archive' %} aria-current="page"{% endif %}>アーカイブ</a>
+  </nav>
+  <span class="header-spacer"></span>
+  <div class="palette-switch" role="group" aria-label="配色テーマ">
+    <span class="pl-label">THEME</span>
+    <button class="sw-cyan"  data-palette="cyan"  title="Cyan Signal" aria-label="Cyan Signal"></button>
+    <button class="sw-azure" data-palette="azure" title="Azure Deep"  aria-label="Azure Deep"></button>
+    <button class="sw-ion"   data-palette="ion"   title="Ion"         aria-label="Ion"></button>
+  </div>
+</header>

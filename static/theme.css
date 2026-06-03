@@ -1,0 +1,346 @@
+/* ============================================================
+   AI-Pulse — Design Tokens
+   Theme: Dark base × Cool-tech (blue→cyan)
+   Palettes are switchable via [data-palette] on <html>.
+   ============================================================ */
+
+:root {
+  /* ---- Typography -------------------------------------- */
+  --font-head: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-body: "Noto Serif JP", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-ui: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-sans: "Noto Sans JP", system-ui, -apple-system, sans-serif;
+
+  --w-reg: 400;
+  --w-med: 500;
+  --w-bold: 700;
+  --w-black: 900;
+
+  /* fluid heading sizes */
+  --t-display: clamp(28px, 4.4vw, 46px);
+  --t-h1: clamp(24px, 3.2vw, 34px);
+  --t-h2: clamp(19px, 2.1vw, 24px);
+  --t-h3: 17px;
+  --t-body: 16px;
+  --t-sm: 14px;
+  --t-label: 12px;
+  --t-mono: 12.5px;
+
+  /* ---- Spacing scale (4/8/16/24/32/48/64) -------------- */
+  --s-4: 4px;
+  --s-8: 8px;
+  --s-16: 16px;
+  --s-24: 24px;
+  --s-32: 32px;
+  --s-48: 48px;
+  --s-64: 64px;
+
+  /* ---- Radius (hard / editorial) ----------------------- */
+  --r-0: 0px;
+  --r-sm: 2px;
+  --r-md: 4px;
+
+  /* ---- Neutrals — NewsPicks-style neutral near-black ---- */
+  --bg:         oklch(0.178 0.004 265);
+  --bg-elev:    oklch(0.220 0.005 265);
+  --bg-elev-2:  oklch(0.268 0.006 265);
+  --fg:         oklch(0.952 0.003 265);
+  --fg-sub:     oklch(0.745 0.007 265);
+  --fg-mute:    oklch(0.560 0.008 265);
+  --border:     oklch(0.300 0.006 265);
+  --border-soft:oklch(0.252 0.006 265);
+  --border-strong: oklch(0.400 0.008 265);
+
+  /* ---- Category accents (6 lenses) --------------------- */
+  /* shared L/C, hue-varied for instant recognition */
+  --c-model:  oklch(0.74 0.135 256);  /* モデル/LLM        ◆ */
+  --c-editor: oklch(0.81 0.120 200);  /* AIエディタ        ▲ */
+  --c-media:  oklch(0.77 0.155 322);  /* 画像・動画・音声  ◎ */
+  --c-agent:  oklch(0.81 0.140 158);  /* エージェント      ■ */
+  --c-infra:  oklch(0.84 0.130 82);   /* インフラ・チップ  ▶ */
+  --c-policy: oklch(0.76 0.150 30);   /* 規制・資金・業界  ✦ */
+
+  /* solid fills for badges (darker shade → white text passes AA) */
+  --c-model-solid:  oklch(0.515 0.155 262);
+  --c-editor-solid: oklch(0.505 0.110 220);
+  --c-media-solid:  oklch(0.520 0.185 322);
+  --c-agent-solid:  oklch(0.495 0.130 160);
+  --c-infra-solid:  oklch(0.515 0.110 70);
+  --c-policy-solid: oklch(0.530 0.175 30);
+
+  /* ---- Importance heat scale --------------------------- */
+  --imp-high: oklch(0.72 0.175 28);
+  --imp-mid:  oklch(0.84 0.130 82);
+  --imp-low:  oklch(0.62 0.012 252);
+
+  /* ---- Relationship semantics -------------------------- */
+  --rel-capital: oklch(0.81 0.140 158); /* 資本         */
+  --rel-tech:    oklch(0.74 0.135 256); /* 技術依存     */
+  --rel-rival:   oklch(0.72 0.175 28);  /* 競合         */
+  --rel-std:     oklch(0.77 0.150 300); /* 標準化協調   */
+
+  /* ---- Source tiers ------------------------------------ */
+  --tier-1: oklch(0.81 0.140 158);
+  --tier-2: oklch(0.81 0.120 200);
+  --tier-3: oklch(0.62 0.012 252);
+
+  /* ---- Primary accent — Palette A "Cyan Signal" -------- */
+  --accent:      oklch(0.82 0.130 205);
+  --accent-2:    oklch(0.72 0.140 222);
+  --accent-fg:   oklch(0.17 0.030 230);
+  --accent-weak: color-mix(in oklab, var(--accent) 16%, transparent);
+  --glow:        color-mix(in oklab, var(--accent) 32%, transparent);
+
+  /* ---- Elevation ---------------------------------------- */
+  --shadow-1: 0 1px 0 oklch(0 0 0 / 0.45);
+  --shadow-2: 0 2px 10px oklch(0 0 0 / 0.40), 0 1px 0 oklch(0 0 0 / 0.50);
+  --shadow-pop: 0 14px 40px oklch(0 0 0 / 0.55);
+
+  /* layout */
+  --maxw: 1180px;
+  --header-h: 84px;
+}
+
+/* ---- Palette B "Azure Deep" ---------------------------- */
+[data-palette="azure"] {
+  --bg:        oklch(0.150 0.026 262);
+  --bg-elev:   oklch(0.192 0.028 262);
+  --bg-elev-2: oklch(0.232 0.030 262);
+  --border:    oklch(0.310 0.026 262);
+  --border-soft: oklch(0.258 0.022 262);
+  --accent:    oklch(0.70 0.155 254);
+  --accent-2:  oklch(0.62 0.165 262);
+  --accent-fg: oklch(0.97 0.01 250);
+}
+
+/* ---- Palette C "Ion" — near-black, electric cyan ------- */
+[data-palette="ion"] {
+  --bg:        oklch(0.135 0.012 200);
+  --bg-elev:   oklch(0.180 0.014 200);
+  --bg-elev-2: oklch(0.220 0.016 200);
+  --border:    oklch(0.305 0.016 200);
+  --border-soft: oklch(0.250 0.014 200);
+  --accent:    oklch(0.86 0.145 188);
+  --accent-2:  oklch(0.78 0.150 196);
+  --accent-fg: oklch(0.15 0.02 200);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--t-body);
+  line-height: 1.7;
+  font-feature-settings: "palt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, .head { font-family: var(--font-head); line-height: 1.3; }
+
+a { color: inherit; text-decoration: none; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}
+
+::selection { background: var(--glow); color: var(--fg); }
+
+/* thin scrollbar */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 0; }
+
+/* mono utility */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.label {
+  font-family: var(--font-mono); font-size: var(--t-label);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-mute);
+}
+
+/* category color binding */
+[data-cat="model"]  { --cat: var(--c-model);  --cat-solid: var(--c-model-solid); }
+[data-cat="editor"] { --cat: var(--c-editor); --cat-solid: var(--c-editor-solid); }
+[data-cat="media"]  { --cat: var(--c-media);  --cat-solid: var(--c-media-solid); }
+[data-cat="agent"]  { --cat: var(--c-agent);  --cat-solid: var(--c-agent-solid); }
+[data-cat="infra"]  { --cat: var(--c-infra);  --cat-solid: var(--c-infra-solid); }
+[data-cat="policy"] { --cat: var(--c-policy); --cat-solid: var(--c-policy-solid); }
+
+/* ============================================================
+   App shell — fixed header
+   ============================================================ */
+.app-header {
+  position: fixed; inset: 0 0 auto 0; z-index: 50;
+  height: var(--header-h);
+  display: flex; align-items: flex-end; gap: var(--s-24);
+  padding: 0 var(--s-24) 12px;
+  background: color-mix(in oklab, var(--bg) 84%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: flex-end; gap: 11px; }
+.brand .logo { display: block; flex: 0 0 auto; animation: logobeat 3s ease-in-out infinite; }
+.brand .logo .ekg { animation: ekg 3s ease-in-out infinite; }
+@keyframes logobeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes ekg { 0%,18%,100% { opacity: .92; } 9% { opacity: 1; } }
+.brand .name {
+  font-family: var(--font-head); font-weight: var(--w-black);
+  font-size: 45px; letter-spacing: -0.02em; line-height: 1;
+}
+.brand .name b { color: var(--accent); font-weight: var(--w-black); }
+.app-nav { display: flex; gap: var(--s-4); margin-left: var(--s-8); align-self: flex-end; }
+.app-nav a {
+  font-family: var(--font-ui); font-weight: var(--w-med); font-size: var(--t-sm);
+  padding: 7px 12px 9px; color: var(--fg-sub); border-radius: var(--r-sm) var(--r-sm) 0 0; white-space: nowrap;
+  border: 1px solid transparent; border-bottom: 0; transition: color .15s, background .15s; position: relative; bottom: -12px;
+}
+.app-nav a:hover { color: var(--fg); background: var(--bg-elev); }
+.app-nav a[aria-current="page"] {
+  color: var(--fg); background: var(--bg-elev);
+  border-color: var(--border); box-shadow: inset 0 2px 0 var(--accent);
+}
+.header-spacer { flex: 1; }
+
+/* palette switcher */
+.palette-switch { display: flex; align-items: center; gap: 7px; align-self: flex-end; padding-bottom: 1px; }
+.palette-switch .pl-label { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); letter-spacing: .08em; }
+.palette-switch button {
+  width: 20px; height: 20px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--sw); position: relative;
+  transition: transform .12s;
+}
+.palette-switch button:hover { transform: scale(1.12); }
+.palette-switch button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--fg); }
+.sw-cyan  { --sw: oklch(0.82 0.130 205); }
+.sw-azure { --sw: oklch(0.70 0.155 254); }
+.sw-ion   { --sw: oklch(0.86 0.145 188); }
+
+/* main scroll region */
+.app-main { padding-top: var(--header-h); }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--s-24); }
+
+/* ============================================================
+   Category chips (filter)
+   ============================================================ */
+.chip-bar {
+  position: sticky; top: var(--header-h); z-index: 40;
+  background: color-mix(in oklab, var(--bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-soft);
+}
+.chip-row {
+  max-width: var(--maxw); margin: 0 auto;
+  display: flex; gap: var(--s-8); padding: 11px var(--s-24);
+  overflow-x: auto; scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-ui); font-weight: var(--w-med); font-size: var(--t-sm);
+  color: var(--cat, var(--accent)); background: var(--bg-elev);
+  border: 1px solid color-mix(in oklab, var(--cat, var(--accent)) 32%, var(--border)); border-radius: var(--r-sm);
+  padding: 6px 12px; white-space: nowrap;
+  transition: color .14s, border-color .14s, background .14s, opacity .14s;
+}
+.chip .gly { color: var(--cat, var(--accent)); font-size: 11px; }
+.chip:hover { border-color: var(--cat, var(--accent)); background: color-mix(in oklab, var(--cat, var(--accent)) 10%, var(--bg-elev)); }
+.chip[aria-pressed="true"] {
+  color: #fff; background: var(--cat-solid, var(--cat));
+  border-color: var(--cat-solid, var(--cat));
+}
+.chip[aria-pressed="true"] .gly { color: #fff; }
+/* deselected category chips grey out */
+.chip:not(.all):not([aria-pressed="true"]) {
+  color: var(--fg-mute); border-color: var(--border); background: var(--bg-elev); opacity: .5;
+}
+.chip:not(.all):not([aria-pressed="true"]) .gly { color: var(--fg-mute); }
+/* All = neutral rounded-pill reset button */
+.chip.all {
+  color: var(--fg-sub); background: var(--bg-elev);
+  border: 1px solid var(--border); border-radius: 999px; padding: 6px 18px; font-weight: var(--w-bold);
+}
+.chip.all:hover { color: var(--fg); border-color: var(--border-strong); background: var(--bg-elev-2); opacity: 1; }
+
+/* ============================================================
+   Badges, glyphs, importance
+   ============================================================ */
+.cat-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-head); font-size: 12.5px; font-weight: var(--w-med);
+  color: #fff; white-space: nowrap;
+  padding: 3px 9px; border-radius: var(--r-sm);
+  background: var(--cat-solid, var(--cat));
+  border: 1px solid var(--cat-solid, var(--cat));
+}
+.cat-badge .gly { font-size: 11px; line-height: 1; color: #fff; }
+
+.imp {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-sub);
+}
+.imp .bars { display: inline-flex; gap: 2px; }
+.imp .bars i {
+  width: 4px; height: 12px; background: var(--border-strong); display: block;
+}
+.imp[data-level="高"] .bars i, .imp[data-level="中"] .bars i:nth-child(-n+2), .imp[data-level="低"] .bars i:nth-child(1) { background: var(--ic); }
+.imp[data-level="高"] { --ic: var(--imp-high); }
+.imp[data-level="中"] { --ic: var(--imp-mid); }
+.imp[data-level="低"] { --ic: var(--imp-low); }
+.imp .lvl { color: var(--ic); font-weight: var(--w-med); }
+
+/* generic small caps tag */
+.tag {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-family: var(--font-head); font-size: var(--t-sm);
+  color: var(--fg-sub); background: var(--bg-elev-2);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 3px 8px;
+}
+
+/* footer */
+.app-foot {
+  border-top: 1px solid var(--border); margin-top: var(--s-64);
+  color: var(--fg-mute);
+}
+.app-foot .wrap { padding-top: var(--s-32); padding-bottom: var(--s-48); }
+.app-foot .intent {
+  font-family: var(--font-body); color: var(--fg-sub);
+  max-width: 62ch; line-height: 1.85; font-size: var(--t-sm);
+}
+
+/* ============================================================
+   モバイル（スマホ実機 390px 検証で追加）
+   共有ヘッダを縮約し、パレット切替を画面内に収める。
+   --header-h を縮めると app-main / chip-bar / 日付レールの
+   オフセットも CSS 変数経由で自動連動する。
+   ============================================================ */
+@media (max-width: 560px) {
+  :root { --header-h: 58px; }
+  .app-header { gap: var(--s-8); padding: 0 var(--s-16) 8px; }
+  .brand { gap: 7px; }
+  .brand .logo { width: 28px; height: 28px; }
+  .brand .name { font-size: 22px; white-space: nowrap; }  /* ワードマークを1行に保つ */
+  .app-nav { margin-left: 2px; }
+  .app-nav a { padding: 5px 8px 6px; font-size: 13px; bottom: -8px; }
+  .palette-switch { gap: 5px; }
+  .palette-switch .pl-label { display: none; }   /* THEME ラベルは省スペースのため隠す */
+  .palette-switch button { width: 17px; height: 17px; }
+}

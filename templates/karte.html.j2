@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<title>AI-Pulse — カルテ：{{ k.name }}</title>
+{% include "_head.html.j2" %}
+<style>
+/* breadcrumb */
+.crumb { display: flex; align-items: center; gap: 8px; padding: var(--s-16) 0 0; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); }
+.crumb a:hover { color: var(--accent); }
+.crumb .sep { opacity: .5; }
+
+/* service header */
+.karte-head { padding: var(--s-24) 0 var(--s-32); border-bottom: 1px solid var(--border); }
+.karte-head .top { display: flex; justify-content: space-between; gap: var(--s-24); flex-wrap: wrap; align-items: flex-start; }
+.karte-head .eyebrow { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; }
+.karte-head h1 {
+  font-weight: var(--w-black); font-size: var(--t-display); letter-spacing: -0.02em;
+  margin: var(--s-16) 0 var(--s-8); display: flex; align-items: center; gap: 14px;
+}
+.karte-head h1 .mark {
+  width: 12px; height: 28px; background: var(--cat); border-radius: 1px;
+  box-shadow: 0 0 14px color-mix(in oklab, var(--cat) 50%, transparent);
+}
+.karte-head .position {
+  font-family: var(--font-body); font-size: 18px; color: var(--fg-sub);
+  margin: 0 0 var(--s-16); max-width: 60ch; line-height: 1.7;
+}
+.karte-head .position b { color: var(--fg); font-weight: var(--w-bold); font-style: italic; }
+.spec-tags { display: flex; gap: var(--s-8); flex-wrap: wrap; }
+.spec-tags .tag .k { color: var(--fg-mute); }
+.spec-tags .tag .v { color: var(--fg); }
+.maker { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-sub); margin-top: var(--s-16); }
+.maker b { color: var(--cat); }
+
+/* confidence + tier shoulder */
+.shoulder { display: flex; flex-direction: column; gap: var(--s-8); align-items: flex-end; min-width: 230px; }
+.verified {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: var(--t-sm); font-weight: var(--w-med);
+  color: var(--tier-1); background: color-mix(in oklab, var(--tier-1) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--tier-1) 45%, transparent);
+  padding: 7px 12px; border-radius: var(--r-sm); white-space: nowrap;
+}
+.verified .ck { font-weight: var(--w-bold); }
+.tier-legend { display: flex; gap: 6px; }
+.tier-legend .t {
+  font-family: var(--font-mono); font-size: 10.5px; padding: 3px 7px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); color: var(--fg-mute); white-space: nowrap;
+}
+.tier-legend .t b { color: var(--tc); }
+.tier-legend .t1 { --tc: var(--tier-1); }
+.tier-legend .t2 { --tc: var(--tier-2); }
+.tier-legend .t3 { --tc: var(--tier-3); }
+
+/* layout grid */
+.karte-grid { display: grid; grid-template-columns: 1fr 320px; gap: var(--s-32); padding: var(--s-32) 0 0; align-items: start; }
+/* grid 子の min-width:auto を解除。比較表(min-width)が列を押し広げ overflow-x を無効化するのを防ぐ */
+.karte-grid > * { min-width: 0; }
+@media (max-width: 880px) { .karte-grid { grid-template-columns: 1fr; } }
+
+/* evolution timeline */
+.evo { padding: var(--s-32) 0 0; }
+.evo > h2 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: var(--t-h2);
+  letter-spacing: -0.01em; margin: 0 0 6px; display: flex; align-items: center; gap: 10px;
+}
+.evo > h2::before { content: ""; width: 4px; height: 18px; background: var(--cat); border-radius: 1px; }
+.evo .desc { color: var(--fg-sub); font-size: var(--t-sm); margin: 0 0 var(--s-24); }
+.evo-track { display: flex; gap: 0; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
+.evo-step { flex: 1 0 192px; position: relative; padding: 26px var(--s-16) 0 0; }
+.evo-step::before { content: ""; position: absolute; top: 6px; left: 0; right: 0; height: 2px; background: var(--border); }
+.evo-step:last-child::before { right: auto; width: 14px; }
+.evo-step .dot {
+  position: absolute; top: 0; left: 0; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--cat); z-index: 1;
+}
+.evo-step.now .dot { background: var(--cat); box-shadow: 0 0 0 4px color-mix(in oklab, var(--cat) 22%, transparent); }
+.evo-step .when { font-family: var(--font-mono); font-size: var(--t-label); color: var(--cat); letter-spacing: .04em; }
+.evo-step h3 { font-family: var(--font-head); font-weight: var(--w-med); font-size: 16px; margin: 6px 0 5px; line-height: 1.4; }
+.evo-step p { margin: 0 var(--s-16) 0 0; color: var(--fg-sub); font-size: 13px; line-height: 1.7; }
+.evo-step .nowtag {
+  display: inline-block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  color: var(--accent-fg); background: var(--cat); padding: 1px 6px; border-radius: 2px; margin-left: 6px; vertical-align: middle;
+}
+.evo-step .src {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--cat); text-decoration: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--cat) 40%, transparent); padding-bottom: 1px;
+}
+.evo-step .src:hover { border-bottom-color: var(--cat); }
+.evo-rule { border: 0; border-top: 1px solid var(--border); margin: var(--s-32) 0 0; }
+/* 6件超のヒストリーは直近5件のみ表示し、残りを details で折りたたむ（JS不要） */
+.evo-more { margin-top: var(--s-16); }
+.evo-more > summary { cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: var(--t-sm); color: var(--cat); list-style: none; padding: 6px 0; user-select: none; }
+.evo-more > summary::-webkit-details-marker { display: none; }
+.evo-more > summary::before { content: "▸"; font-size: 11px; transition: transform .15s ease; }
+.evo-more[open] > summary::before { transform: rotate(90deg); }
+.evo-more[open] > summary .evo-more-label::after { content: " （閉じる）"; color: var(--fg-mute); }
+.evo-more > .evo-track { margin-top: var(--s-16); }
+/* 狭幅では横スクロール（overflow-x:auto）だと最新マイルストーンが画面外に隠れるため縦積みにする。
+   縦積み時はドット中心を通す縦の一本線で各マイルストーンを繋ぎ、左側で連続して見えるようにする */
+@media (max-width: 560px) {
+  .evo-track { flex-wrap: wrap; overflow-x: visible; gap: var(--s-16) 0; }
+  .evo-step { flex: 1 1 100%; padding: 0 0 0 var(--s-24); }
+  /* ::before を横線→縦線へ。ドット(left:0/中心6.5px)を貫き、次ステップのドットまで(gap分)伸ばす */
+  .evo-step::before { top: 6px; left: 6px; right: auto; bottom: calc(-1 * var(--s-16)); width: 2px; height: auto; }
+  .evo-step:last-child::before { display: none; }
+  .evo-step .dot { top: 0; left: 0; }
+  .evo-step p { margin-right: 0; }
+}
+
+/* section */
+.sect { margin-bottom: var(--s-48); }
+.sect > h2 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: var(--t-h2);
+  letter-spacing: -0.01em; margin: 0 0 var(--s-16); display: flex; align-items: center; gap: 10px;
+}
+.sect > h2::before { content: ""; width: 4px; height: 18px; background: var(--cat); border-radius: 1px; }
+.sect .desc { color: var(--fg-sub); font-size: var(--t-sm); margin: -8px 0 var(--s-16); }
+
+/* relations */
+.rel-legend { display: flex; gap: var(--s-16); flex-wrap: wrap; margin-bottom: var(--s-16); }
+.rel-legend span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-sub); }
+.rel-legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.rel-map { display: flex; flex-direction: column; gap: 10px; }
+.rel-node {
+  display: grid; grid-template-columns: 1fr auto 1.3fr; align-items: center; gap: var(--s-16);
+  background: var(--bg-elev); border: 1px solid var(--border); border-left: 3px solid var(--rc);
+  border-radius: var(--r-sm); padding: 14px var(--s-16);
+}
+.rel-node .ent { font-family: var(--font-head); font-weight: var(--w-med); }
+.rel-node .ent .sub { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute); margin-top: 2px; font-weight: 400; }
+.rel-node .flow { font-family: var(--font-mono); font-size: var(--t-label); color: var(--rc); display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; }
+.rel-node .flow .arr { font-size: 15px; }
+.rel-node .target { text-align: right; }
+.rel-node .target .note { font-family: var(--font-body); font-size: var(--t-sm); color: var(--fg-sub); }
+.rc-capital { --rc: var(--rel-capital); }
+.rc-tech { --rc: var(--rel-tech); }
+.rc-rival { --rc: var(--rel-rival); }
+.rc-std { --rc: var(--rel-std); }
+@media (max-width: 560px) { .rel-node { grid-template-columns: 1fr; gap: 8px; text-align: left; } .rel-node .target { text-align: left; } .rel-node .flow { flex-direction: row; align-self: start; } }
+
+/* future scenario */
+.future { display: grid; gap: 12px; }
+.future .step {
+  display: grid; grid-template-columns: auto 1fr; gap: var(--s-16); align-items: start;
+  padding: var(--s-16); background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.future .step .h { font-family: var(--font-mono); font-size: var(--t-label); color: var(--cat); padding-top: 2px; white-space: nowrap; }
+.future .step .c h3 { font-family: var(--font-head); font-size: var(--t-h3); margin: 0 0 4px; font-weight: var(--w-med); }
+.future .step .c p { margin: 0; color: var(--fg-sub); font-size: var(--t-sm); }
+.future .guess { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); border: 1px dashed var(--border-strong); padding: 1px 6px; border-radius: 2px; margin-left: 8px; }
+.future .step .c .why, .future .step .c .quant { margin: 6px 0 0; font-size: var(--t-sm); line-height: 1.6; }
+.future .step .c .why { color: var(--fg-sub); }
+.future .step .c .quant { color: var(--fg); }
+.future .step .c .why b, .future .step .c .quant b { font-family: var(--font-mono); font-size: 10px; color: var(--cat); margin-right: 7px; letter-spacing: .04em; }
+.future .fsrc { display: inline-flex; align-items: center; gap: 4px; margin-top: 9px; font-family: var(--font-mono); font-size: 11px; color: var(--cat); text-decoration: none; border-bottom: 1px solid color-mix(in oklab, var(--cat) 40%, transparent); padding-bottom: 1px; }
+.future .fsrc:hover { border-bottom-color: var(--cat); }
+
+/* comparison matrix */
+.cmp-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.cmp { width: 100%; border-collapse: collapse; font-size: var(--t-sm); min-width: 520px; }
+.cmp th, .cmp td { padding: 12px var(--s-16); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-soft); }
+.cmp thead th { font-family: var(--font-mono); font-size: var(--t-label); letter-spacing: .04em; color: var(--fg-sub); background: var(--bg-elev); font-weight: var(--w-med); white-space: nowrap; }
+.cmp tbody tr:last-child th, .cmp tbody tr:last-child td { border-bottom: 0; }
+.cmp .axis-h { font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); font-weight: 400; white-space: nowrap; background: var(--bg-elev); }
+.cmp td { font-family: var(--font-body); color: var(--fg); line-height: 1.5; }
+.cmp .self { background: color-mix(in oklab, var(--cat) 12%, var(--bg-elev)); }
+.cmp thead th.self { color: var(--cat); font-weight: var(--w-bold); }
+.cmp .mk { font-family: var(--font-mono); font-weight: var(--w-bold); margin-right: 1px; }
+.self-note { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute); margin-left: 8px; }
+/* 多モデルを 1 セルに列挙する箇条書き（model レンズの strength / context / pricing 等） */
+.cmp .cell-list { margin: 0; padding-left: 1.05em; }
+.cmp .cell-list li { margin: 2px 0; line-height: 1.45; }
+.cmp-note { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); margin: 10px 0 0; line-height: 1.6; }
+
+/* sidebar cards */
+.side { position: sticky; top: calc(var(--header-h) + var(--s-24)); display: grid; gap: var(--s-16); }
+.card {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: var(--s-24); box-shadow: var(--shadow-1);
+}
+.card > h3 {
+  font-family: var(--font-head); font-size: var(--t-h3); font-weight: var(--w-bold);
+  margin: 0 0 var(--s-16); display: flex; align-items: center; justify-content: space-between;
+}
+.card > h3 .label { font-weight: 400; }
+.verdict { display: grid; gap: 1px; background: var(--border-soft); border: 1px solid var(--border-soft); border-radius: var(--r-sm); overflow: hidden; }
+.verdict .row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-elev); }
+.verdict .row .scene { font-family: var(--font-body); font-size: var(--t-sm); color: var(--fg); }
+.verdict .row .mk { font-family: var(--font-mono); font-size: 20px; font-weight: var(--w-bold); }
+.mk.dbl { color: var(--c-agent); }
+.mk.cir { color: var(--c-infra); }
+.mk.tri { color: var(--fg-mute); }
+.verdict-legend { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute); margin-top: 12px; line-height: 1.8; }
+.verdict-legend b { color: var(--fg-sub); }
+
+/* confidence bar */
+.conf .meter { height: 8px; background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; margin: 6px 0 8px; }
+.conf .meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+.conf .nums { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-sub); }
+.conf .nums b { color: var(--accent); font-size: 15px; }
+.src-list { display: grid; gap: 8px; margin-top: 4px; }
+.src-list .s { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-sub); }
+.src-list .s .tg { color: var(--tier-1); font-weight: var(--w-bold); }
+</style>
+</head>
+<body data-cat="{{ k.cat }}">
+
+{% include "_header.html.j2" %}
+
+<main class="app-main">
+  <div class="wrap">
+    <nav class="crumb">
+      <a href="index.html">フィード</a><span class="sep">/</span>
+      <span class="cat-badge"><span class="gly">{{ k.glyph }}</span> {{ k.cat_label }}</span><span class="sep">/</span>
+      <span>分析カルテ</span>
+    </nav>
+
+    <!-- Service header -->
+    <header class="karte-head">
+      <div class="top">
+        <div>
+          <div class="eyebrow">
+            <span class="label">サービスカルテ / ENTITY KARTE</span>
+          </div>
+          <h1><span class="mark"></span>{{ k.name }}</h1>
+          <p class="position">「<b>{{ k.positioning }}</b>」</p>
+          <div class="spec-tags">
+            <span class="tag"><span class="k">種類</span><span class="v">{{ k.kind_ja }}</span></span>
+            <span class="tag"><span class="k">ドメイン</span><span class="v">{{ k.domain_ja }}</span></span>
+            <span class="tag"><span class="k">提供形態</span><span class="v">{{ k.offering_ja }}</span></span>
+          </div>
+          <div class="maker">開発元 <b>{{ k.vendor }}</b></div>
+        </div>
+        <div class="shoulder">
+          <span class="verified"><span class="ck">✓</span> 確信度 {{ k.conf_pct }}% ・ 検証済</span>
+          <div class="tier-legend">
+            <span class="t t1"><b>T1</b> 公式</span>
+            <span class="t t2"><b>T2</b> 一次報道</span>
+            <span class="t t3"><b>T3</b> 二次</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% if k.history %}
+    <!-- Evolution / history timeline（entity.history がある時だけ描画。直近5件を表示し残りは折りたたむ） -->
+    {% macro evo_step(h) %}
+    <div class="evo-step{% if h.now %} now{% endif %}">
+      <span class="dot"></span>
+      <div class="when">{{ h.when }}</div>
+      <h3>{{ h.title }}{% if h.now %}<span class="nowtag">最新</span>{% endif %}</h3>
+      <p>{{ h.note }}</p>
+      {% if h.url %}<a class="src" href="{{ h.url }}" target="_blank" rel="noopener noreferrer">出典: {{ h.source or 'リンク' }} ↗</a>{% endif %}
+    </div>
+    {% endmacro %}
+    <section class="evo">
+      <h2>テクニカル・ヒストリー</h2>
+      <p class="desc">最新版から遡る主要マイルストーン。{% if k.history|length > 5 %}直近 5 件を表示中（残りは下で展開）。{% endif %}</p>
+      <div class="evo-track">
+        {% for h in k.history[:5] %}{{ evo_step(h) }}{% endfor %}
+      </div>
+      {% if k.history|length > 5 %}
+      <details class="evo-more">
+        <summary><span class="evo-more-label">さらに {{ k.history|length - 5 }} 件の履歴を表示</span></summary>
+        <div class="evo-track">
+          {% for h in k.history[5:] %}{{ evo_step(h) }}{% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      <hr class="evo-rule" />
+    </section>
+    {% endif %}
+
+    <div class="karte-grid">
+      <!-- MAIN COLUMN -->
+      <div>
+        {% if k.comparison %}
+        <!-- Competitor comparison matrix -->
+        {% set rmap = {'◎': 'dbl', '○': 'cir', '△': 'tri', '×': 'tri'} %}
+        <section class="sect">
+          <h2>競合比較</h2>
+          <p class="desc">同じ「{{ k.cat_label }}」レンズの主要プロダクトを横並びで比較。<span class="self-note">{{ k.name }} = 本エンティティ</span></p>
+          <div class="cmp-wrap">
+            <table class="cmp">
+              <thead>
+                <tr>
+                  <th class="axis-h">比較軸</th>
+                  {% for col in k.comparison.cols %}<th{% if col.self %} class="self"{% endif %}>{{ col.name }}</th>{% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for ax in k.comparison.axes %}
+                <tr>
+                  <th class="axis-h" scope="row">{{ ax.label }}</th>
+                  {% for col in k.comparison.cols %}{% set cell = col.cells[ax.key] %}<td{% if col.self %} class="self"{% endif %}>{% if cell %}{% if cell.r %}<span class="mk {{ rmap.get(cell.r, 'tri') }}">{{ cell.r }}</span> {% endif %}{% if cell.v is string %}{{ cell.v }}{% else %}<ul class="cell-list">{% for it in cell.v %}<li>{{ it }}</li>{% endfor %}</ul>{% endif %}{% endif %}</td>{% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if k.cat == 'model' %}<p class="cmp-note">価格は 2026-06 時点（/Mtok = 100 万トークンあたり input / output）。マルチモーダル出力は画像/音声の専用モデルでの対応を含む。</p>{% endif %}
+        </section>
+        {% elif k.competitors %}
+        <!-- Competitors（comparison が無い時のフォールバック: 名前のみ） -->
+        <section class="sect">
+          <h2>競合</h2>
+          <p class="desc">同じ「{{ k.cat_label }}」レンズの主要競合。</p>
+          <div class="spec-tags">
+            {% for c in k.competitors %}<span class="tag"><span class="v">{{ c }}</span></span>{% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        {% if k.relations %}
+        <!-- Inter-company relations -->
+        <section class="sect">
+          <h2>企業間関係</h2>
+          <p class="desc">資金・技術・競合・標準化の4関係を色で分類。矢印は依存・影響の向き。</p>
+          <div class="rel-legend">
+            <span><i style="background:var(--rel-capital)"></i> 資本</span>
+            <span><i style="background:var(--rel-tech)"></i> 技術依存</span>
+            <span><i style="background:var(--rel-rival)"></i> 競合</span>
+            <span><i style="background:var(--rel-std)"></i> 標準化協調</span>
+          </div>
+          <div class="rel-map">
+            {% for r in k.relations %}
+            <div class="rel-node {{ r.cls }}">
+              <div class="ent">{{ k.name }}<span class="sub">本エンティティ</span></div>
+              <div class="flow"><span class="arr">{{ r.arr }}</span>{{ r.label }}</div>
+              <div class="target"><div class="ent" style="font-weight:700">{{ r.company }}</div>{% if r.note %}<div class="note">{{ r.note }}</div>{% endif %}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        {% if k.future %}
+        <!-- Future scenario（modules.future がある時だけ描画） -->
+        <section class="sect">
+          <h2>将来シナリオ</h2>
+          <p class="desc">現状トレンドからの論理的推測。定量は第三者の市場予測を出典付きで併記。<span class="guess">推測</span></p>
+          <div class="future">
+            {% for f in k.future %}
+            <div class="step">
+              <div class="h">{{ f.label }}</div>
+              <div class="c">
+                <h3>{{ f.title }}</h3>
+                {% if f.note %}<p>{{ f.note }}</p>{% endif %}
+                {% if f.rationale %}<p class="why"><b>根拠</b>{{ f.rationale }}</p>{% endif %}
+                {% if f.quant %}<p class="quant"><b>定量</b>{{ f.quant }}</p>{% endif %}
+                {% if f.url %}<a class="fsrc" href="{{ f.url }}" target="_blank" rel="noopener noreferrer">出典: {{ f.source or 'リンク' }} ↗</a>{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+
+      <!-- SIDEBAR -->
+      <aside class="side">
+        <div class="card">
+          <h3>採用判断 <span class="label">verdict</span></h3>
+          <div class="verdict">
+            {% for r in k.rec_rows %}
+            <div class="row"><span class="scene">{{ r.scene }}</span><span class="mk {{ r.cls }}">{{ r.mark }}</span></div>
+            {% endfor %}
+          </div>
+          <p class="verdict-legend">
+            <b>◎</b> 強く推奨 ・ <b>○</b> 条件付き推奨 ・ <b>△</b> 要検討 ・ <b>×</b> 非推奨
+          </p>
+        </div>
+
+        <div class="card conf">
+          <h3>確信度 <span class="label">confidence</span></h3>
+          <div class="meter"><i style="width: {{ k.conf_pct }}%"></i></div>
+          <div class="nums"><span>検証済 / VERIFIED</span><b>{{ k.conf_pct }}%</b></div>
+        </div>
+
+        <div class="card">
+          <h3>出典ティア <span class="label">sources</span></h3>
+          {% if k.sources %}
+          <div class="src-list">
+            {% for s in k.sources %}
+            <div class="s"><span class="tg" style="color:var(--tier-{{ s.tier[1:] }})">{{ s.tier }}</span> {{ s.source }}</div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="verdict-legend">このエンティティを参照するデルタはまだありません。</p>
+          {% endif %}
+          <p class="verdict-legend" style="margin-top:14px">T1 公式 ・ T2 一次報道 ・ T3 二次。</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <footer class="app-foot">
+    <div class="wrap">
+      <span class="label">設計意図 / DESIGN INTENT</span>
+      <p class="intent">1サービス=1ページ。左に「比較・関係・将来」の分析、右に「採用判断・確信度・出典」の結論を固定し、忙しい開発者が結論から逆引きできる構成。関係性は4色で意味を即読でき、◎○△の記号スケールが定性評価を一目で揃えます。</p>
+    </div>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

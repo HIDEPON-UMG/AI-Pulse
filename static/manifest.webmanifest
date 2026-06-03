@@ -1,0 +1,19 @@
+{
+  "name": "AI-Pulse — 生成AIニュース分析",
+  "short_name": "AI-Pulse",
+  "description": "生成AIニュースの分析サイト兼DB。今日の動きを一覧で掴み、サービスの分析カルテへ深掘りできる。",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#101113",
+  "theme_color": "#101113",
+  "categories": ["news", "technology"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,32 @@
+[project]
+name = "ai-pulse"
+version = "0.1.0"
+description = "生成AI特化のニュースサイト兼DB（2層: カルテ + デルタ）"
+requires-python = ">=3.11"
+# SSG（tools/generate_pages.py）の実行時依存。収集系は標準ライブラリのみで動く。
+dependencies = ["jinja2>=3.1"]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# TID = flake8-tidy-imports（banned-api を有効化）
+select = ["E", "F", "TID"]
+
+# subprocess 直呼びを全 ban し、起動を tools/_proc/run.py の 1 箇所に集約する
+# （Windows 黒窓 = CREATE_NO_WINDOW 付け忘れの class of bug を「境界 1 箇所 + lint 1 ルール」で封じる）
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"subprocess.run".msg = "tools/_proc/run.py の quiet_run を使う（Windows 黒窓防止 CREATE_NO_WINDOW）"
+"subprocess.Popen".msg = "tools/_proc/run.py の spawn_detached を使う（同上）"
+"subprocess.call".msg = "tools/_proc/run.py の quiet_run を使う"
+"subprocess.check_call".msg = "tools/_proc/run.py の quiet_run を使う"
+"subprocess.check_output".msg = "tools/_proc/run.py の quiet_run を使う"
+
+[tool.ruff.lint.per-file-ignores]
+# 境界モジュール自身だけ subprocess 直呼びを許可
+"tools/_proc/run.py" = ["TID251"]
+# テストはスキーマ dict / 引用元テキストなど幅広のリテラルを持つため行長は不問
+"tests/**" = ["E501"]

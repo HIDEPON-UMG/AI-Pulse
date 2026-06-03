@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="thumbnail placeholder">
+  <defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2d34"></stop><stop offset="0.55" stop-color="#1c1e23"></stop><stop offset="1" stop-color="#141519"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#sg)"></rect>
+  <text x="20" y="30" font-family="ui-monospace, monospace" font-size="10" letter-spacing="2.5" fill="#8a909c">AI-PULSE</text>
+  <rect x="22" y="118" width="96" height="8" rx="1" fill="#dfe3ea" opacity="0.55"></rect>
+  <rect x="22" y="134" width="150" height="6" rx="1" fill="#aeb4c2" opacity="0.28"></rect>
+  <rect x="22" y="148" width="120" height="6" rx="1" fill="#aeb4c2" opacity="0.16"></rect>
+  <circle cx="250" cy="86" r="26" fill="none" stroke="#dfe3ea" stroke-opacity="0.30" stroke-width="2"></circle>
+  <path d="M243 86 l10 6 0 -12 z" fill="#dfe3ea" fill-opacity="0.55"></path>
+  <rect x="0" y="196" width="320" height="4" fill="#5fb0e0" fill-opacity="0.8"></rect>
+  <rect x="0.5" y="0.5" width="319" height="199" fill="none" stroke="#ffffff" stroke-opacity="0.08"></rect>
+</svg>

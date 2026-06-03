@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Pulse アーキテクチャ — 設計仕様</title>
+  <style>
+    /* ============================================================
+       DESIGN.md トークン (Claude.ai 公式トンマナ準拠)
+       - この仕様書自体の見た目。AI-Pulse 本番サイトの配色は別物
+         (Claude Design で生成する DESIGN.md を一次ソースにする)。
+       - 色直書き禁止: ここで定義した CSS 変数のみを使う。
+       - 同期元: ~/.claude/templates/DESIGN.md
+       ============================================================ */
+    :root {
+      --color-primary: #141413;
+      --color-secondary: #6A6A6A;
+      --color-tertiary: #CC785C;
+      --color-tertiary-hover: #B86A50;
+      --color-neutral: #F8F6F3;
+      --color-surface: #FFFFFF;
+      --color-border: #E8E6E3;
+      --color-on-tertiary: #FFFFFF;
+      --color-on-primary: #FAF9F5;
+      --color-accent-blue: #A8C5E6;
+      --color-accent-teal: #9DD4C7;
+      --color-accent-beige: #F4E4C1;
+      --color-success: #3D7E60;
+      --color-warning: #B7773D;
+      --color-error: #B83A2D;
+      --font-serif: Copernicus, 'Source Serif 4', Georgia, serif;
+      --font-sans: 'Styrene B', Söhne, Inter, system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+      --rounded-sm: 6px;
+      --rounded-md: 10px;
+      --rounded-lg: 16px;
+      --rounded-full: 9999px;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+      --space-3xl: 64px;
+      --shadow-sm: 0 1px 2px rgba(20, 20, 19, 0.04);
+      --shadow-md: 0 4px 12px rgba(20, 20, 19, 0.06);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--color-neutral);
+      color: var(--color-primary);
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 64rem; margin: 0 auto; padding: var(--space-2xl) var(--space-lg) var(--space-3xl); }
+
+    .spec-header { padding-bottom: var(--space-xl); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-xl); }
+    .spec-eyebrow { color: var(--color-secondary); font-size: 0.75rem; letter-spacing: 0.02em; font-weight: 500; text-transform: uppercase; }
+    h1 { font-family: var(--font-serif); font-size: 3rem; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; margin: var(--space-md) 0 var(--space-sm); }
+    h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; letter-spacing: -0.015em; margin: 0 0 var(--space-md); }
+    h3 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 500; line-height: 1.3; margin: var(--space-xl) 0 var(--space-sm); }
+    .lead { color: var(--color-secondary); font-size: 1.125rem; line-height: 1.6; margin: var(--space-sm) 0 var(--space-md); }
+
+    p { margin: 0 0 var(--space-md); }
+    a { color: var(--color-tertiary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .tabs { display: flex; gap: var(--space-xs); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-xl); overflow-x: auto; }
+    .tab { background: none; border: none; padding: var(--space-sm) var(--space-md); font-family: var(--font-sans); font-size: 0.875rem; color: var(--color-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+    .tab:hover { color: var(--color-primary); }
+    .tab.active { color: var(--color-primary); border-bottom-color: var(--color-tertiary); font-weight: 500; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fade 160ms ease-out; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-lg); }
+    .card-muted { background: var(--color-neutral); border-radius: var(--rounded-lg); padding: var(--space-lg); }
+
+    .badge { display: inline-block; background: var(--color-accent-beige); color: var(--color-primary); border-radius: var(--rounded-full); padding: 4px 12px; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.02em; }
+    .badge-success { background: var(--color-success); color: var(--color-on-primary); }
+    .badge-warning { background: var(--color-warning); color: var(--color-on-primary); }
+    .badge-error { background: var(--color-error); color: var(--color-on-primary); }
+
+    table { width: 100%; border-collapse: collapse; margin: var(--space-md) 0; font-size: 0.9375rem; }
+    th, td { text-align: left; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    th { font-weight: 500; color: var(--color-secondary); font-size: 0.75rem; letter-spacing: 0.02em; text-transform: uppercase; }
+
+    code { font-family: var(--font-mono); font-size: 0.875rem; background: var(--color-neutral); padding: 2px 6px; border-radius: var(--rounded-sm); border: 1px solid var(--color-border); }
+    pre { background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--rounded-md); padding: var(--space-md); overflow-x: auto; font-family: var(--font-mono); font-size: 0.875rem; line-height: 1.5; margin: var(--space-md) 0; }
+    pre code { background: none; padding: 0; border: 0; color: inherit; }
+
+    .btn { display: inline-flex; align-items: center; gap: var(--space-sm); padding: 10px 18px; border-radius: var(--rounded-md); border: 0; font-family: var(--font-sans); font-size: 0.9375rem; font-weight: 500; cursor: pointer; transition: background 120ms; }
+    .btn-accent { background: var(--color-tertiary); color: var(--color-on-tertiary); }
+    .btn-accent:hover { background: var(--color-tertiary-hover); }
+
+    .playground { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-lg); margin: var(--space-md) 0; }
+    .playground-control { display: flex; align-items: center; gap: var(--space-md); margin: var(--space-md) 0; }
+    .playground-control label { min-width: 220px; font-size: 0.875rem; color: var(--color-secondary); }
+    .playground-control input[type="range"] { flex: 1; accent-color: var(--color-tertiary); }
+    .playground-control output { min-width: 84px; font-family: var(--font-mono); font-size: 0.875rem; text-align: right; }
+
+    .timeline { display: flex; gap: var(--space-md); margin: var(--space-lg) 0; flex-wrap: wrap; }
+    .timeline-step { flex: 1 1 150px; background: var(--color-accent-beige); border-radius: var(--rounded-md); padding: var(--space-md); }
+    .timeline-step strong { display: block; font-family: var(--font-serif); font-size: 1.25rem; margin-bottom: var(--space-xs); }
+    .timeline-step.guide { background: var(--color-accent-teal); }
+
+    .severity-info { border-left: 3px solid var(--color-accent-blue); padding-left: var(--space-md); margin: var(--space-md) 0; }
+    .severity-warn { border-left: 3px solid var(--color-warning); padding-left: var(--space-md); margin: var(--space-md) 0; }
+
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin: var(--space-md) 0; }
+    .svg-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-lg); margin: var(--space-md) 0; }
+
+    @media (max-width: 768px) {
+      .compare-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 2.25rem; }
+      .container { padding: var(--space-xl) var(--space-md); }
+      .playground-control { flex-wrap: wrap; }
+      .playground-control label { min-width: 100%; }
+    }
+    @media print {
+      .tabs { display: none; }
+      .tab-panel { display: block !important; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="spec-header">
+      <div class="spec-eyebrow">SPEC · <span id="spec-date">2026-06-02</span></div>
+      <h1>AI-Pulse アーキテクチャ</h1>
+      <p class="lead">生成AIに特化した「分かりやすい」ニュースサイト兼DB。新着フィードを入口に、各ニュースから対象サービス/モデルの分析カルテへ深掘りできる 2 層構造。</p>
+      <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-md); flex-wrap: wrap;">
+        <span class="badge">draft</span>
+        <span class="badge">旧 ClaudeCodeFeed を全廃して新設</span>
+        <span class="badge">News-Grasp の器を踏襲</span>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="overview">概要</button>
+      <button class="tab" data-tab="alternatives">比較</button>
+      <button class="tab" data-tab="dataflow">データフロー</button>
+      <button class="tab" data-tab="impl">実装ステップ</button>
+      <button class="tab" data-tab="playground">パラメータ</button>
+    </nav>
+
+    <!-- ===================== 概要 ===================== -->
+    <section id="overview" class="tab-panel active">
+      <h2>概要</h2>
+      <p><strong>AI-Pulse</strong> は、生成AI領域（LLM・AIエディタ・画像/動画/音声生成・エージェント・ローカルLLM・AIチップ）のニュースを、時系列フィードで瞬時に把握でき、気になった対象は「使うべきか」まで 1 ページで深掘りできるニュースサイト兼DBである。器（SSG + PWA + タグ + デザイン）は実績ある姉妹サイト <strong>News-Grasp</strong> を踏襲し、データは 2 層（エンティティ・カルテ ＋ イベント・デルタ）で持つ。記事リサーチは <strong>NotebookLM-Search</strong> を主エンジンにし、ソース本体を Claude の文脈へ積載しないことで DeepResearch 比 70–80% のトークン削減を狙う。</p>
+
+      <h3>確定方針</h3>
+      <table>
+        <thead><tr><th>#</th><th>論点</th><th>決定</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>データ層構造</td><td>2 層併用（カルテ ＋ デルタ）</td></tr>
+          <tr><td>2</td><td>カルテのスキーマ</td><td>共通コア ＋ タイプ別モジュール</td></tr>
+          <tr><td>3</td><td>連携実装例 (D3)</td><td>採用候補のみ実機ディープダイブ。カルテは可否＋方式＋公式リンクのみ</td></tr>
+          <tr><td>4</td><td>主役 / 入口</td><td>新着フィードが入口・カルテが深掘り先</td></tr>
+          <tr><td>5</td><td>公開 / ホスト</td><td>GitHub Pages + PWA で公開</td></tr>
+          <tr><td>6</td><td>更新トリガー</td><td>全て定期自動（NotebookLM deep は非同期 2 段ジョブ）</td></tr>
+          <tr><td>7</td><td>デザイン</td><td>分かりやすさ思想は継承・配色は生成AI特化で刷新（News-Grasp と区別）</td></tr>
+        </tbody>
+      </table>
+
+      <h3>カテゴリ（6 レンズ）</h3>
+      <p>フィードとカルテはこの 6 レンズで分類する。各レンズに固有のアクセント色とグリフを割り当てる（色は Claude Design で刷新予定）。</p>
+      <p><span class="badge">① モデル/LLM</span> <span class="badge">② AIエディタ・コーディング</span> <span class="badge">③ 画像・動画・音声生成</span> <span class="badge">④ エージェント・ツール</span> <span class="badge">⑤ インフラ・チップ</span> <span class="badge">⑥ 規制・資金・業界</span></p>
+
+      <div class="severity-info">
+        <strong>前提・制約</strong>
+        <p>NotebookLM は公開情報のみ扱える（機密データ送信禁止）。レイテンシは fast 2–5 分 / deep 5–30 分で、速報には不向き。ベンチ/star/価格などの定量値は幻覚リスクがあるため一次ソースで裏取りする。本番サイトの配色はこの仕様書のトーン（Claude.ai 暫定）とは別に、Claude Design 生成の DESIGN.md を一次ソースとする。</p>
+      </div>
+    </section>
+
+    <!-- ===================== 比較 ===================== -->
+    <section id="alternatives" class="tab-panel">
+      <h2>採用しなかった案</h2>
+
+      <h3>カルテのスキーマ収容</h3>
+      <div class="compare-grid">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <h3 style="margin: 0;">単一テンプレ条件分岐 / 完全分割</h3>
+            <span class="badge badge-error">却下</span>
+          </div>
+          <p>単一テンプレは空欄だらけの「穴あきチーズ」になり肥大化する。完全分割は共通部の重複保守が発生し、サイトの横断比較が困難になる。</p>
+        </div>
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <h3 style="margin: 0;">共通コア ＋ タイプ別モジュール</h3>
+            <span class="badge badge-success">採用</span>
+          </div>
+          <p>全対象共通のコアを単一スキーマで持ち横断比較と DRY を両立。ベンチ/IP権利/エコシステム等のタイプ固有軸はモジュールで合体し、無駄な空欄を排除する。</p>
+        </div>
+      </div>
+
+      <h3>「ニュース」の持ち方</h3>
+      <div class="compare-grid">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <h3 style="margin: 0;">日次 digest 型（News-Grasp 流）</h3>
+            <span class="badge badge-error">却下</span>
+          </div>
+          <p>毎回エンティティを全部プロファイルし直す運用になり破綻する。「存在の説明」と「今回の変化」を区別できない。</p>
+        </div>
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <h3 style="margin: 0;">2 層（カルテ ＋ デルタ）</h3>
+            <span class="badge badge-success">採用</span>
+          </div>
+          <p>カルテ＝資産（定期リフレッシュ）、デルタ＝ニュース 1 件の差分。デルタはカルテを参照し「何が変わったか」だけを書くので再導出の無駄が消える。</p>
+        </div>
+      </div>
+
+      <h3>連携実装例 (D3) の扱い</h3>
+      <div class="compare-grid">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <h3 style="margin: 0;">全件で自筆手順を必須</h3>
+            <span class="badge badge-error">却下</span>
+          </div>
+          <p>試さず手順を書けば未検証の捏造になり、全件分は非スケール。API バージョンで腐りメンテ負債化する。</p>
+        </div>
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <h3 style="margin: 0;">採用候補のみ実機ディープダイブ</h3>
+            <span class="badge badge-success">採用</span>
+          </div>
+          <p>カルテは可否・方式・公式リンクのみの検証可能な事実。手順自筆は実際に試す採用検討時だけ実機検証付きで別モジュールに書く。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== データフロー ===================== -->
+    <section id="dataflow" class="tab-panel">
+      <h2>データフロー</h2>
+
+      <h3>2 層データモデル</h3>
+      <p>L2 デルタは <code>entity_id</code> で L1 カルテを参照し、「カルテ更新フック」でカルテ側のフィールドを更新する。</p>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 820 320" role="img" aria-label="2層データモデル図" style="width: 100%; height: auto;">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M 0 0 L 9 3 L 0 6 Z" fill="var(--color-secondary)"/>
+            </marker>
+          </defs>
+          <!-- L1 カルテ -->
+          <rect x="20" y="20" width="360" height="280" rx="16" fill="var(--color-neutral)" stroke="var(--color-border)"/>
+          <text x="40" y="50" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="var(--color-primary)">L1 エンティティ・カルテ</text>
+          <text x="40" y="70" font-family="Inter, sans-serif" font-size="12" fill="var(--color-secondary)">entities.jsonl（1 エンティティ 1 行）</text>
+          <rect x="40" y="86" width="320" height="96" rx="10" fill="var(--color-accent-blue)"/>
+          <text x="56" y="110" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="var(--color-primary)">共通コア（全対象必須）</text>
+          <text x="56" y="130" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">識別 / Signals / A1 / B1 / B3 / C / D1</text>
+          <text x="56" y="148" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">確信度 / 陳腐化トリガー / 推奨度</text>
+          <text x="56" y="166" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">種類 × ドメイン × 提供形態</text>
+          <rect x="40" y="194" width="320" height="90" rx="10" fill="var(--color-accent-teal)"/>
+          <text x="56" y="218" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="var(--color-primary)">タイプ別モジュール（該当時のみ）</text>
+          <text x="56" y="238" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">ベンチ / ランタイム / エコシステム</text>
+          <text x="56" y="256" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">ライセンスTCO / IP権利 / 規制</text>
+          <text x="56" y="274" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">連携ディープダイブ（採用候補のみ）</text>
+          <!-- 参照矢印 -->
+          <path d="M 560 160 L 384 160" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow)"/>
+          <text x="470" y="150" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-secondary)">entity_id 参照</text>
+          <text x="470" y="178" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-secondary)">＋カルテ更新フック</text>
+          <!-- L2 デルタ -->
+          <rect x="560" y="60" width="240" height="200" rx="16" fill="var(--color-neutral)" stroke="var(--color-border)"/>
+          <text x="580" y="90" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="var(--color-primary)">L2 イベント・デルタ</text>
+          <text x="580" y="110" font-family="Inter, sans-serif" font-size="12" fill="var(--color-secondary)">events.jsonl（1 ニュース 1 行）</text>
+          <rect x="580" y="124" width="200" height="120" rx="10" fill="var(--color-accent-beige)"/>
+          <text x="596" y="146" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">イベント種別 / 前回差分</text>
+          <text x="596" y="166" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">波及主体 (ripple)</text>
+          <text x="596" y="186" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">ネガティブシグナル</text>
+          <text x="596" y="206" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">ニュース性スコア / 自分関連度</text>
+          <text x="596" y="226" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">予測追跡</text>
+        </svg>
+      </div>
+
+      <h3>パイプライン（全自動・2 系統ジョブ）</h3>
+      <p>速報は WebSearch で短周期、深掘りは NotebookLM で長周期・非同期 2 段（30 分のレイテンシを同期ブロックさせない）。</p>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 820 360" role="img" aria-label="パイプライン図" style="width: 100%; height: auto;">
+          <defs>
+            <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M 0 0 L 9 3 L 0 6 Z" fill="var(--color-secondary)"/>
+            </marker>
+          </defs>
+          <!-- 速報ジョブ -->
+          <text x="20" y="34" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="var(--color-primary)">① 速報ジョブ（短周期）</text>
+          <rect x="20" y="48" width="140" height="44" rx="10" fill="var(--color-accent-blue)"/>
+          <text x="90" y="75" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">WebSearch 収集</text>
+          <path d="M 160 70 L 200 70" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <rect x="200" y="48" width="150" height="44" rx="10" fill="var(--color-accent-teal)"/>
+          <text x="275" y="68" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">L2 デルタ生成</text>
+          <text x="275" y="84" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">＋カルテ更新フック</text>
+          <path d="M 350 70 L 390 70" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <rect x="390" y="48" width="120" height="44" rx="10" fill="var(--color-accent-beige)"/>
+          <text x="450" y="75" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">SSG ビルド</text>
+          <path d="M 510 70 L 550 70" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <rect x="550" y="48" width="150" height="44" rx="10" fill="var(--color-accent-beige)"/>
+          <text x="625" y="75" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">commit / push</text>
+
+          <!-- 深掘りジョブ -->
+          <text x="20" y="150" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="var(--color-primary)">② 深掘りジョブ（長周期・非同期 2 段）</text>
+          <text x="20" y="172" font-family="Inter, sans-serif" font-size="12" fill="var(--color-secondary)">段 A: キック</text>
+          <rect x="20" y="182" width="180" height="44" rx="10" fill="var(--color-accent-blue)"/>
+          <text x="110" y="202" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">start_research</text>
+          <text x="110" y="218" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">(deep, wait=False)</text>
+          <path d="M 200 204 L 240 204" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <rect x="240" y="182" width="160" height="44" rx="10" fill="var(--color-neutral)" stroke="var(--color-border)"/>
+          <text x="320" y="202" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">notebook_id 保存</text>
+          <text x="320" y="218" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-secondary)">（ジョブ終了）</text>
+
+          <text x="20" y="268" font-family="Inter, sans-serif" font-size="12" fill="var(--color-secondary)">段 B: 後続ジョブ（完了後）</text>
+          <rect x="20" y="278" width="150" height="44" rx="10" fill="var(--color-accent-teal)"/>
+          <text x="95" y="298" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">status → import</text>
+          <text x="95" y="314" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">→ ask(6観点)</text>
+          <path d="M 170 300 L 210 300" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <rect x="210" y="278" width="150" height="44" rx="10" fill="var(--color-accent-teal)"/>
+          <text x="285" y="298" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">L1 カルテ更新</text>
+          <text x="285" y="314" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="var(--color-primary)">＋定量裏取り</text>
+          <path d="M 360 300 L 400 300" stroke="var(--color-secondary)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <rect x="400" y="278" width="120" height="44" rx="10" fill="var(--color-accent-beige)"/>
+          <text x="460" y="305" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="var(--color-primary)">SSG → push</text>
+        </svg>
+      </div>
+
+      <h3>リサーチエンジンの使い分け</h3>
+      <table>
+        <thead><tr><th>用途</th><th>エンジン</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td>カルテの俯瞰 / 競合 / 将来 (C軸)・背景解説</td><td>NotebookLM</td><td>横断要約に強く、ソース非積載でトークンが安い</td></tr>
+          <tr><td>速報・新着デルタ</td><td>WebSearch</td><td>NotebookLM のレイテンシ（数分〜30 分）を回避</td></tr>
+          <tr><td>ベンチ / star / 価格などの定量</td><td>一次ソース直接取得で裏取り</td><td>幻覚リスクを排除。<code>ask --json</code> の引用元 source ID をクロールして検証</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== 実装ステップ ===================== -->
+    <section id="impl" class="tab-panel">
+      <h2>実装ステップ</h2>
+      <p>Step 2 の HTML 設計仕様（本書）は<strong>実装の道標</strong>として本作業の前に置く。Step 3 以降はこの仕様を一次ソースに進める。</p>
+      <div class="timeline">
+        <div class="timeline-step"><strong>1.</strong>退避 & scaffold（AI-Pulse 新設・git init）</div>
+        <div class="timeline-step guide"><strong>2.</strong>HTML 設計仕様（本書・道標）</div>
+        <div class="timeline-step"><strong>3.</strong>データモデル＋契約テスト</div>
+        <div class="timeline-step"><strong>4.</strong>リサーチ・パイプライン</div>
+        <div class="timeline-step"><strong>5.</strong>デザイン適用（DESIGN.md lint）</div>
+        <div class="timeline-step"><strong>6.</strong>PWA ＋ GitHub Pages 公開</div>
+        <div class="timeline-step"><strong>7.</strong>自動化（Task Scheduler 2 系統）</div>
+      </div>
+
+      <h3>主要ファイル</h3>
+      <table>
+        <thead><tr><th>パス</th><th>種別</th><th>意図</th></tr></thead>
+        <tbody>
+          <tr><td><code>data/entities.jsonl</code></td><td>add</td><td>L1 カルテ格納。スキーマ不変条件は契約テスト 1 件で locked-in</td></tr>
+          <tr><td><code>data/events.jsonl</code></td><td>add</td><td>L2 デルタ格納。entity_id でカルテを参照</td></tr>
+          <tr><td><code>tools/research_notebooklm.py</code></td><td>add</td><td>深掘り非同期 2 段（start_research → status → import → ask）</td></tr>
+          <tr><td><code>tools/research_websearch.py</code></td><td>add</td><td>速報収集 → L2 デルタ生成</td></tr>
+          <tr><td><code>tools/verify_quant.py</code></td><td>add</td><td>定量値の一次ソース裏取り（引用元クロール）</td></tr>
+          <tr><td><code>tools/generate_pages.py</code></td><td>add</td><td>Jinja2 SSG（<code>|tojson</code> 必須）。News-Grasp から移植</td></tr>
+          <tr><td><code>tools/_proc/run.py</code></td><td>add</td><td>subprocess 境界。Windows は <code>CREATE_NO_WINDOW</code> を強制（banned-api lint 1 ルール）</td></tr>
+          <tr><td><code>prompts/</code></td><td>add</td><td>LLM プロンプト ＋ Jinja2 HTML テンプレ</td></tr>
+          <tr><td><code>DESIGN.md</code></td><td>add</td><td>Claude Design 生成 → <code>/design-md</code> lint(errors=0)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="severity-warn">
+        <strong>未着手（別途 GO が必要）</strong>
+        <p>ClaudeCodeFeed フォルダの撤去（不可逆）と docs 退避は本仕様の範囲外。実行前にユーザー承認を得る。</p>
+      </div>
+    </section>
+
+    <!-- ===================== パラメータ ===================== -->
+    <section id="playground" class="tab-panel">
+      <h2>パラメータ</h2>
+      <p>掲載閾値や収集量、再評価周期、ポーリング間隔を仮置きする。スライダーで調整し「プロンプトとしてコピー」で Claude Code に戻して確定する。</p>
+      <div class="playground">
+        <div class="playground-control">
+          <label for="p-score">ニュース性スコア下限（掲載閾値）</label>
+          <input type="range" id="p-score" min="0" max="100" value="50" step="5" data-unit=" 点">
+          <output for="p-score">50 点</output>
+        </div>
+        <div class="playground-control">
+          <label for="p-count">速報 1 カテゴリあたり収集件数</label>
+          <input type="range" id="p-count" min="1" max="10" value="5" step="1" data-unit=" 件">
+          <output for="p-count">5 件</output>
+        </div>
+        <div class="playground-control">
+          <label for="p-recheck">カルテ再評価の既定周期</label>
+          <input type="range" id="p-recheck" min="7" max="180" value="30" step="1" data-unit=" 日">
+          <output for="p-recheck">30 日</output>
+        </div>
+        <div class="playground-control">
+          <label for="p-poll">NotebookLM deep のポーリング間隔</label>
+          <input type="range" id="p-poll" min="1" max="15" value="5" step="1" data-unit=" 分">
+          <output for="p-poll">5 分</output>
+        </div>
+        <div style="margin-top: var(--space-lg);">
+          <button class="btn btn-accent" id="copy-prompt">プロンプトとしてコピー</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Tab 切替
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === target));
+      });
+    });
+
+    // Playground 値同期
+    document.querySelectorAll('.playground-control input[type="range"]').forEach(r => {
+      const out = document.querySelector(`output[for="${r.id}"]`);
+      const unit = r.dataset.unit || '';
+      r.addEventListener('input', () => { if (out) out.textContent = r.value + unit; });
+    });
+
+    // プロンプトコピー
+    const copyBtn = document.getElementById('copy-prompt');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const values = Array.from(document.querySelectorAll('.playground-control')).map(c => {
+          const label = c.querySelector('label')?.textContent?.trim() || '';
+          const range = c.querySelector('input[type="range"]');
+          const unit = range?.dataset.unit || '';
+          return `${label}: ${range.value}${unit}`;
+        }).join('\n');
+        const prompt = `AI-Pulse を以下のパラメータで実装してください。\n\n${values}`;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = 'コピーしました';
+          setTimeout(() => copyBtn.textContent = orig, 1500);
+        } catch (e) {
+          alert('クリップボードに書き込めませんでした。\n\n' + prompt);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
