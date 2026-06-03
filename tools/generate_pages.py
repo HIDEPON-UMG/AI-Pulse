@@ -45,11 +45,15 @@ TIER_LABEL = {"T1": "T1 公式", "T2": "T2 一次報道", "T3": "T3 二次"}
 KIND_JA = {
     "model": "モデル", "runtime": "ランタイム", "app": "アプリ",
     "library": "ライブラリ", "repo": "リポジトリ",
+    "hardware": "ハードウェア", "regulation": "規制/政策",
 }
-OFFERING_JA = {"oss": "OSS", "saas": "SaaS", "commercial": "商用", "hybrid": "ハイブリッド"}
+OFFERING_JA = {"oss": "OSS", "saas": "SaaS", "commercial": "商用",
+               "hybrid": "ハイブリッド", "public": "公的"}
 DOMAIN_JA = {
     "language": "言語", "code": "コード", "image": "画像",
     "video": "動画", "audio": "音声", "multimodal": "マルチモーダル",
+    "robotics": "ロボティクス", "compute": "計算基盤", "governance": "ガバナンス",
+    "agent": "エージェント",
 }
 # 企業間関係 type → (CSS クラス, ラベル, 矢印)。未知 type は REL_FALLBACK。
 REL_META = {

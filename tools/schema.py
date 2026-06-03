@@ -14,9 +14,12 @@ from pathlib import Path
 
 # --- 許容値（enum 相当。ここに無い値は validate_* が弾く） ---
 CATEGORIES = {"model", "editor", "media", "agent", "infra", "policy", "physical"}  # 7 レンズ
-KINDS = {"model", "runtime", "app", "library", "repo"}
-OFFERINGS = {"oss", "saas", "commercial", "hybrid"}
-EVENT_TYPES = {"release", "funding", "pricing", "ma", "shutdown", "incident", "benchmark"}
+KINDS = {"model", "runtime", "app", "library", "repo", "hardware", "regulation"}
+# hardware=チップ/インフラ(infra レンズ), regulation=規制/政策(policy レンズ)。7レンズ化に伴う追加。
+OFFERINGS = {"oss", "saas", "commercial", "hybrid", "public"}
+# public=公的（規制・法令など「提供」概念が当てはまらない policy レンズ向け）。
+EVENT_TYPES = {"release", "funding", "pricing", "ma", "shutdown", "incident", "benchmark", "regulation"}
+# regulation=規制の施行・ガイドライン公表など(policy レンズ)。
 SOURCE_TIERS = {"T1", "T2", "T3"}  # T1 公式/一次, T2 一次報道, T3 二次/個人
 IMPORTANCE = {"high", "mid", "low"}
 
