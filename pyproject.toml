@@ -4,7 +4,13 @@ version = "0.1.0"
 description = "生成AI特化のニュースサイト兼DB（2層: カルテ + デルタ）"
 requires-python = ">=3.11"
 # SSG（tools/generate_pages.py）の実行時依存。収集系は標準ライブラリのみで動く。
-dependencies = ["jinja2>=3.1"]
+dependencies = [
+    "jinja2>=3.1",
+    "google-genai>=1.0",          # Gemini API SDK (response_schema JSON mode)
+    "trafilatura>=2.0",           # 本文抽出
+    "googlenewsdecoder>=0.1",     # GNews redirect → publisher URL（urllib では解決不可と実機確認）
+    "python-dotenv>=1.0",         # .env から GEMINI_API_KEY を読む
+]
 
 [project.optional-dependencies]
 dev = ["ruff>=0.6", "pytest>=8"]

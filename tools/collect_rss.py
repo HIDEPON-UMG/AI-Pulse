@@ -1,11 +1,16 @@
-"""日次速報ジョブ: Google News RSS -> L2 events -> store.ingest_events
+"""日次速報ジョブ: Google News RSS -> publisher 本文 -> Gemini 要約 -> L2 events -> store.ingest_events
 
-claude -p / SDK 不使用。標準ライブラリ（urllib + xml）のみ依存。
-entities.jsonl の name/vendor からクエリを自動生成（QUERY_OVERRIDES で上書き可能）。
+依存: 標準ライブラリに加えて google-genai / trafilatura / googlenewsdecoder / python-dotenv。
+Gemini API キーは AI-Pulse/.env の GEMINI_API_KEY を読む（.env は .gitignore 済み）。
 Task Scheduler から run_daily.py 経由で毎日 7:00 に実行。
+
+旧版 (2026-06-03 以前) は RSS description をそのまま summary として保存し summary_points / rationale を
+空にしていた。本版は Gemini Free Tier (15 RPM / 1500 RPD) で要約・判断根拠を生成する。
+event_id は `-gem<NN>` 接尾辞で旧 `-rss<NN>` と区別する。
 """
 from __future__ import annotations
 
+import html as _html
 import re
 import sys
 import time
@@ -19,6 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import config  # noqa: E402
+import fetch_article  # noqa: E402
+import llm_gemini  # noqa: E402
 import schema  # noqa: E402
 import store  # noqa: E402
 
@@ -35,8 +42,8 @@ _T1_DOMAINS = frozenset({
     "anthropic.com", "openai.com", "google.com", "deepmind.com", "googleblog.com",
     "meta.com", "microsoft.com", "nvidia.com", "figureai.com",
     "physicalintelligence.ai", "cognition.ai", "eu.europa.eu",
-    "digital.go.jp", "meti.go.jp", "cursor.sh", "codeium.com",
-    "blackforestlabs.ai", "runwayml.com", "langchain.com",
+    "digital.go.jp", "meti.go.jp", "cursor.sh", "cursor.com", "codeium.com",
+    "blackforestlabs.ai", "bfl.ai", "runwayml.com", "langchain.com",
     "deepseek.com", "alibabacloud.com", "llama.meta.com",
 })
 _T2_DOMAINS = frozenset({
@@ -45,42 +52,6 @@ _T2_DOMAINS = frozenset({
     "thenextweb.com", "zdnet.com", "cnet.com", "tomsguide.com",
     "9to5google.com", "9to5mac.com", "engadget.com", "gizmodo.com",
 })
-
-# タイトル/概要 -> event_type（先にマッチしたものを採用）
-_TYPE_PATTERNS: list[tuple[str, str]] = [
-    (r"\b(acqui(?:re|red|sition)|merger|M&A)\b", "ma"),
-    (r"\b(shut(?:down|ting)|clos(?:e|ed|ing|ure)|discontinu|end of service)\b", "shutdown"),
-    (r"\b(outage|incident|breach|hack|vuln(?:erability)?|leak)\b", "incident"),
-    (r"\b(benchmark|score|MMLU|HumanEval|Arena|Elo|leaderboard)\b", "benchmark"),
-    (r"\b(fund(?:ing|ed)|invest(?:ment|ed)|rais(?:e|ed)|Series [A-E]|seed round|IPO)\b", "funding"),
-    (r"\b(pric(?:e|ed|ing)|subscription|tier|plan|fee)\b", "pricing"),
-    (r"\b(regulat|law|act|policy|bill|enforcement|guidance|compliance)\b", "regulation"),
-]
-
-
-def _infer_event_type(title: str, summary: str) -> str:
-    text = f"{title} {summary}"
-    for pat, etype in _TYPE_PATTERNS:
-        if re.search(pat, text, re.IGNORECASE):
-            return etype
-    return "release"
-
-
-def _score_and_importance(title: str, source_name: str, event_type: str) -> tuple[int, str]:
-    score = 50
-    high_sources = {
-        "techcrunch", "reuters", "bloomberg", "the verge", "wired",
-        "ars technica", "venturebeat", "wsj", "financial times",
-    }
-    if any(s in source_name.lower() for s in high_sources):
-        score += 15
-    bonus = {
-        "funding": 20, "ma": 20, "shutdown": 15, "benchmark": 10,
-        "regulation": 10, "incident": 10, "pricing": 5, "release": 0,
-    }
-    score = min(100, score + bonus.get(event_type, 0))
-    importance = "high" if score >= 70 else "mid" if score >= 50 else "low"
-    return score, importance
 
 
 def _source_tier(url: str) -> str:
@@ -122,23 +93,23 @@ def _fetch_rss(query: str, num: int = 5) -> list[dict]:
         title = re.sub(r"\s+-\s+\S.*$", "", title_raw) if " - " in title_raw else title_raw
         link = (item.findtext("link") or "").strip()
         desc_raw = (item.findtext("description") or "").strip()
-        desc = re.sub(r"<[^>]+>", "", desc_raw).strip()
+        desc = _html.unescape(re.sub(r"<[^>]+>", "", desc_raw).strip())
         pub_str = item.findtext("pubDate") or ""
         try:
             date_str = parsedate_to_datetime(pub_str).date().isoformat()
         except Exception:
             date_str = datetime.now(timezone.utc).date().isoformat()
-        # <source url="..."> から元記事ドメインを取得（Google リダイレクト回避）
+        # <source url="..."> から元記事ドメインを取得（fallback 用）
         src_elem = item.find("source")
         source_name = src_elem.text.strip() if src_elem is not None else "Unknown"
-        source_url = src_elem.get("url", link) if src_elem is not None else link
+        source_url_hint = src_elem.get("url", link) if src_elem is not None else link
         items.append({
             "title": title or title_raw,
             "link": link,
-            "summary": desc or title_raw,
+            "rss_summary": desc or title_raw,
             "date": date_str,
             "source_name": source_name,
-            "source_url": source_url,
+            "source_url_hint": source_url_hint,
         })
     return items
 
@@ -157,36 +128,57 @@ def build_query(entity: dict) -> str:
     return f"{name_part} {vendor_part}".strip()
 
 
-def _make_event(entity: dict, item: dict, idx: int) -> dict:
+def _make_event(entity: dict, item: dict, article: dict, extras: dict, idx: int) -> dict:
+    """RSS item + 取得本文 + Gemini 出力 から L2 dict を組み立てる。
+
+    article: fetch_article.extract() 返り値（publisher_url / publisher_name / og_image / text）
+    extras : llm_gemini.generate_event_extras() 返り値（summary/summary_points/rationale/score/importance/event_type）
+    """
     entity_id = entity["entity_id"]
     category = entity["category"]
-    event_type = _infer_event_type(item["title"], item["summary"])
-    score, importance = _score_and_importance(item["title"], item["source_name"], event_type)
-    tier = _source_tier(item["source_url"])
+    publisher_url = article["publisher_url"]
+    publisher_name = article.get("publisher_name") or item["source_name"]
+    tier = _source_tier(publisher_url)
     date = item["date"]
     short = re.sub(r"[^a-z0-9]", "", entity_id.lower())[:8]
-    event_id = f"{date}-{short}-rss{idx:02d}"
-    return {
+    event_id = f"{date}-{short}-gem{idx:02d}"
+    ev = {
         "event_id": event_id,
         "entity_id": entity_id,
         "date": date,
         "category": category,
-        "event_type": event_type,
+        "event_type": extras["event_type"],
         "headline": item["title"],
-        "summary": item["summary"] or item["title"],
-        "score": score,
-        "importance": importance,
-        "source": item["source_name"],
+        "summary": extras["summary"],
+        "summary_points": extras["summary_points"],
+        "rationale": extras["rationale"],
+        "score": int(extras["score"]),
+        "importance": extras["importance"],
+        "source": publisher_name,
         "source_tier": tier,
-        "source_url": item["source_url"],
+        "source_url": publisher_url,  # publisher 直リンク（Google News redirect から脱却）
         "karte_updated": False,
+    }
+    if article.get("og_image"):
+        ev["thumb"] = article["og_image"]
+    return ev
+
+
+def _build_meta(entity: dict, item: dict) -> dict:
+    return {
+        "title": item["title"],
+        "entity_name": entity.get("name", ""),
+        "category": entity.get("category", ""),
+        "vendor": entity.get("vendor", ""),
+        "entity_positioning": entity.get("positioning", ""),
     }
 
 
 def collect_entities(entity_subset: list[str] | None = None) -> dict:
     """全エンティティ（またはサブセット）の RSS を収集して ingest する。
 
-    返り値: store.ingest_events と同形式 {'added': [...], 'skipped_dup': int, 'skipped_score': int}
+    返り値: store.ingest_events と同形式 {'added': [...], 'skipped_dup': int,
+    'skipped_score': int, 'skipped_extract': int, 'skipped_llm': int}
     """
     entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
     targets = {e["entity_id"]: e for e in entities}
@@ -194,15 +186,35 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
         targets = {eid: e for eid, e in targets.items() if eid in entity_subset}
 
     candidates: list[dict] = []
+    skipped_extract = 0
+    skipped_llm = 0
+    skipped_validate = 0
+    known_ids = set(targets) | {e["entity_id"] for e in entities}
     for entity_id, entity in targets.items():
         query = build_query(entity)
         print(f"  [{entity_id}] {query!r}")
         items = _fetch_rss(query, num=config.BREAKING_PER_CATEGORY)
         for i, item in enumerate(items, 1):
             try:
-                candidates.append(_make_event(entity, item, i))
-            except Exception as exc:
-                print(f"    スキップ ({entity_id}/{i}): {exc}", file=sys.stderr)
+                article = fetch_article.extract(item["link"])
+            except fetch_article.ArticleFetchError as exc:
+                skipped_extract += 1
+                print(f"    skip-extract ({entity_id}/{i}): {exc}", file=sys.stderr)
+                continue
+            try:
+                extras = llm_gemini.generate_event_extras(article["text"], _build_meta(entity, item))
+            except llm_gemini.LLMError as exc:
+                skipped_llm += 1
+                print(f"    skip-llm ({entity_id}/{i}): {exc}", file=sys.stderr)
+                continue
+            try:
+                ev = _make_event(entity, item, article, extras, i)
+                schema.validate_event(ev, known_ids)
+            except schema.SchemaError as exc:
+                skipped_validate += 1
+                print(f"    skip-validate ({entity_id}/{i}): {exc}", file=sys.stderr)
+                continue
+            candidates.append(ev)
         time.sleep(1.0)  # Google RSS rate limit 対策
 
     result = store.ingest_events(
@@ -210,10 +222,13 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
         DATA / "events.jsonl",
         candidates,
     )
+    result["skipped_extract"] = skipped_extract
+    result["skipped_llm"] = skipped_llm
+    result["skipped_validate"] = skipped_validate
     print(
-        f"RSS 収集完了: 採用 {len(result['added'])} 件 / "
-        f"重複スキップ {result['skipped_dup']} 件 / "
-        f"閾値スキップ {result['skipped_score']} 件"
+        f"RSS+Gemini 収集完了: 採用 {len(result['added'])} 件 / "
+        f"重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "
+        f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / schema違反 {skipped_validate}"
     )
     return result
 

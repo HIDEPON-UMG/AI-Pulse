@@ -158,6 +158,40 @@ class TestSchemaContract(unittest.TestCase):
         self.assertEqual(len(ok["summary_points"]), 3)
         self.assertTrue(ok["karte_updated"])
 
+    def test_source_url_blocks_xss_payloads(self):
+        """source_url に JS リテラル / HTML 属性を破壊する文字を含めると ingest 時に弾く。
+
+        なぜ重要か: index.html.j2 が onclick 内で source_url を JS 文字列リテラルに埋める設計で、
+        Jinja autoescape は HTML エンティティしかエスケープせず JS の single quote `'` は素通り。
+        ingest 時点で illegal state を表現できないようにすることで、SSG 後の DOM XSS を封じる。
+        publisher 側が悪意ある URL（gnewsdecoder の resolve 経由で `'`+JS payload）を返した場合の
+        防衛線。class of bugs を 1 ルールで構造的に塞ぐ（feedback_check_design_principles §1）。
+        """
+        base = {"event_id": "x", "entity_id": "claude-opus", "date": "2026-06-02",
+                "category": "model", "event_type": "release", "headline": "h", "summary": "s",
+                "score": 80, "importance": "high", "source": "x", "source_tier": "T1"}
+        ids = {"claude-opus"}
+        # JS 文字列を脱出しうる single quote を含む URL は拒否
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "source_url": "https://x.example.com/a'-alert(1)-'b"}, ids)
+        # double quote も同様（HTML 属性脱出）
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "source_url": 'https://x.example.com/a"onmouseover=alert(1)'}, ids)
+        # 改行・タブ・NUL も拒否
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "source_url": "https://x.example.com/\nalert(1)"}, ids)
+        # scheme が http(s) でないものを拒否
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "source_url": "file:///etc/passwd"}, ids)
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "source_url": "data:text/html,<script>alert(1)</script>"}, ids)
+        # hostname 欠落は拒否
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "source_url": "https:///path"}, ids)
+        # 正常な URL は通る
+        ok = schema.validate_event({**base, "source_url": "https://example.com/article/123?q=foo&p=1"}, ids)
+        self.assertTrue(ok["source_url"].startswith("https://"))
+
 
 if __name__ == "__main__":
     unittest.main()

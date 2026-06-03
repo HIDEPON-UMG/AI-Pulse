@@ -11,6 +11,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import urlparse
+
+# JS 文字列リテラル / HTML 属性 / URL 構文を破壊しうる危険文字。
+# templates/index.html.j2 が source_url を JS の onclick 文字列に埋め込むため、
+# ' を含む URL を許すと DOM XSS の経路になる（Jinja autoescape は JS 文字列のクオートをエスケープしない）。
+# → ingest 時点で illegal state を表現できないようにする（feedback_check_design_principles §1）
+_URL_FORBIDDEN_CHARS = frozenset("'\"<>\n\r\t\x00\\`")
 
 # --- 許容値（enum 相当。ここに無い値は validate_* が弾く） ---
 CATEGORIES = {"model", "editor", "media", "agent", "infra", "policy", "physical"}  # 7 レンズ
@@ -192,8 +199,17 @@ def _validate_event_extras(d: dict, ctx: str) -> None:
     - rationale: 重要/影響/話題の3指標を「なぜそう判断したか」の根拠（3キー必須）。
     """
     su = d.get("source_url")
-    if "source_url" in d and not (isinstance(su, str) and su.startswith("http")):
-        raise SchemaError(f"{ctx}: source_url は http(s) 文字列（実値 {su!r}）")
+    if "source_url" in d:
+        if not (isinstance(su, str) and su):
+            raise SchemaError(f"{ctx}: source_url は非空文字列（実値 {su!r}）")
+        parsed = urlparse(su)
+        if parsed.scheme not in ("http", "https"):
+            raise SchemaError(f"{ctx}: source_url の scheme は http(s) 必須（実値 {su!r}）")
+        if not parsed.netloc:
+            raise SchemaError(f"{ctx}: source_url に hostname がない（実値 {su!r}）")
+        bad = [c for c in su if c in _URL_FORBIDDEN_CHARS]
+        if bad:
+            raise SchemaError(f"{ctx}: source_url に危険文字 {bad!r}（実値 {su!r}）")
     if "karte_updated" in d and not isinstance(d["karte_updated"], bool):
         raise SchemaError(f"{ctx}: karte_updated は bool（実値 {d['karte_updated']!r}）")
     pts = d.get("summary_points")
@@ -210,6 +226,40 @@ def _validate_event_extras(d: dict, ctx: str) -> None:
                    if not (isinstance(rat.get(k), str) and rat.get(k))]
         if missing:
             raise SchemaError(f"{ctx}: rationale に重要/影響/話題の根拠欠落 {missing}")
+
+
+def gemini_response_schema() -> dict:
+    """Gemini API の response_schema (JSON mode) に渡す dict を返す。
+
+    _validate_event_extras と整合する形状（summary 20-200 / summary_points 3-5 件 / rationale 3 軸）
+    を Gemini 側にも強制し、Python 側のリトライ回数を減らす。enum は EVENT_TYPES / IMPORTANCE と一致。
+    schema 違反の単一ソースを本モジュールに集約する目的で、llm_gemini.py はここから import する。
+    """
+    return {
+        "type": "object",
+        "required": ["summary", "summary_points", "rationale", "score", "importance", "event_type"],
+        "properties": {
+            "summary": {"type": "string", "minLength": 20, "maxLength": 200},
+            "summary_points": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 5,
+                "items": {"type": "string", "minLength": 5},
+            },
+            "rationale": {
+                "type": "object",
+                "required": ["importance", "impact", "buzz"],
+                "properties": {
+                    "importance": {"type": "string"},
+                    "impact": {"type": "string"},
+                    "buzz": {"type": "string"},
+                },
+            },
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "importance": {"type": "string", "enum": sorted(IMPORTANCE)},
+            "event_type": {"type": "string", "enum": sorted(EVENT_TYPES)},
+        },
+    }
 
 
 def validate_event(d: dict, known_entity_ids: set) -> dict:

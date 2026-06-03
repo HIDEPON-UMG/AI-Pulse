@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Pulse 収集パイプライン再設計 — 仕様書 (2026-06-03)</title>
+  <style>
+    /* ============================================================
+       Claude.ai 公式トンマナ (warm cream + Claude Orange)
+       - この仕様書自体の見た目。AI-Pulse 本番サイト (Dark + Cyan) とは
+         意図的に別物。本番サイトの DESIGN.md は site/static/theme.css。
+       - 色直書き禁止: CSS 変数のみを参照。
+       - 同期元: ~/.claude/templates/DESIGN.md
+       ============================================================ */
+    :root {
+      --color-primary: #141413;
+      --color-secondary: #6A6A6A;
+      --color-tertiary: #CC785C;
+      --color-tertiary-hover: #B86A50;
+      --color-neutral: #F8F6F3;
+      --color-surface: #FFFFFF;
+      --color-border: #E8E6E3;
+      --color-on-tertiary: #FFFFFF;
+      --color-on-primary: #FAF9F5;
+      --color-accent-blue: #A8C5E6;
+      --color-accent-teal: #9DD4C7;
+      --color-accent-beige: #F4E4C1;
+      --color-success: #3D7E60;
+      --color-warning: #B7773D;
+      --color-error: #B83A2D;
+      --font-serif: Copernicus, 'Source Serif 4', Georgia, serif;
+      --font-sans: 'Styrene B', Söhne, Inter, system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+      --rounded-sm: 6px;
+      --rounded-md: 10px;
+      --rounded-lg: 16px;
+      --rounded-full: 9999px;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+      --space-3xl: 64px;
+      --shadow-sm: 0 1px 2px rgba(20, 20, 19, 0.04);
+      --shadow-md: 0 4px 12px rgba(20, 20, 19, 0.06);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--color-neutral);
+      color: var(--color-primary);
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 64rem; margin: 0 auto; padding: var(--space-2xl) var(--space-lg) var(--space-3xl); }
+
+    .spec-header { padding-bottom: var(--space-xl); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-xl); }
+    .spec-eyebrow { color: var(--color-secondary); font-size: 0.75rem; letter-spacing: 0.02em; font-weight: 500; text-transform: uppercase; }
+    h1 { font-family: var(--font-serif); font-size: 3rem; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; margin: var(--space-md) 0 var(--space-sm); }
+    h2 { font-family: var(--font-serif); font-size: 2rem; font-weight: 500; line-height: 1.2; letter-spacing: -0.015em; margin: 0 0 var(--space-md); }
+    h3 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 500; line-height: 1.3; margin: var(--space-xl) 0 var(--space-sm); }
+    h4 { font-family: var(--font-sans); font-size: 1.0625rem; font-weight: 600; margin: var(--space-lg) 0 var(--space-sm); }
+    .lead { color: var(--color-secondary); font-size: 1.125rem; line-height: 1.6; margin: var(--space-sm) 0 var(--space-md); }
+
+    p { margin: 0 0 var(--space-md); }
+    a { color: var(--color-tertiary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul, ol { padding-left: var(--space-lg); margin: 0 0 var(--space-md); }
+    li { margin: var(--space-xs) 0; }
+
+    .tabs { display: flex; gap: var(--space-xs); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-xl); overflow-x: auto; }
+    .tab { background: none; border: none; padding: var(--space-sm) var(--space-md); font-family: var(--font-sans); font-size: 0.875rem; color: var(--color-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+    .tab:hover { color: var(--color-primary); }
+    .tab.active { color: var(--color-primary); border-bottom-color: var(--color-tertiary); font-weight: 500; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fade 160ms ease-out; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-lg); }
+    .card-muted { background: var(--color-neutral); border-radius: var(--rounded-lg); padding: var(--space-lg); }
+
+    .badge { display: inline-block; background: var(--color-accent-beige); color: var(--color-primary); border-radius: var(--rounded-full); padding: 4px 12px; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.02em; }
+    .badge-success { background: var(--color-success); color: var(--color-on-primary); }
+    .badge-warning { background: var(--color-warning); color: var(--color-on-primary); }
+    .badge-error { background: var(--color-error); color: var(--color-on-primary); }
+    .badge-info { background: var(--color-accent-blue); color: var(--color-primary); }
+
+    table { width: 100%; border-collapse: collapse; margin: var(--space-md) 0; font-size: 0.9375rem; }
+    th, td { text-align: left; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    th { font-weight: 500; color: var(--color-secondary); font-size: 0.75rem; letter-spacing: 0.02em; text-transform: uppercase; }
+
+    code { font-family: var(--font-mono); font-size: 0.875rem; background: var(--color-neutral); padding: 2px 6px; border-radius: var(--rounded-sm); border: 1px solid var(--color-border); }
+    pre { background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--rounded-md); padding: var(--space-md); overflow-x: auto; font-family: var(--font-mono); font-size: 0.875rem; line-height: 1.5; margin: var(--space-md) 0; }
+    pre code { background: none; padding: 0; border: 0; color: inherit; }
+
+    .btn { display: inline-flex; align-items: center; gap: var(--space-sm); padding: 10px 18px; border-radius: var(--rounded-md); border: 0; font-family: var(--font-sans); font-size: 0.9375rem; font-weight: 500; cursor: pointer; transition: background 120ms; }
+    .btn-accent { background: var(--color-tertiary); color: var(--color-on-tertiary); }
+    .btn-accent:hover { background: var(--color-tertiary-hover); }
+
+    .playground { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-lg); margin: var(--space-md) 0; }
+    .playground-control { display: flex; align-items: center; gap: var(--space-md); margin: var(--space-md) 0; }
+    .playground-control label { min-width: 240px; font-size: 0.875rem; color: var(--color-secondary); }
+    .playground-control input[type="range"] { flex: 1; accent-color: var(--color-tertiary); }
+    .playground-control output { min-width: 96px; font-family: var(--font-mono); font-size: 0.875rem; text-align: right; }
+    .playground-hint { color: var(--color-secondary); font-size: 0.8125rem; margin-top: var(--space-sm); }
+    .playground-derived { background: var(--color-neutral); border-radius: var(--rounded-md); padding: var(--space-md); margin-top: var(--space-md); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--color-secondary); }
+
+    .timeline { display: flex; gap: var(--space-md); margin: var(--space-lg) 0; flex-wrap: wrap; }
+    .timeline-step { flex: 1 1 180px; background: var(--color-accent-beige); border-radius: var(--rounded-md); padding: var(--space-md); }
+    .timeline-step strong { display: block; font-family: var(--font-serif); font-size: 1.25rem; margin-bottom: var(--space-xs); }
+    .timeline-step.guide { background: var(--color-accent-teal); }
+
+    .severity-info { border-left: 3px solid var(--color-accent-blue); padding-left: var(--space-md); margin: var(--space-md) 0; }
+    .severity-warn { border-left: 3px solid var(--color-warning); padding-left: var(--space-md); margin: var(--space-md) 0; }
+    .severity-error { border-left: 3px solid var(--color-error); padding-left: var(--space-md); margin: var(--space-md) 0; }
+
+    .svg-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-lg); margin: var(--space-md) 0; }
+
+    .kv-grid { display: grid; grid-template-columns: 200px 1fr; gap: var(--space-sm) var(--space-md); margin: var(--space-md) 0; font-size: 0.9375rem; }
+    .kv-grid dt { color: var(--color-secondary); font-weight: 500; }
+    .kv-grid dd { margin: 0; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 2.25rem; }
+      .container { padding: var(--space-xl) var(--space-md); }
+      .playground-control { flex-wrap: wrap; }
+      .playground-control label { min-width: 100%; }
+      .kv-grid { grid-template-columns: 1fr; }
+    }
+    @media print {
+      .tabs { display: none; }
+      .tab-panel { display: block !important; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="spec-header">
+      <div class="spec-eyebrow">SPEC · <span id="spec-date">2026-06-03</span></div>
+      <h1>AI-Pulse 収集パイプライン再設計</h1>
+      <p class="lead">Google News RSS + trafilatura で本文を取得し、Gemini API Free Tier で日本語要約と rationale を生成する。<code>claude -p</code> 課金化に備えた次世代パイプライン。</p>
+      <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-md); flex-wrap: wrap;">
+        <span class="badge">draft</span>
+        <span class="badge badge-info">設計のみ</span>
+        <span class="badge">実装 = 次セッション</span>
+        <span class="badge">Task Scheduler 切替 = さらに別セッション</span>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="overview">概要</button>
+      <button class="tab" data-tab="dataflow">データフロー</button>
+      <button class="tab" data-tab="gemini">Gemini 接続</button>
+      <button class="tab" data-tab="impl">実装ステップ</button>
+      <button class="tab" data-tab="playground">パラメータ</button>
+    </nav>
+
+    <!-- ===================== 概要 ===================== -->
+    <section id="overview" class="tab-panel active">
+      <h2>概要</h2>
+      <p>現状の <code>tools/collect_rss.py</code> は Google News RSS から 95 件/日を取り込むが、<code>summary_points</code> と <code>rationale</code> が空のまま生成されており、UI 上の情報密度が手製 25 件と大差している。直近セッションの応急処置 (HTML エンティティ unescape・出典名 suffix 除去・<code>_auto_rationale</code> 自動生成・<code>source_url = item["link"]</code> 変更) では本質的な品質問題が解消しない。</p>
+      <p>別案として設計済みの「速報ジョブ (<code>claude -p</code> WebSearch)」が <code>prompts/breaking_websearch.md</code> + <code>tools/research_websearch.py</code> に残るが、<strong><code>claude -p</code> / <code>claude --print</code> は将来 Anthropic 課金扱いに変わる前提</strong>のため除外する。News-Grasp の同経路 (<code>news-grasp-runner.ps1</code> → <code>claude --print</code>) も同じ理由で参考にしない (非 LLM 部品の流用のみ可)。</p>
+
+      <div class="severity-info">
+        <strong>確定方針</strong>
+        <p>Google News RSS 継続 (<code>collect_rss.py</code> 流用) + <strong>trafilatura</strong> で本文取得 + <strong>Gemini API Free Tier</strong> (15 RPM / 1500 RPD) で日本語要約・rationale 生成。Gemini 2.5 Flash の Free 枠は 95 件/日で 6% 消費。<strong>課金カード登録なし</strong>で運用可能。</p>
+      </div>
+
+      <h3>確定方針 8 件 (ユーザー回答)</h3>
+      <table>
+        <thead><tr><th>#</th><th>論点</th><th>確定値</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>収集主軸</td><td>Google News RSS 継続 (<code>collect_rss.py</code> を流用)</td></tr>
+          <tr><td>2</td><td>本文取得</td><td>trafilatura ライブラリ (Apache2.0)</td></tr>
+          <tr><td>3</td><td>LLM 経路</td><td>Gemini API Free Tier (<code>google-genai</code> SDK + <code>response_schema</code> JSON mode)</td></tr>
+          <tr><td>4</td><td>既存 RSS 95 件</td><td>全削除して新方式で再生成 (手製 25 件は保護)</td></tr>
+          <tr><td>5</td><td><code>event_id</code> 命名</td><td><code>-gemNN</code> 接尾辞 (例: <code>2026-06-03-claude-opus-gem01</code>)</td></tr>
+          <tr><td>6</td><td><code>summary</code> 言語</td><td>日本語で統一 (手製 25 件も順次日本語化)</td></tr>
+          <tr><td>7</td><td>score / importance / event_type</td><td>Gemini に任せる。Python は <code>config.SCORE_MIN</code> 閾値フィルタだけ残す</td></tr>
+          <tr><td>8</td><td>次セッションスコープ</td><td>実装 + 手動検証 (1 回実行 + 契約テスト + E2E) まで。Task Scheduler 切替は更に別セッション</td></tr>
+        </tbody>
+      </table>
+
+      <h3>除外された案 (なぜ採用しないか)</h3>
+      <table>
+        <thead><tr><th>案</th><th>除外理由</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>速報ジョブ復活 (<code>claude -p</code> WebSearch)</td>
+            <td>設計・契約テスト済だが <code>claude -p</code> 自体が将来 Anthropic 課金扱いになるため。News-Grasp も同経路で同じ理由。</td>
+          </tr>
+          <tr>
+            <td>anthropic SDK 直呼び (Haiku 4.5 で要約)</td>
+            <td>$0.2/日 = $6/月 と安価だが、Capstone (MCP 採用で API 課金回避) と整合しない。</td>
+          </tr>
+          <tr>
+            <td>NotebookLM へ統一</td>
+            <td>fast モード 1〜3 分/件 × 95 = 数時間。速報には不向きと <code>handoff_2026-06-03_articles_expansion.md</code> でも明記。</td>
+          </tr>
+          <tr>
+            <td>現状維持 + 手製優先表示</td>
+            <td>低品質 RSS が残る = 根本見直しになっていない。</td>
+          </tr>
+          <tr>
+            <td>LLM 完全不使用 (rule-based)</td>
+            <td>trafilatura で本文抽出して先頭 200 字を summary に使う案。事実抽出に限定され手製 25 件の品質に及ばない。</td>
+          </tr>
+          <tr>
+            <td>Ollama ローカル LLM (RTX 5080)</td>
+            <td>課金完全ゼロだが、レート制限なし・品質安定性で Gemini Flash に劣り、運用負荷も増える。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>前提・制約</h3>
+      <ul>
+        <li>Gemini Free Tier の制限: 15 RPM / 1500 RPD / 250k TPM。95 件/日は RPD の 6.3% で余裕。</li>
+        <li>API キーは <code>.env</code> に保管 (git ignore 済)、<code>python-dotenv</code> で <code>llm_gemini.py</code> が読み込む。Task Scheduler 経由でも cwd 配下の <code>.env</code> を拾える。</li>
+        <li>Gemini 2.5 Flash は Free Tier で課金カード登録不要。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で取得。</li>
+        <li>Google News RSS の <code>&lt;link&gt;</code> は <code>https://news.google.com/rss/articles/CBM...?oc=5</code> 形式。urllib HTTPRedirectHandler で publisher 直リンクへ解決を試みる (302 で解決できる場合と 200+JS の場合がある — 実装前に調査)。</li>
+        <li>本文取得失敗 (text &lt; 200 字 / タイムアウト) は当該記事ドロップ。RSS description でのフォールバックは品質優先で<strong>しない</strong>。</li>
+        <li>既存 38 契約テスト PASS が基準。新規 5 件を追加して 43 PASS が次セッションの基準。</li>
+      </ul>
+    </section>
+
+    <!-- ===================== データフロー ===================== -->
+    <section id="dataflow" class="tab-panel">
+      <h2>データフロー (per entity loop)</h2>
+      <p>各エンティティ (21 件) ごとに以下の 7 ステップを走らせる。所要時間は全 21 エンティティで 13〜15 分 (Gemini レート制御込み)。</p>
+
+      <div class="svg-wrap">
+        <svg viewBox="0 0 920 540" role="img" aria-label="収集パイプラインのデータフロー図" style="width: 100%; height: auto;">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M 0 0 L 9 3 L 0 6 Z" fill="#6A6A6A"/>
+            </marker>
+            <marker id="arrow-warn" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M 0 0 L 9 3 L 0 6 Z" fill="#B7773D"/>
+            </marker>
+          </defs>
+
+          <!-- Step 1: RSS fetch -->
+          <rect x="20" y="20" width="220" height="64" rx="10" fill="#A8C5E6"/>
+          <text x="130" y="48" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#141413">[1] RSS fetch</text>
+          <text x="130" y="68" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#141413">collect_rss._fetch_rss</text>
+
+          <!-- Arrow 1 -> 2 -->
+          <path d="M 130 84 L 130 130" stroke="#6A6A6A" stroke-width="2" marker-end="url(#arrow)"/>
+          <text x="140" y="110" font-family="JetBrains Mono, monospace" font-size="10" fill="#6A6A6A">{title, link(GNews), source_name, description, date}</text>
+
+          <!-- Step 2: redirect resolve -->
+          <rect x="20" y="135" width="220" height="64" rx="10" fill="#9DD4C7"/>
+          <text x="130" y="163" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#141413">[2] redirect resolve</text>
+          <text x="130" y="183" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#141413">fetch_article.resolve</text>
+
+          <!-- Arrow 2 -> 3 -->
+          <path d="M 130 199 L 130 245" stroke="#6A6A6A" stroke-width="2" marker-end="url(#arrow)"/>
+          <text x="140" y="225" font-family="JetBrains Mono, monospace" font-size="10" fill="#6A6A6A">publisher_url (302 を 5 hops まで追跡)</text>
+
+          <!-- Step 3: trafilatura -->
+          <rect x="20" y="250" width="220" height="64" rx="10" fill="#9DD4C7"/>
+          <text x="130" y="278" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#141413">[3] trafilatura extract</text>
+          <text x="130" y="298" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#141413">fetch_article.extract</text>
+
+          <!-- Arrow 3 -> 4 -->
+          <path d="M 130 314 L 130 360" stroke="#6A6A6A" stroke-width="2" marker-end="url(#arrow)"/>
+          <text x="140" y="340" font-family="JetBrains Mono, monospace" font-size="10" fill="#6A6A6A">{text, publisher_url, publisher_name, og_image}</text>
+
+          <!-- Step 4: Gemini -->
+          <rect x="20" y="365" width="220" height="80" rx="10" fill="#F4E4C1"/>
+          <text x="130" y="393" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#141413">[4] Gemini summarize</text>
+          <text x="130" y="412" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#141413">llm_gemini.generate_event_extras</text>
+          <text x="130" y="430" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#B7773D">12 RPM, JSON schema 強制</text>
+
+          <!-- Arrow 4 -> 5 -->
+          <path d="M 240 405 L 350 405" stroke="#6A6A6A" stroke-width="2" marker-end="url(#arrow)"/>
+          <text x="295" y="395" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#6A6A6A">L2 dict</text>
+
+          <!-- Step 5: assemble -->
+          <rect x="350" y="365" width="240" height="80" rx="10" fill="#F4E4C1"/>
+          <text x="470" y="393" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#141413">[5] 候補組立 + 先行検証</text>
+          <text x="470" y="412" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#141413">collect_rss._make_event</text>
+          <text x="470" y="430" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#141413">_validate_event_extras 通過必須</text>
+
+          <!-- Arrow 5 -> 6 -->
+          <path d="M 590 405 L 700 405" stroke="#6A6A6A" stroke-width="2" marker-end="url(#arrow)"/>
+          <text x="645" y="395" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#6A6A6A">候補配列</text>
+
+          <!-- Step 6: ingest -->
+          <rect x="700" y="365" width="200" height="80" rx="10" fill="#CC785C"/>
+          <text x="800" y="393" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#FFFFFF">[6] store.ingest_events</text>
+          <text x="800" y="412" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#FFFFFF">閾値 + 重複排除 + 永続化</text>
+          <text x="800" y="430" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#FFFFFF">events.jsonl</text>
+
+          <!-- Arrow 6 -> 7 (downward) -->
+          <path d="M 800 445 L 800 480" stroke="#6A6A6A" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <!-- Step 7: downstream -->
+          <rect x="660" y="485" width="240" height="40" rx="10" fill="#A8C5E6"/>
+          <text x="780" y="510" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="#141413">[7] backfill_thumb → generate_pages (不変)</text>
+
+          <!-- Drop paths (warn) -->
+          <path d="M 240 280 L 290 280 L 290 410 L 350 410" stroke="#B7773D" stroke-width="1.5" stroke-dasharray="4,3" fill="none"/>
+          <text x="295" y="270" font-family="Inter, sans-serif" font-size="10" fill="#B7773D">text&lt;200 → drop</text>
+
+          <path d="M 240 410 L 290 410" stroke="#B7773D" stroke-width="0" fill="none"/>
+          <text x="245" y="450" font-family="Inter, sans-serif" font-size="10" fill="#B7773D">429/5xx → backoff x2 → drop</text>
+          <text x="245" y="465" font-family="Inter, sans-serif" font-size="10" fill="#B7773D">JSON 違反 → retry x1 → drop</text>
+        </svg>
+      </div>
+
+      <h3>各ステップの入出力と失敗時挙動</h3>
+      <table>
+        <thead>
+          <tr><th>#</th><th>処理</th><th>入力</th><th>出力</th><th>失敗時</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>collect_rss._fetch_rss</code></td>
+            <td>entity name + vendor</td>
+            <td>RSS item 最大 5 件 (title, link, source_name, description, date)</td>
+            <td>空配列を返し当該 entity スキップ (現状維持)</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>fetch_article.resolve</code></td>
+            <td>Google News redirect URL</td>
+            <td>publisher 直リンク</td>
+            <td>HEAD 302 で解決不可なら RSS item の <code>&lt;source url&gt;</code> 属性へフォールバック</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>fetch_article.extract</code></td>
+            <td>publisher URL</td>
+            <td>{text, lang, publisher_name, og_image} 本文 200〜3000 字</td>
+            <td>text &lt; 200 字 / 例外 → 当該記事ドロップ (<code>skipped_extract</code>)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>llm_gemini.generate_event_extras</code></td>
+            <td>{title, text, entity_name, category, vendor, positioning}</td>
+            <td>{summary, summary_points[3-5], rationale{...}, score, importance, event_type}</td>
+            <td>429/5xx → 指数バックオフ 2 回 / schema 違反 → 再投げ 1 回 / なお失敗 → ドロップ</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>collect_rss._make_event</code></td>
+            <td>(1) + (4) を組立</td>
+            <td>L2 dict (EVENT_REQUIRED + extras 完備)</td>
+            <td><code>_validate_event_extras</code> 違反は ingest 前に弾く (ingest 例外で全件ロールバック防止)</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>store.ingest_events</code></td>
+            <td>候補配列</td>
+            <td>{added, skipped_dup, skipped_score}</td>
+            <td>既存挙動のまま (SCORE_MIN 閾値・重複排除)</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>backfill_thumb</code> + <code>generate_pages</code></td>
+            <td>events.jsonl</td>
+            <td>site/ 配下の HTML / PWA</td>
+            <td>不変 (今回の改造対象外)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="severity-warn">
+        <strong><code>source_url</code> の意味的変化</strong>
+        <p>現状は item["link"] = Google News redirect URL を <code>source_url</code> に入れているが、新方式では <strong>publisher 直リンク</strong>に切り替わる。UI クリックの飛び先が出典直接になり、OGP 取得 (<code>backfill_thumb</code>) の成功率も上がる。</p>
+      </div>
+    </section>
+
+    <!-- ===================== Gemini 接続 ===================== -->
+    <section id="gemini" class="tab-panel">
+      <h2>Gemini 接続</h2>
+
+      <h3>SDK と API キー保管</h3>
+      <dl class="kv-grid">
+        <dt>SDK</dt>
+        <dd><code>google-genai &gt;= 1.0</code> (<code>google-generativeai</code> は legacy で 2025 後半に EOL 予定)</dd>
+        <dt>モデル</dt>
+        <dd><code>gemini-2.5-flash</code></dd>
+        <dt>API キー取得</dt>
+        <dd>ユーザーが <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で生成。<strong>課金カード登録不要</strong>。次セッション着手前に取得</dd>
+        <dt>保管場所</dt>
+        <dd><code>AI-Pulse/.env</code> に <code>GEMINI_API_KEY=...</code>。<code>.gitignore</code> に <code>.env</code> 追加済を確認</dd>
+        <dt>読込</dt>
+        <dd><code>python-dotenv</code> で <code>llm_gemini.py</code> 冒頭で <code>load_dotenv()</code>。Task Scheduler 経由でも cwd 配下を拾える</dd>
+        <dt>Credential Manager</dt>
+        <dd>不採用 (Windows-only で運用上の可搬性が落ちる)</dd>
+      </dl>
+
+      <h3>プロンプト構造</h3>
+      <h4>system_instruction</h4>
+      <pre><code>あなたは AI-Pulse の編集者。記事本文を読み、日本語で要約と判断理由を生成する。
+出力は schema 厳守の JSON。本文に書かれていない事実は推測・捏造しない。
+score / importance / event_type は本文と entity context から客観的に判定する。</code></pre>
+
+      <h4>user (テンプレ)</h4>
+      <pre><code>[title] {title}
+[publisher_text] {publisher_text (本文 200-3000 字)}
+[entity_context]
+  name: {entity_name}
+  category: {category} ({lens})
+  vendor: {vendor}
+  positioning: {entity.positioning}
+
+出力規約:
+  - summary: 日本語 80-120 字、見出しと重複しない要点
+  - summary_points: 日本語箇条書き 3-5 件、各 20-50 字
+  - rationale: {importance, impact, buzz} の 3 軸、各 40-80 字
+  - score: 0-100 整数 (news 性)
+  - importance: high / mid / low
+  - event_type: release / funding / pricing / ma / shutdown / incident / benchmark / regulation のいずれか</code></pre>
+
+      <h3>response_schema (JSON mode に渡す)</h3>
+      <p>下記は <code>tools/schema.py</code> の <code>_validate_event_extras</code> と完全一致させる。schema 定義を <code>schema.py</code> に export して <code>llm_gemini.py</code> で再利用する。</p>
+      <pre><code>{
+  "type": "object",
+  "required": ["summary", "summary_points", "rationale", "score", "importance", "event_type"],
+  "properties": {
+    "summary": {"type": "string", "minLength": 20, "maxLength": 200},
+    "summary_points": {
+      "type": "array", "minItems": 3, "maxItems": 5,
+      "items": {"type": "string", "minLength": 5}
+    },
+    "rationale": {
+      "type": "object",
+      "required": ["importance", "impact", "buzz"],
+      "properties": {
+        "importance": {"type": "string"},
+        "impact": {"type": "string"},
+        "buzz": {"type": "string"}
+      }
+    },
+    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "importance": {"type": "string", "enum": ["high", "mid", "low"]},
+    "event_type": {
+      "type": "string",
+      "enum": ["release","funding","pricing","ma","shutdown","incident","benchmark","regulation"]
+    }
+  }
+}</code></pre>
+
+      <h3>レート制御</h3>
+      <table>
+        <thead><tr><th>制約</th><th>Free Tier 上限</th><th>本パイプラインの使用量</th><th>余裕</th></tr></thead>
+        <tbody>
+          <tr><td>RPM (Requests Per Minute)</td><td>15</td><td>12 (config.GEMINI_RPM)</td><td>20%</td></tr>
+          <tr><td>RPD (Requests Per Day)</td><td>1,500</td><td>約 95</td><td>93.7%</td></tr>
+          <tr><td>TPM (Tokens Per Minute)</td><td>250,000</td><td>42,000 (入力 3,500 tok × 12 req)</td><td>83.2%</td></tr>
+        </tbody>
+      </table>
+      <p>実装は <code>rate_limiter.TokenBucket(rate=12/60)</code> で <code>acquire()</code> ブロック。<code>time.monotonic()</code> ベース。95 件 = 95 req → 1 req/5s → 約 8 分 + trafilatura 5 分 = 合計 13〜15 分。</p>
+
+      <h3>失敗時の挙動</h3>
+      <table>
+        <thead><tr><th>失敗パターン</th><th>挙動</th></tr></thead>
+        <tbody>
+          <tr><td>429 (rate exceeded)</td><td>指数バックオフ 5s → 15s → 45s、3 回目で諦めて当該記事ドロップ</td></tr>
+          <tr><td>5xx (server error)</td><td>同上</td></tr>
+          <tr><td>JSON schema 違反</td><td>「差分を厳密 JSON で出し直して」の 1 回再投げ。2 回連続失敗で当該記事ドロップ</td></tr>
+          <tr><td>本文取得失敗 (trafilatura 短文・タイムアウト)</td><td>当該記事ドロップ。RSS description でのフォールバックは<strong>しない</strong> (品質優先)</td></tr>
+          <tr><td>API キー無効・SDK エラー</td><td>全体停止、<code>run_daily.py</code> を非ゼロ終了で Task Scheduler ログに記録</td></tr>
+        </tbody>
+      </table>
+
+      <h3>コスト・トークン見積</h3>
+      <ul>
+        <li>入力トークン: 本文 2000 字 ≒ 3000 tok + system/instruction 500 tok → 約 3500 tok/req × 95 ≒ 333k tok/日</li>
+        <li>出力トークン: summary + 4 points + rationale 3 軸 ≒ 350 tok × 95 ≒ 33k tok/日</li>
+        <li>所要時間: Gemini 12 RPM で約 8 分 + trafilatura 平均 3 秒 × 95 ≒ 5 分 = 合計 13〜15 分</li>
+        <li><strong>Free Tier 内で完結</strong>。RPM/RPD/TPM すべて余裕。クレジットカード登録不要</li>
+      </ul>
+    </section>
+
+    <!-- ===================== 実装ステップ ===================== -->
+    <section id="impl" class="tab-panel">
+      <h2>実装ステップ</h2>
+
+      <div class="timeline">
+        <div class="timeline-step"><strong>1.</strong>依存追加 (pyproject) + .env テンプレ + .gitignore 更新</div>
+        <div class="timeline-step"><strong>2.</strong>fetch_article.py / rate_limiter.py / llm_gemini.py 実装</div>
+        <div class="timeline-step"><strong>3.</strong>schema.py の response_schema export + collect_rss.py 2 段化</div>
+        <div class="timeline-step"><strong>4.</strong>契約テスト 5 件追加 (38 → 43)</div>
+        <div class="timeline-step guide"><strong>5.</strong>purge_rss_events.py で 95 件削除 (backup あり)</div>
+        <div class="timeline-step guide"><strong>6.</strong>run_daily.py 1 回手動実行 + E2E 確認</div>
+      </div>
+
+      <h3>新規ファイル</h3>
+      <table>
+        <thead><tr><th>パス</th><th>役割</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>tools/llm_gemini.py</code></td>
+            <td>Gemini API 薄ラッパ。<code>generate_event_extras(article_text, meta) -&gt; dict</code> を公開。<code>google-genai</code> SDK + <code>response_mime_type="application/json"</code> + <code>response_schema</code> で JSON 強制。schema 違反時 1 回リトライ、429/5xx は指数バックオフ 2 回、なお失敗は当該記事ドロップ</td>
+          </tr>
+          <tr>
+            <td><code>tools/fetch_article.py</code></td>
+            <td>Google News redirect URL 解決 + trafilatura 本文抽出。<code>resolve(url) -&gt; publisher_url</code> と <code>extract(url) -&gt; {text, publisher_url, publisher_name, og_image}</code>。短文 (text&lt;200 字) は例外で落として paywall / 404 を本文として食わせない</td>
+          </tr>
+          <tr>
+            <td><code>tools/rate_limiter.py</code></td>
+            <td>RPM トークンバケット。<code>time.monotonic()</code> ベース、<code>acquire()</code> でブロック。<code>config.GEMINI_RPM = 12</code> (15 RPM から 20% 余裕代) を default</td>
+          </tr>
+          <tr>
+            <td><code>prompts/gemini_summarize.md</code></td>
+            <td>Gemini 用 system_instruction + user テンプレ。捏造禁止・schema 厳守・日本語 80-120 字 summary・3-5 件 summary_points・rationale 3 軸 (各 40-80 字)</td>
+          </tr>
+          <tr>
+            <td><code>scripts/purge_rss_events.py</code></td>
+            <td>一回限り。<code>event_id</code> の suffix が <code>-rssNN</code> の 95 件削除 → <code>entities.jsonl</code> の <code>recent_events</code> 再計算 → <code>data/events.jsonl.bak-YYYYMMDD</code> / <code>entities.jsonl.bak-YYYYMMDD</code> を残す</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_llm_gemini.py</code></td>
+            <td>Gemini レイヤの契約テスト (モック使用、API キー不要)</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_fetch_article.py</code></td>
+            <td>redirect 解決 + 短文ドロップの契約テスト</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>改造ファイル</h3>
+      <table>
+        <thead><tr><th>パス</th><th>改造内容</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>tools/collect_rss.py</code></td>
+            <td><code>_fetch_rss</code> は維持。<code>_make_event</code> を 2 段化: (a) RSS dict を最低限作る → (b) <code>fetch_article.extract</code> → <code>llm_gemini.generate_event_extras</code> → 確定 dict を組立。<code>event_id</code> は <code>-gemNN</code> 接尾辞。<code>_score_and_importance</code> は Gemini に責務移管したため削除候補</td>
+          </tr>
+          <tr>
+            <td><code>tools/run_daily.py</code></td>
+            <td>Step1 (<code>collect_rss.collect_entities()</code>) の呼び出し面は不変。内部処理が新方式に置換され所要時間が 2 分 → 13-15 分。Step2 (NotebookLM fast) / Step3 (backfill_thumb) / Step4 (generate_pages) は不変</td>
+          </tr>
+          <tr>
+            <td><code>tools/config.py</code></td>
+            <td><code>GEMINI_MODEL = "gemini-2.5-flash"</code>, <code>GEMINI_RPM = 12</code>, <code>GEMINI_TIMEOUT_SEC = 30</code>, <code>ARTICLE_FETCH_TIMEOUT = 12</code>, <code>MAX_BODY_CHARS = 3000</code>, <code>MIN_BODY_CHARS = 200</code> を追加</td>
+          </tr>
+          <tr>
+            <td><code>pyproject.toml</code></td>
+            <td>dependencies に <code>google-genai&gt;=1.0</code>, <code>trafilatura&gt;=2.0</code>, <code>python-dotenv&gt;=1.0</code> 追加</td>
+          </tr>
+          <tr>
+            <td><code>.gitignore</code></td>
+            <td><code>.env</code> を ignore (Gemini API キー漏洩防止)</td>
+          </tr>
+          <tr>
+            <td><code>tools/schema.py</code></td>
+            <td><code>_validate_event_extras</code> の現行ルール (summary_points 3-5 件・rationale 3 軸) は維持。Gemini に渡す <code>response_schema</code> 定義を <code>schema.py</code> から export して <code>llm_gemini.py</code> で再利用</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>不変ファイル (今回は触らない)</h3>
+      <ul>
+        <li><code>tools/research_websearch.py</code> — <code>claude -p</code> 速報ジョブ取込口・今回は使わないが残置</li>
+        <li><code>tools/research_notebooklm.py</code> — カルテ deep 更新用・責務が違うため温存</li>
+        <li><code>tools/fetch_ogp.py</code> — urllib + html.parser の OGP 取得・<code>backfill_thumb</code> で引き続き使用</li>
+        <li><code>data/events.jsonl</code> の手製 25 件・<code>data/entities.jsonl</code> の 21 カルテ</li>
+        <li><code>templates/index.html.j2</code> (UI 側の summary_points / rationale 分岐は既に対応済)</li>
+      </ul>
+
+      <h3>契約テスト案 (新規 5 件)</h3>
+      <p>class of bug を 1 件 1 テストで封じる (個別 smoke = 最終手段ではなく、契約テスト 1 件で不変条件 locked-in)。</p>
+      <table>
+        <thead><tr><th>ファイル</th><th>テスト名</th><th>封じる class of bug</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>test_llm_gemini.py</code></td>
+            <td><code>test_schema_violation_retries_once</code></td>
+            <td>Gemini が summary_points 2 件返した → 1 回再投げ → 4 件返す → ok。再投げロジックの不変条件</td>
+          </tr>
+          <tr>
+            <td>同上</td>
+            <td><code>test_rate_limit_blocks_until_token</code></td>
+            <td>13 req 目を 5 秒以上待たせる。突発バーストで 429 を踏むのを防止</td>
+          </tr>
+          <tr>
+            <td>同上</td>
+            <td><code>test_failure_drops_candidate</code></td>
+            <td>Gemini が 3 回連続 5xx → 当該候補が None として返る (<code>ingest</code> に届かない)</td>
+          </tr>
+          <tr>
+            <td><code>test_fetch_article.py</code></td>
+            <td><code>test_redirect_resolves_to_publisher</code></td>
+            <td>モック HTTPServer で 302 → publisher URL を返す。Google News redirect を解決できなかったら ingest に Google News URL が漏れる現状再発を防ぐ</td>
+          </tr>
+          <tr>
+            <td>同上</td>
+            <td><code>test_short_body_drops</code></td>
+            <td>text &lt; 200 字 → 例外 → ドロップ。paywall / 404 ページを本文として食う事故を防ぐ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>既存 95 件削除と再生成 (次セッション開始時の手順)</h3>
+      <ol>
+        <li>backup: <code>data/events.jsonl</code> と <code>data/entities.jsonl</code> を <code>.bak-YYYYMMDD</code> 接尾辞でコピー</li>
+        <li><code>python scripts/purge_rss_events.py</code> 実行
+          <ul>
+            <li><code>event_id</code> suffix が <code>-rssNN</code> (<code>re.search(r"-rss\d+$", event_id)</code>) の 95 件削除</li>
+            <li>手製 25 件は命名規則 (<code>-opus48</code>, <code>-cursor-autoreview</code> 等) なので無傷</li>
+            <li><code>entities.jsonl</code> の 21 件すべてで <code>recent_events</code> を再計算</li>
+            <li><code>snapshot_date</code> を残存 events の <code>max(date)</code> に更新</li>
+          </ul>
+        </li>
+        <li>確認: <code>wc -l data/events.jsonl</code> で 25 行・<code>grep -c -- "-rss" data/events.jsonl</code> で 0</li>
+        <li><code>python tools/run_daily.py</code> を 1 回手動実行 → 新方式で events.jsonl に追記</li>
+        <li>結果確認: 新規 event の <code>event_id</code> に <code>-gem</code> 接尾辞・summary が日本語・summary_points と rationale が埋まっていること</li>
+      </ol>
+
+      <h3>検証手順 (次セッション着手時)</h3>
+      <ol>
+        <li><strong>依存追加と環境</strong>: <code>pip install -e .</code> で <code>google-genai</code> / <code>trafilatura</code> / <code>python-dotenv</code> を引き込む。<code>.env</code> に <code>GEMINI_API_KEY=...</code> を書き、<code>.gitignore</code> で除外確認</li>
+        <li><strong>単体</strong>: <code>python -m pytest -q</code> で 38 + 5 = 43 PASS</li>
+        <li><strong>小規模試走</strong>: 1 entity のみ実行 → 標準出力で req 数・<code>skipped_extract</code>・<code>skipped_llm</code> を確認 → <code>data/events.jsonl</code> 末尾を目視</li>
+        <li><strong>purge と再生成</strong>: <code>python scripts/purge_rss_events.py</code> → <code>python tools/run_daily.py</code> を 1 回手動実行 → 13-15 分待ち → 件数確認</li>
+        <li><strong>E2E</strong>: Chrome DevTools MCP で <code>python -m http.server 5500 --directory site --bind 127.0.0.1</code> 配信を開く → 新 event カードに日本語 summary・summary_points 箇条書き・rationale 3 軸 (展開) が出ていること・source link が publisher 直リンク (<code>https://news.google.com/</code> 始まりではない) であること・モバイル 390px でも横はみ出し 0 を確認</li>
+        <li><strong>PWA cache</strong>: アセット変更ありなので <code>static/sw.js</code> の <code>CACHE</code> を <code>aipulse-v6</code> に bump</li>
+        <li><strong>完了報告</strong>: 「pytest 43 PASS・手動実行で新 events N 件追加・E2E でモバイル/desktop 確認」を実測値付きで報告</li>
+      </ol>
+
+      <div class="severity-warn">
+        <strong>Task Scheduler 切替は本セッションでも次セッションでもやらない</strong>
+        <p>不可逆寄りの操作 (既存自動運用が停止する) のため、別セッションで明示 GO 後に <code>scripts/run_daily.bat</code> の中身を差し替える。それまで朝 7:00 の自動実行は旧 RSS 方式のまま動くが、purge 実行後は新 events が 0 件のまま積まれない期間が発生する点だけ意識する。</p>
+      </div>
+
+      <h3>実装前に Claude/ユーザーが確認すべき事項</h3>
+      <table>
+        <thead><tr><th>項目</th><th>確認方法</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>trafilatura が Google News redirect URL を解決できるか</td>
+            <td>次セッション冒頭で <code>scripts/probe_gnews_redirect.py</code> を 5-10 行で書き、3 件の実 URL を <code>urllib.request.urlopen</code> + <code>Location</code> ヘッダで追跡。302 解決できれば素直、200+JS なら RSS item の <code>&lt;source url&gt;</code> + 中間 HTML の canonical link 探索を追加</td>
+          </tr>
+          <tr>
+            <td><code>schema.py</code> の <code>event_type</code> enum 現行値</td>
+            <td>実装直前に Read して <code>EVENT_TYPES</code> (or 相当の定数) を確認。Gemini の response_schema enum と完全一致させる</td>
+          </tr>
+          <tr>
+            <td>Gemini API キーの取得</td>
+            <td>ユーザーが <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で生成しておく</td>
+          </tr>
+          <tr>
+            <td><code>google-genai</code> SDK の install 名</td>
+            <td><code>pip show google-genai</code> で正式パッケージ名を確認 (gemini-api skill ドキュメント参照)</td>
+          </tr>
+          <tr>
+            <td>手製 25 件の言語統一スコープ</td>
+            <td>本セッションの確定回答どおり次セッションでは触らない。UI 上は混在期間も summary_points / rationale が機能していれば許容</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== パラメータ ===================== -->
+    <section id="playground" class="tab-panel">
+      <h2>パラメータ</h2>
+      <p>パイプラインの主要パラメータをスライダーで触り、所要時間とトークン消費のトレードオフを見る。最後に「プロンプトとしてコピー」で次セッションへ送れる。</p>
+
+      <div class="playground">
+        <div class="playground-control">
+          <label for="param-rpm">GEMINI_RPM (12 推奨 / 15 max)</label>
+          <input type="range" id="param-rpm" min="3" max="15" value="12" step="1" data-unit=" rpm">
+          <output for="param-rpm">12 rpm</output>
+        </div>
+        <p class="playground-hint">15 で攻めると 429 を踏みやすい。12 が安全マージン 20%。</p>
+
+        <div class="playground-control">
+          <label for="param-timeout">ARTICLE_FETCH_TIMEOUT</label>
+          <input type="range" id="param-timeout" min="5" max="30" value="12" step="1" data-unit=" sec">
+          <output for="param-timeout">12 sec</output>
+        </div>
+        <p class="playground-hint">trafilatura が publisher サーバーを待つ最大秒数。長すぎると 1 件で全体が詰まる。</p>
+
+        <div class="playground-control">
+          <label for="param-max-body">MAX_BODY_CHARS</label>
+          <input type="range" id="param-max-body" min="500" max="6000" value="3000" step="500" data-unit=" chars">
+          <output for="param-max-body">3000 chars</output>
+        </div>
+        <p class="playground-hint">Gemini に渡す本文の最大文字数。長いと入力トークン増で TPM に近づく。要約品質は 2000-3000 で頭打ち。</p>
+
+        <div class="playground-control">
+          <label for="param-min-body">MIN_BODY_CHARS</label>
+          <input type="range" id="param-min-body" min="50" max="500" value="200" step="50" data-unit=" chars">
+          <output for="param-min-body">200 chars</output>
+        </div>
+        <p class="playground-hint">本文がこれより短ければドロップ。paywall / 404 ページを食わせない閾値。</p>
+
+        <div class="playground-control">
+          <label for="param-score-min">SCORE_MIN (ingest 閾値)</label>
+          <input type="range" id="param-score-min" min="0" max="100" value="50" step="5" data-unit="">
+          <output for="param-score-min">50</output>
+        </div>
+        <p class="playground-hint"><code>store.ingest_events</code> でこの score 未満は <code>skipped_score</code> として捨てる。手製は 68-85、現 RSS は 50-65。</p>
+
+        <div class="playground-derived" id="derived">所要時間: 約 8 分 (Gemini 12 RPM × 95 件) + trafilatura 5 分 = 合計 13-15 分</div>
+
+        <div style="margin-top: var(--space-lg);">
+          <button class="btn btn-accent" id="copy-prompt">プロンプトとしてコピー</button>
+        </div>
+      </div>
+
+      <div class="severity-info" style="margin-top: var(--space-xl);">
+        <strong>次セッション着手時の使い方</strong>
+        <p>このタブで決めたパラメータをコピーボタンで取得し、次セッション冒頭で「AI-Pulse の収集パイプライン再設計を実装。<code>~/.claude/plans/ai-pulse-wise-tide.md</code> と <code>docs/specs/2026-06-03_collection-pipeline-redesign.html</code> を読んで、以下パラメータで進めて」と貼り付ける。Claude が <code>tools/config.py</code> に反映する。</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === target));
+      });
+    });
+
+    document.querySelectorAll('.playground-control input[type="range"]').forEach(r => {
+      const out = document.querySelector(`output[for="${r.id}"]`);
+      const unit = r.dataset.unit || '';
+      r.addEventListener('input', () => {
+        if (out) out.textContent = r.value + unit;
+        recomputeDerived();
+      });
+    });
+
+    function recomputeDerived() {
+      const rpm = parseInt(document.getElementById('param-rpm').value, 10);
+      const timeout = parseInt(document.getElementById('param-timeout').value, 10);
+      const events = 95;
+      const geminiMin = (events / rpm).toFixed(1);
+      const trafilaturaMin = ((events * (timeout / 4)) / 60).toFixed(1);
+      const total = (parseFloat(geminiMin) + parseFloat(trafilaturaMin)).toFixed(1);
+      document.getElementById('derived').textContent =
+        `所要時間: 約 ${geminiMin} 分 (Gemini ${rpm} RPM × ${events} 件) + trafilatura 約 ${trafilaturaMin} 分 = 合計 約 ${total} 分`;
+    }
+    recomputeDerived();
+
+    const copyBtn = document.getElementById('copy-prompt');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const values = Array.from(document.querySelectorAll('.playground-control')).map(c => {
+          const label = c.querySelector('label')?.textContent?.trim() || '';
+          const range = c.querySelector('input[type="range"]');
+          const unit = range?.dataset.unit || '';
+          return `  - ${label}: ${range.value}${unit}`;
+        }).join('\n');
+        const prompt = `AI-Pulse の収集パイプライン再設計を実装。\n~/.claude/plans/ai-pulse-wise-tide.md と AI-Pulse/docs/specs/2026-06-03_collection-pipeline-redesign.html を読んでから着手。\n以下パラメータで tools/config.py を設定:\n\n${values}`;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = 'コピーしました';
+          setTimeout(() => copyBtn.textContent = orig, 1500);
+        } catch (e) {
+          alert('クリップボードに書き込めませんでした。\n\n' + prompt);
+        }
+      });
+    }
+
+    const dateEl = document.getElementById('spec-date');
+    if (dateEl) dateEl.textContent = '2026-06-03';
+  </script>
+</body>
+</html>

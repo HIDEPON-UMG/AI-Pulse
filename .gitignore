@@ -8,3 +8,5 @@ docs/specs/_verify_*.png
 .e2e/
 site/
 scripts/
+.env
+data/*.bak-*

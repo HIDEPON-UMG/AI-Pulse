@@ -97,10 +97,45 @@ def _rel_label(ref: dt.date, d: dt.date) -> str:
     return "本日" if days <= 0 else f"{days}日前"
 
 
+def _clean_summary(summary: str, headline: str) -> str:
+    """RSS OGP 由来の要約を整形して返す。
+    HTMLエンティティをデコード後、  出典名サフィックスを除去。
+    headline と実質同一なら空文字を返す。"""
+    import html as _html
+    if not summary:
+        return ""
+    # &nbsp; 等の HTML エンティティを Unicode に正規化（&nbsp; →  ）
+    s = _html.unescape(summary.strip())
+    # "タイトル  出典名" 形式の出典名サフィックスを除去
+    core = re.sub(r" .*$", "", s).strip()
+    if not core:
+        return ""
+    # core が headline と完全一致なら要約として価値なし
+    if core.strip().lower() == headline.strip().lower():
+        return ""
+    return core
+
+
+def _auto_rationale(ev: dict) -> dict:
+    """rationale が無い RSS イベント向けにスコア・重要度・波及から簡易根拠テキストを生成する。"""
+    imp = _level(ev.get("importance", "low"))
+    n_ripple = len(ev.get("ripple") or [])
+    imp_label = {"高": "high", "中": "mid", "低": "low"}.get(imp, "low")
+    return {
+        "importance": f"スコア{ev['score']}・{imp}水準の報道（{ev.get('source','不明')}）",
+        "impact": f"波及先{n_ripple}件 → {'高' if n_ripple >= 2 else '中' if n_ripple == 1 else '低'}水準",
+        "buzz": f"ニュース性スコア{ev['score']}（{'80+ 高' if ev['score'] >= 80 else '60+ 中' if ev['score'] >= 60 else '60未満 低'}）",
+    }
+
+
 def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
     cat = ev["category"]
     d = _d(ev["date"])
     ent = ent_by_id.get(ev["entity_id"])
+    rat = ev.get("rationale") or {}
+    if not rat:
+        rat = _auto_rationale(ev)
+    summary = _clean_summary(ev.get("summary", ""), ev["headline"])
     return {
         "id": ev["event_id"],
         "cat": cat,
@@ -108,7 +143,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "glyph": CAT_META[cat]["glyph"],
         "score": ev["score"],
         "headline": ev["headline"],
-        "summary": ev["summary"],
+        "summary": summary,
         "source": ev["source"],
         "tier": ev["source_tier"],
         "tier_label": TIER_LABEL.get(ev["source_tier"], ev["source_tier"]),
@@ -120,7 +155,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "karte": f"karte-{ev['entity_id']}.html" if ent else None,
         "source_url": ev.get("source_url"),
         "summary_points": ev.get("summary_points") or [],
-        "rationale": ev.get("rationale") or {},
+        "rationale": rat,
         "karte_updated": bool(ev.get("karte_updated")),
         "thumb": ev.get("thumb") or "",
         "feature": feature,
