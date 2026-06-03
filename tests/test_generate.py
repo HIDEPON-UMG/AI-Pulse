@@ -6,6 +6,7 @@
 - <script> の |tojson アイランドが壊れず feed_count と一致する（autoescape の二重エスケープ無し）。
 - 値は autoescape され、HTML へ生のタグが注入されない（XSS 防止）。
 """
+import html as _html
 import json
 import re
 import sys
@@ -40,7 +41,7 @@ class TestGenerate(unittest.TestCase):
             published = [e for e in self.events if e["score"] >= gp.config.SCORE_MIN]
             self.assertEqual(r["feed"], len(published))
             self.assertEqual(r["archive"], len(self.events))
-            idx = (Path(d) / "index.html").read_text(encoding="utf-8")
+            idx = _html.unescape((Path(d) / "index.html").read_text(encoding="utf-8"))
             for e in published:
                 self.assertIn(e["headline"], idx)
 

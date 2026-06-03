@@ -3,8 +3,9 @@
 段A kick_deep : notebooklm create/use → deep research を非同期キック → job-state 保存（待たない）。
 段B collect   : job-state を読み、source list が ready なら ask --json で観点別回答を取得して返す。
               （30 分級のレイテンシを同期ブロックさせないため 2 段に割る。dataflow 図 ②）
-カルテ各フィールドへの落とし込み（要約→positioning / competitors / C軸 / recommendation）は
-LLM（claude -p, prompts/deepdive_notebooklm.md）が行い、その抽出結果を apply_deepdive で永続化する。
+build_carte_fields: ソースが ready な notebook に対して axis ごとに ask し carte_fields を生成する。
+              claude -p 不要。LENS_AXES の各軸を個別に質問し回答を直接 cells に入れる。
+              apply_deepdive と組み合わせてカルテを更新する（run_daily / run_weekly が呼ぶ）。
 
 NotebookLM CLI（専用 venv に隔離。所在は memory reference_notebooklm_digest）:
   ~/.claude/tools/notebooklm-py/.venv/Scripts/notebooklm.exe（Path.home() 起点で解決）
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,6 +92,56 @@ def apply_deepdive(entity_id, carte_fields, entities_path=None, events_path=None
     schema.validate_entity(by_id[entity_id])
     store.write_entities(entities_path, entities)
     return by_id[entity_id]
+
+
+def build_carte_fields(entity: dict, nb_id: str, *, runner=quiet_run) -> dict:
+    """NotebookLM の ask で overview + LENS_AXES 各軸に回答させ carte_fields を生成する。
+
+    claude -p 不要。axis ごとに ask し回答を直接 cells に格納する（LLM 変換を省略）。
+    返り値は apply_deepdive に渡せる dict（overview + comparison）。
+    """
+    eid = entity["entity_id"]
+    name = entity.get("name", eid)
+    category = entity.get("category", "")
+    axes = schema.LENS_AXES.get(category, [])
+
+    # overview（3〜5 文の説明）
+    q_ov = (
+        f"Summarize {name} in 3-5 sentences: what it is, who makes it, "
+        f"its main use case, and its current position in the market. "
+        f"Use only information from the registered sources. "
+        f"If no information is available, write 'No information available.'"
+    )
+    ov_cp = _nb(["-n", nb_id, "ask", q_ov, "--timeout", "120"], runner=runner)
+    overview = ov_cp.stdout.strip() or entity.get("overview", "")
+
+    # LENS_AXES の各軸を axis ごとに ask → cells に直入れ
+    cells: dict[str, str] = {}
+    for axis in axes:
+        key = axis["key"]
+        label = axis["label"]
+        q_axis = (
+            f"About {name}: describe its '{label}' in 1-2 concise sentences. "
+            f"Use only information from the registered sources. "
+            f"If no information is available, write 'N/A'."
+        )
+        cp = _nb(["-n", nb_id, "ask", q_axis, "--timeout", "90"], runner=runner)
+        cells[key] = cp.stdout.strip() or "N/A"
+        time.sleep(1.0)  # ask 間の rate limit 対策
+
+    fields: dict = {"overview": overview}
+    if cells:
+        # 既存 comparison の self 列を更新（他エンティティ列は保持）
+        existing_cmp = entity.get("comparison") or {}
+        existing_cols: list[dict] = list(existing_cmp.get("cols") or [])
+        self_col = next((c for c in existing_cols if c.get("name") == name), None)
+        if self_col is not None:
+            self_col["cells"].update(cells)
+        else:
+            existing_cols.insert(0, {"name": name, "cells": cells})
+        fields["comparison"] = {"cols": existing_cols}
+
+    return fields
 
 
 def _parse_notebook_id(stdout: str) -> str:

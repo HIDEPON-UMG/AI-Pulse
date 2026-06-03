@@ -122,6 +122,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "summary_points": ev.get("summary_points") or [],
         "rationale": ev.get("rationale") or {},
         "karte_updated": bool(ev.get("karte_updated")),
+        "thumb": ev.get("thumb") or "",
         "feature": feature,
     }
 

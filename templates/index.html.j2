@@ -23,9 +23,9 @@
 /* feed list */
 .feed { list-style: none; margin: 0; padding: var(--s-8) 0 0; }
 .story {
-  display: grid; grid-template-columns: 92px 1fr 184px;
-  gap: var(--s-24); align-items: start;
-  padding: var(--s-24) var(--s-16); margin: 0 calc(var(--s-16) * -1);
+  display: grid; grid-template-columns: 80px 180px 1fr;
+  gap: var(--s-16) var(--s-20); align-items: start;
+  padding: var(--s-20) var(--s-16); margin: 0 calc(var(--s-16) * -1);
   border-bottom: 1px solid var(--border-soft);
   border-left: 2px solid transparent;
   transition: background .16s, border-color .16s;
@@ -36,11 +36,27 @@
 }
 .story[data-href] { cursor: pointer; }
 .story .score { padding-top: 2px; }
-.story .score .num { font-family: var(--font-mono); font-weight: 700; font-size: 30px; line-height: 1; color: var(--cat); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.story .score .num { font-family: var(--font-mono); font-weight: 700; font-size: 28px; line-height: 1; color: var(--cat); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .story .score .lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: .18em; color: var(--fg-mute); margin-top: 4px; }
-.story .score .date { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-mute); margin-top: 14px; line-height: 1.35; }
+.story .score .date { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); margin-top: 12px; line-height: 1.35; }
 .story .score .date span { display: block; font-size: 10px; margin-top: 1px; opacity: .8; }
-.story .metrics { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+/* サムネイル列 */
+.story .thumb-col { display: flex; flex-direction: column; gap: 8px; }
+.story .thumb {
+  width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
+  background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.story .thumb[src=""] { visibility: hidden; }
+.story .karte-link {
+  font-family: var(--font-mono); font-size: 11px; color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  padding: 4px 9px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px;
+  transition: background .15s; white-space: nowrap; align-self: flex-start;
+}
+.story .karte-link:hover { background: var(--accent-weak); }
+.story .karte-link .arr { transition: transform .15s; }
+.story:hover .karte-link .arr { transform: translateX(2px); }
+.story .metrics { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .story .metric { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-sub); }
 .story .metric b { font-weight: 500; color: var(--fg-mute); }
 .story .metric .bars { display: inline-flex; gap: 2px; }
@@ -54,7 +70,7 @@
 .story .body { min-width: 0; }
 .story .meta-row { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; margin-bottom: var(--s-8); }
 .story h2 {
-  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 20px;
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 19px;
   letter-spacing: -0.01em; line-height: 1.4; margin: 0 0 6px; color: var(--fg);
   text-wrap: pretty;
 }
@@ -63,38 +79,36 @@
   margin: 0; color: var(--fg-sub); font-size: var(--t-sm); line-height: 1.75;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.story .src { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); }
+.story .src { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); flex-wrap: wrap; }
 .story .src .tier { color: var(--cat); font-weight: var(--w-med); }
-.story .aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; width: 184px; }
-.story .thumb {
-  width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
-  background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--r-sm);
-}
-.story .karte-link {
-  font-family: var(--font-mono); font-size: 11px; color: var(--accent);
-  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
-  padding: 4px 9px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px;
-  transition: background .15s; white-space: nowrap;
-}
-.story .karte-link:hover { background: var(--accent-weak); }
-.story .karte-link .arr { transition: transform .15s; }
-.story:hover .karte-link .arr { transform: translateX(2px); }
 
-@media (max-width: 720px) {
-  .story { grid-template-columns: 1fr; gap: var(--s-8); }
-  .story .aside { width: 100%; flex-direction: column; align-items: stretch; order: -1; gap: 10px; }
+/* スマホ (< 600px): 2列(スコア+サムネイル) → 本文 の縦積み */
+@media (max-width: 600px) {
+  .story {
+    grid-template-columns: 64px 1fr;
+    grid-template-rows: auto auto;
+    gap: var(--s-8) var(--s-12);
+  }
+  /* 1行目: スコア(左) + サムネイル(右) */
+  .story .score { grid-column: 1; grid-row: 1; }
+  .story .thumb-col { grid-column: 2; grid-row: 1; }
+  /* 2行目: 本文(全幅) */
+  .story .body { grid-column: 1 / -1; grid-row: 2; }
   .story .thumb { aspect-ratio: 16 / 9; }
-  .story .karte-link { align-self: flex-start; }
-  .story .score { display: flex; align-items: baseline; gap: 10px; }
-  .story .score .lbl { align-self: center; margin: 0; }
-  .story .score .date { margin: 0 0 0 auto; }
+  .story h2 { font-size: 16px; }
+  .story .score .num { font-size: 22px; }
+}
+
+/* タブレット (600〜860px): スコア狭め・サムネイル縮小 */
+@media (min-width: 601px) and (max-width: 860px) {
+  .story { grid-template-columns: 64px 140px 1fr; }
 }
 
 /* lead feature (first story bigger) */
-.story.feature { grid-template-columns: 92px 1fr 240px; background: var(--bg-elev); border-left-color: var(--cat); border-radius: var(--r-sm); }
-.story.feature h2 { font-size: 26px; }
-.story.feature .aside { width: 240px; }
-@media (max-width: 720px) { .story.feature { grid-template-columns: 1fr; } .story.feature .aside { width: 100%; } }
+.story.feature { background: var(--bg-elev); border-left-color: var(--cat); border-radius: var(--r-sm); }
+.story.feature h2 { font-size: 24px; }
+.story.feature .thumb { aspect-ratio: 16 / 9; }
+@media (max-width: 600px) { .story.feature { background: none; } }
 /* search */
 .search-row { max-width: var(--maxw); margin: 0 auto; padding: 11px var(--s-24) 0; }
 .search { display: flex; align-items: center; gap: 9px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 12px; max-width: 480px; color: var(--fg-mute); transition: border-color .15s; }
@@ -190,6 +204,10 @@
           <div class="lbl">SCORE</div>
           <div class="date">{{ s.date_md }}<span>{{ s.date_rel }}</span></div>
         </div>
+        <div class="thumb-col">
+          <img class="thumb" {% if s.thumb %}data-thumb="{{ s.thumb }}"{% endif %} alt="" loading="lazy" />
+          {% if s.karte %}<a class="karte-link" href="{{ s.karte }}">{% if s.karte_updated %}<span class="upd-badge">UPDATE</span>{% endif %}{% if s.feature %}カルテを見る{% else %}関連カルテ{% endif %} <span class="arr">→</span></a>{% endif %}
+        </div>
         <div class="body">
           <div class="meta-row">
             <span class="cat-badge"><span class="gly">{{ s.glyph }}</span> {{ s.cat_label }}</span>
@@ -208,10 +226,6 @@
             </dl>
           </details>
           {% endif %}
-        </div>
-        <div class="aside">
-          <img class="thumb" alt="" />
-          {% if s.karte %}<a class="karte-link" href="{{ s.karte }}">{% if s.karte_updated %}<span class="upd-badge">UPDATE</span>{% endif %}{% if s.feature %}カルテを見る{% else %}関連カルテ{% endif %} <span class="arr">→</span></a>{% endif %}
         </div>
       </li>
       {% endfor %}
