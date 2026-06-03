@@ -39,6 +39,7 @@ CAT_META = {
     "agent": {"label": "エージェント・ツール", "glyph": "■"},
     "infra": {"label": "インフラ・チップ", "glyph": "▶"},
     "policy": {"label": "規制・資金・業界", "glyph": "✦"},
+    "physical": {"label": "フィジカルAI", "glyph": "⬢"},
 }
 TIER_LABEL = {"T1": "T1 公式", "T2": "T2 一次報道", "T3": "T3 二次"}
 KIND_JA = {

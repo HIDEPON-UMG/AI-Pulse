@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 # --- 許容値（enum 相当。ここに無い値は validate_* が弾く） ---
-CATEGORIES = {"model", "editor", "media", "agent", "infra", "policy"}  # 6 レンズ
+CATEGORIES = {"model", "editor", "media", "agent", "infra", "policy", "physical"}  # 7 レンズ
 KINDS = {"model", "runtime", "app", "library", "repo"}
 OFFERINGS = {"oss", "saas", "commercial", "hybrid"}
 EVENT_TYPES = {"release", "funding", "pricing", "ma", "shutdown", "incident", "benchmark"}
@@ -31,7 +31,7 @@ ENTITY_REQUIRED = (
 #          entity は cols(name/cells) だけ持つ。各 col は所属レンズ全 axis キーのセルを揃える。
 HISTORY_ITEM_REQUIRED = ("when", "title")
 
-# レンズ(6カテゴリ)ごとの比較軸。「同レンズ=同軸」を強制する単一ソース（方針B）。
+# レンズ(7カテゴリ)ごとの比較軸。「同レンズ=同軸」を強制する単一ソース（方針B）。
 # entity.comparison.cols の cells はここで定義した key を全て埋める。
 LENS_AXES = {
     "model": [
@@ -68,6 +68,11 @@ LENS_AXES = {
         {"key": "scope", "label": "適用範囲"}, {"key": "binding", "label": "拘束力"},
         {"key": "topic", "label": "主な論点"}, {"key": "target", "label": "対象"},
         {"key": "timing", "label": "施行時期"},
+    ],
+    "physical": [
+        {"key": "form", "label": "形態"}, {"key": "hardware", "label": "対応ハード"},
+        {"key": "foundation", "label": "基盤モデル(VLA等)"}, {"key": "autonomy", "label": "自律度"},
+        {"key": "strength", "label": "主な強み"},
     ],
 }
 EVENT_REQUIRED = (

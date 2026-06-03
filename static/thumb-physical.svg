@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="PHYSICAL AI fallback">
+  <defs>
+    <linearGradient id="bg_physical" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23252b"></stop>
+      <stop offset="1" stop-color="#15161a"></stop>
+    </linearGradient>
+    <radialGradient id="gl_physical" cx="0.5" cy="0.42" r="0.6">
+      <stop offset="0" stop-color="#ad94ea" stop-opacity="0.16"></stop>
+      <stop offset="1" stop-color="#ad94ea" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#bg_physical)"></rect>
+  <rect width="320" height="200" fill="url(#gl_physical)"></rect>
+  <text x="20" y="30" font-family="ui-monospace, monospace" font-size="10" letter-spacing="2.5" fill="#7a808c">AI-PULSE</text>
+  <text x="300" y="30" font-family="ui-monospace, monospace" font-size="9" letter-spacing="2" fill="#5b616d" text-anchor="end">NO IMAGE</text>
+  <text x="160" y="92" font-family="ui-monospace, monospace" font-size="58" fill="#ad94ea" fill-opacity="0.92" text-anchor="middle" dominant-baseline="central">⬢</text>
+  <line x1="130" y1="128" x2="190" y2="128" stroke="#ad94ea" stroke-opacity="0.45" stroke-width="1"></line>
+  <text x="160" y="150" font-family="ui-monospace, monospace" font-size="12.5" letter-spacing="2.5" fill="#c8ccd4" text-anchor="middle">PHYSICAL AI</text>
+  <rect x="0" y="196" width="320" height="4" fill="#ad94ea" fill-opacity="0.85"></rect>
+  <rect x="0.5" y="0.5" width="319" height="199" fill="none" stroke="#ffffff" stroke-opacity="0.07"></rect>
+</svg>

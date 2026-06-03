@@ -52,22 +52,24 @@
   --border-soft:oklch(0.252 0.006 265);
   --border-strong: oklch(0.400 0.008 265);
 
-  /* ---- Category accents (6 lenses) --------------------- */
+  /* ---- Category accents (7 lenses) --------------------- */
   /* shared L/C, hue-varied for instant recognition */
-  --c-model:  oklch(0.74 0.135 256);  /* モデル/LLM        ◆ */
-  --c-editor: oklch(0.81 0.120 200);  /* AIエディタ        ▲ */
-  --c-media:  oklch(0.77 0.155 322);  /* 画像・動画・音声  ◎ */
-  --c-agent:  oklch(0.81 0.140 158);  /* エージェント      ■ */
-  --c-infra:  oklch(0.84 0.130 82);   /* インフラ・チップ  ▶ */
-  --c-policy: oklch(0.76 0.150 30);   /* 規制・資金・業界  ✦ */
+  --c-model:    oklch(0.74 0.135 256);  /* モデル/LLM        ◆ */
+  --c-editor:   oklch(0.81 0.120 200);  /* AIエディタ        ▲ */
+  --c-media:    oklch(0.77 0.155 322);  /* 画像・動画・音声  ◎ */
+  --c-agent:    oklch(0.81 0.140 158);  /* エージェント      ■ */
+  --c-infra:    oklch(0.84 0.130 82);   /* インフラ・チップ  ▶ */
+  --c-policy:   oklch(0.76 0.150 30);   /* 規制・資金・業界  ✦ */
+  --c-physical: oklch(0.78 0.145 295);  /* フィジカルAI      ⬢ */
 
   /* solid fills for badges (darker shade → white text passes AA) */
-  --c-model-solid:  oklch(0.515 0.155 262);
-  --c-editor-solid: oklch(0.505 0.110 220);
-  --c-media-solid:  oklch(0.520 0.185 322);
-  --c-agent-solid:  oklch(0.495 0.130 160);
-  --c-infra-solid:  oklch(0.515 0.110 70);
-  --c-policy-solid: oklch(0.530 0.175 30);
+  --c-model-solid:    oklch(0.515 0.155 262);
+  --c-editor-solid:   oklch(0.505 0.110 220);
+  --c-media-solid:    oklch(0.520 0.185 322);
+  --c-agent-solid:    oklch(0.495 0.130 160);
+  --c-infra-solid:    oklch(0.515 0.110 70);
+  --c-policy-solid:   oklch(0.530 0.175 30);
+  --c-physical-solid: oklch(0.520 0.170 295);
 
   /* ---- Importance heat scale --------------------------- */
   --imp-high: oklch(0.72 0.175 28);
@@ -179,6 +181,7 @@ a { color: inherit; text-decoration: none; }
 [data-cat="agent"]  { --cat: var(--c-agent);  --cat-solid: var(--c-agent-solid); }
 [data-cat="infra"]  { --cat: var(--c-infra);  --cat-solid: var(--c-infra-solid); }
 [data-cat="policy"] { --cat: var(--c-policy); --cat-solid: var(--c-policy-solid); }
+[data-cat="physical"] { --cat: var(--c-physical); --cat-solid: var(--c-physical-solid); }
 
 /* ============================================================
    App shell — fixed header

@@ -38,7 +38,7 @@ class TestSchemaContract(unittest.TestCase):
                 known_entity_ids={"claude-opus"})
 
     def test_unknown_category_is_rejected(self):
-        """6 レンズ外の category は弾く（色・グリフ未割当を防ぐ）。"""
+        """7 レンズ外の category は弾く（色・グリフ未割当を防ぐ）。"""
         with self.assertRaises(schema.SchemaError):
             schema.validate_entity(
                 {"entity_id": "e", "name": "E", "kind": "app", "domain": "x", "offering": "oss",
