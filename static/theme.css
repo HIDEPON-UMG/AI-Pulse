@@ -4,6 +4,18 @@
    Palettes are switchable via [data-palette] on <html>.
    ============================================================ */
 
+/* ------------------------------------------------------------
+   [hidden] 属性絶対遵守ガード (2026-06-05)
+   ------------------------------------------------------------
+   .story{display:grid} 等の個別 display 指定が UA stylesheet
+   [hidden]{display:none} を CSS specificity で打ち負かす経路を
+   構造的に封じる ([[feedback_web_ui_e2e_test]] / [[feedback_check_design_principles]] 段位 2)。
+   タグフィルター app.js が el.hidden=true をセットしても、
+   .story の display:grid で見え続けてしまった事故 (2026-06-05) の恒久対策。
+   AI-Pulse 全画面の [hidden] = 完全非表示を物理的に保証する境界 1 箇所集約。
+   ------------------------------------------------------------ */
+[hidden] { display: none !important; }
+
 :root {
   /* ---- Typography -------------------------------------- */
   --font-head: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;

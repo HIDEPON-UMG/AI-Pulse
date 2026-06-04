@@ -31,7 +31,7 @@
 /* feed list */
 .feed { list-style: none; margin: 0; padding: var(--s-8) 0 0; }
 .story {
-  display: grid; grid-template-columns: 80px 200px 1fr;
+  display: grid; grid-template-columns: 160px 300px 1fr;
   gap: var(--s-16) var(--s-24); align-items: start;
   padding: var(--s-24) var(--s-16); margin: 0 calc(var(--s-16) * -1);
   border-bottom: 1px solid var(--border-soft);
@@ -44,10 +44,11 @@
 }
 .story[data-href] { cursor: pointer; }
 .story .score { padding-top: 2px; }
-.story .score .num { font-family: var(--font-mono); font-weight: 700; font-size: 28px; line-height: 1; color: var(--cat); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.story .score .lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: .18em; color: var(--fg-mute); margin-top: 4px; }
-.story .score .date { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); margin-top: 12px; line-height: 1.35; }
-.story .score .date span { display: block; font-size: 10px; margin-top: 1px; opacity: .8; }
+/* (2026-06-05) スコアを 2 倍サイズに拡大 (ユーザー要望)。num 28→56px、列幅 80→160px 連動。 */
+.story .score .num { font-family: var(--font-mono); font-weight: 700; font-size: 56px; line-height: 1; color: var(--cat); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.story .score .lbl { font-family: var(--font-mono); font-size: 13px; letter-spacing: .18em; color: var(--fg-mute); margin-top: 6px; }
+.story .score .date { font-family: var(--font-mono); font-size: 16px; color: var(--fg-mute); margin-top: 18px; line-height: 1.35; }
+.story .score .date span { display: block; font-size: 14px; margin-top: 2px; opacity: .8; }
 /* サムネイル列 */
 .story .thumb-col { display: flex; flex-direction: column; gap: 8px; }
 .story .thumb {
@@ -63,11 +64,13 @@
   font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-mute);
   letter-spacing: 0.12em; text-transform: uppercase; line-height: 1;
 }
-.story .karte-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.story .karte-chips { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+/* (2026-06-05) ユーザー要望でカルテボタンとサムネを 1.5 倍化。
+   font 15→22.5px (実値 22)・padding 6/11→9/17 で高さ・幅とも 1.5 倍に揃える。 */
 .story .karte-chip {
-  font-family: var(--font-mono); font-size: 15px; color: var(--cat);
+  font-family: var(--font-mono); font-size: 22px; color: var(--cat);
   border: 1px solid color-mix(in oklab, var(--cat) 45%, transparent);
-  padding: 6px 11px; border-radius: var(--r-sm);
+  padding: 9px 17px; border-radius: var(--r-sm);
   display: inline-flex; align-items: center; line-height: 1.2;
   transition: background .15s; white-space: nowrap; text-decoration: none;
 }
@@ -98,10 +101,11 @@
 .story .src { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); flex-wrap: wrap; }
 .story .src .tier { color: var(--cat); font-weight: var(--w-med); }
 
-/* スマホ (< 600px): 2列(スコア+サムネイル) → 本文 の縦積み */
+/* スマホ (< 600px): 2列(スコア+サムネイル) → 本文 の縦積み
+   (2026-06-05) スコア 2 倍化に合わせ列 64→96px、num 22→36px。サムネ 1.5 倍は 1fr 自動拡大で対応。 */
 @media (max-width: 600px) {
   .story {
-    grid-template-columns: 64px 1fr;
+    grid-template-columns: 96px 1fr;
     grid-template-rows: auto auto;
     gap: var(--s-8) var(--s-8);
   }
@@ -112,12 +116,13 @@
   .story .body { grid-column: 1 / -1; grid-row: 2; }
   .story .thumb { aspect-ratio: 16 / 9; }
   .story h2 { font-size: 18px; }
-  .story .score .num { font-size: 22px; }
+  .story .score .num { font-size: 36px; }
+  .story .karte-chip { font-size: 15px; padding: 5px 10px; }
 }
 
-/* タブレット (600〜860px): スコア狭め・サムネイル縮小 */
+/* タブレット (600〜860px): スコア 2 倍 (64→128) + サムネ 1.5 倍 (160→240) */
 @media (min-width: 601px) and (max-width: 860px) {
-  .story { grid-template-columns: 64px 160px 1fr; }
+  .story { grid-template-columns: 128px 240px 1fr; }
 }
 
 /* lead feature (first story bigger) */
