@@ -19,6 +19,7 @@
   <nav class="app-nav">
     <a href="index.html"{% if page == 'feed' %} aria-current="page"{% endif %}>フィード</a>
     <a href="archive.html"{% if page == 'archive' %} aria-current="page"{% endif %}>アーカイブ</a>
+    <a href="karte-index.html"{% if page in ('karte_index', 'karte') %} aria-current="page"{% endif %}>カルテ</a>
   </nav>
   <span class="header-spacer"></span>
   <div class="palette-switch" role="group" aria-label="配色テーマ">

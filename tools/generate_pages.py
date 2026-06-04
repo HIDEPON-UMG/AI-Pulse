@@ -128,6 +128,37 @@ def _auto_rationale(ev: dict) -> dict:
     }
 
 
+def _karte_names(ev: dict, ent_by_id: dict) -> list[dict]:
+    """主 entity と related_entities を解決して [{name, href}, ...] の順序付きリストを返す。
+
+    主カルテを先頭・関連カルテをデータ記載順に並べる。entity_id が L1 に無い場合はスキップ。
+    related_entities の参照整合は schema 側で担保済み（known_entity_ids チェック）。
+    """
+    items: list[dict] = []
+    primary = ent_by_id.get(ev["entity_id"])
+    if primary:
+        items.append({"name": primary["name"], "href": f"karte-{ev['entity_id']}.html"})
+    for rid in ev.get("related_entities") or []:
+        ent = ent_by_id.get(rid)
+        if ent:
+            items.append({"name": ent["name"], "href": f"karte-{rid}.html"})
+    return items
+
+
+def _summary_short(ev: dict) -> str:
+    """アーカイブの1行サマリ用に summary を 60字目安で切り詰める。
+
+    タイムラインは情報密度を保つため short 表示。空 / headline と同義なら空文字を返し
+    テンプレ側で {% if %} 非表示にする（捏造表示の防止）。
+    """
+    s = _clean_summary(ev.get("summary", ""), ev["headline"])
+    if not s:
+        return ""
+    if len(s) > 60:
+        s = s[:58].rstrip() + "…"
+    return s
+
+
 def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
     cat = ev["category"]
     d = _d(ev["date"])
@@ -153,6 +184,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "impact": _impact_level(ev.get("ripple")),
         "buzz": _buzz_level(ev["score"]),
         "karte": f"karte-{ev['entity_id']}.html" if ent else None,
+        "karte_names": _karte_names(ev, ent_by_id),
         "source_url": ev.get("source_url"),
         "summary_points": ev.get("summary_points") or [],
         "rationale": rat,
@@ -220,13 +252,19 @@ def _karte(ent: dict, all_events: list[dict]) -> dict:
 
 
 def build_context(entities: list[dict], events: list[dict]) -> dict:
-    """検証済み L1/L2 から全テンプレ用の文脈を組む（決定論変換の集約点）。"""
+    """検証済み L1/L2 から全テンプレ用の文脈を組む（決定論変換の集約点）。
+
+    フィードは「events 全体の最大 date と一致するデルタ」だけを表示する（=最新収集日）。
+    過去分はアーカイブに譲ることで、フィードの情報密度を上げる。ユーザー要件 2026-06-04。
+    """
     ent_by_id = {e["entity_id"]: e for e in entities}
     ref = max((_d(e["date"]) for e in events), default=dt.date.today())
+    ref_iso = ref.isoformat()
     all_events = sorted(events, key=lambda e: (e["date"], e["event_id"]), reverse=True)
     feed_events = [e for e in all_events if e["score"] >= config.SCORE_MIN]
-
-    feed = [_story(ev, ent_by_id, ref, feature=(i == 0)) for i, ev in enumerate(feed_events)]
+    feed_today_events = [e for e in feed_events if e["date"] == ref_iso]
+    feed = [_story(ev, ent_by_id, ref, feature=(i == 0))
+            for i, ev in enumerate(feed_today_events)]
 
     groups: list[dict] = []
     for ev in all_events:
@@ -245,6 +283,8 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
             "tier_label": TIER_LABEL.get(ev["source_tier"], ev["source_tier"]),
             "score": ev["score"],  # スコアは各記事タイル右端に表示（日付レールと混同しないため）
             "karte": f"karte-{ev['entity_id']}.html" if ent else None,
+            "karte_names": _karte_names(ev, ent_by_id),  # 実カルテ名（複数対応）
+            "summary_short": _summary_short(ev),         # 英文タイトル対策の1行サマリ
         })
 
     if all_events:
@@ -257,10 +297,35 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
     else:
         range_label = ""
 
+    # カルテ一覧（カテゴリ別カード）。CAT_META の宣言順をレンズ並びの単一ソースとして使う。
+    # 名前は `cards` を使う（Jinja2 で `g.items` は dict.items メソッドと衝突するため）。
+    karte_index_groups: list[dict] = []
+    for cat in CAT_META:
+        cards = sorted(
+            [
+                {
+                    "id": e["entity_id"], "name": e["name"], "cat": cat,
+                    "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"],
+                    "positioning": e["positioning"], "vendor": e["vendor"],
+                    "href": f"karte-{e['entity_id']}.html",
+                }
+                for e in entities if e["category"] == cat
+            ],
+            key=lambda x: x["name"].lower(),
+        )
+        if cards:
+            karte_index_groups.append({
+                "cat": cat, "cat_label": CAT_META[cat]["label"],
+                "glyph": CAT_META[cat]["glyph"], "cards": cards,
+            })
+
     return {
         "feed": feed, "feed_count": len(feed),
+        "feed_total_published": len(feed_events),  # 当日以外も含む全 published（参考表示）
         "groups": groups, "archive_count": len(all_events), "range_label": range_label,
         "kartes": [_karte(ent, all_events) for ent in entities],
+        "karte_index_groups": karte_index_groups,
+        "karte_total": len(entities),
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),
     }
@@ -331,6 +396,11 @@ def generate(out_dir: Path = OUT_DIR) -> dict:
         env.get_template("archive.html.j2").render(**ctx, page="archive"), encoding="utf-8"
     )
     pages.append("archive.html")
+    (out_dir / "karte-index.html").write_text(
+        env.get_template("karte-index.html.j2").render(**ctx, page="karte_index"),
+        encoding="utf-8",
+    )
+    pages.append("karte-index.html")
     karte_tpl = env.get_template("karte.html.j2")
     for k in ctx["kartes"]:
         name = f"karte-{k['id']}.html"

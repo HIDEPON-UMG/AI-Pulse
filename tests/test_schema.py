@@ -158,6 +158,45 @@ class TestSchemaContract(unittest.TestCase):
         self.assertEqual(len(ok["summary_points"]), 3)
         self.assertTrue(ok["karte_updated"])
 
+    def test_related_entities_form_and_refs(self):
+        """related_entities は任意の補助配列だが、入れるなら形と参照整合を固定する（案 B / 2026-06-04）。
+
+        なぜ重要か: 1 件のニュースが複数 entity に紐づくケースを表現する補助フィールド。
+        非リスト・空文字・主entity重複・上限超過・未知 entity_id を通すと、フィード/アーカイブ
+        の karte_chips に偽カルテ名や重複が出る。任意項目だが、入れるなら形を固定して回帰を防ぐ。
+        """
+        base = {"event_id": "x", "entity_id": "claude-opus", "date": "2026-06-02",
+                "category": "model", "event_type": "release", "headline": "h", "summary": "s",
+                "score": 80, "importance": "high", "source": "x", "source_tier": "T1"}
+        ids = {"claude-opus", "cursor", "gemini"}
+        # 主 entity_id を related に含めるのは弾く（重複表示の防止）
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "related_entities": ["claude-opus"]}, ids)
+        # 配列以外は弾く
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "related_entities": "cursor"}, ids)
+        # 空文字を含む配列は弾く
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "related_entities": ["cursor", ""]}, ids)
+        # 5 件超は弾く
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event(
+                {**base, "related_entities": [f"x{i}" for i in range(6)]}, ids)
+        # 重複は弾く
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "related_entities": ["cursor", "cursor"]}, ids)
+        # 未知 entity_id を参照するのは弾く（L1 に存在しない）
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "related_entities": ["ghost"]}, ids)
+        # 正常なケースは通る
+        ok = schema.validate_event({**base, "related_entities": ["cursor", "gemini"]}, ids)
+        self.assertEqual(ok["related_entities"], ["cursor", "gemini"])
+        # 未指定 / 空配列は許容（任意項目）
+        self.assertIsNone(schema.validate_event(base, ids).get("related_entities"))
+        self.assertEqual(
+            schema.validate_event({**base, "related_entities": []}, ids).get("related_entities"),
+            [])
+
     def test_source_url_blocks_xss_payloads(self):
         """source_url に JS リテラル / HTML 属性を破壊する文字を含めると ingest 時に弾く。
 

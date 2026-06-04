@@ -35,15 +35,65 @@ class TestGenerate(unittest.TestCase):
                 self.assertTrue(p.exists(), f"karte 欠落: {e['entity_id']}")
                 self.assertIn(e["name"], p.read_text(encoding="utf-8"))
 
-    def test_feed_is_thresholded_and_archive_lists_all(self):
+    def test_feed_is_today_only_and_archive_lists_all(self):
+        """ユーザー要件 2026-06-04: フィードは最新日付（ref date）の published のみ表示。
+        過去分はアーカイブに譲ることでフィードの情報密度を上げる。
+        アーカイブは全 events を時系列で並べる（参照整合は守られる）。"""
         with tempfile.TemporaryDirectory() as d:
             r = gp.generate(Path(d))
             published = [e for e in self.events if e["score"] >= gp.config.SCORE_MIN]
-            self.assertEqual(r["feed"], len(published))
+            ref_iso = max(e["date"] for e in self.events)
+            published_today = [e for e in published if e["date"] == ref_iso]
+            self.assertEqual(r["feed"], len(published_today))
             self.assertEqual(r["archive"], len(self.events))
             idx = _html.unescape((Path(d) / "index.html").read_text(encoding="utf-8"))
-            for e in published:
+            for e in published_today:
                 self.assertIn(e["headline"], idx)
+            # 当日でない published は index に headline が出ない（アーカイブ専有）
+            past_published = [e for e in published if e["date"] != ref_iso]
+            for e in past_published[:5]:  # 抽出して確認
+                self.assertNotIn(e["headline"], idx)
+
+    def test_karte_index_page_is_built_with_category_groups(self):
+        """カルテ一覧ページ（karte-index.html）が出力され、全カルテ名がカテゴリ別カードで載る。"""
+        with tempfile.TemporaryDirectory() as d:
+            gp.generate(Path(d))
+            ki_path = Path(d) / "karte-index.html"
+            self.assertTrue(ki_path.exists(), "カルテ一覧ページが生成されていない")
+            html = ki_path.read_text(encoding="utf-8")
+            for e in self.entities:
+                self.assertIn(e["name"], html, f"カルテ名 {e['name']!r} がカルテ一覧に出ない")
+            self.assertIn("ki-card", html)
+            self.assertIn("ki-group", html)
+
+    def test_related_entities_render_as_karte_chips(self):
+        """related_entities が指定された event は、主+関連の実カルテ名がフィード/アーカイブで chip 描画される。"""
+        ent_main = {
+            "entity_id": "main", "name": "MainKarte", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-04", "positioning": "p",
+        }
+        ent_rel = {
+            "entity_id": "rel", "name": "RelKarte", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "W", "category": "model",
+            "snapshot_date": "2026-06-04", "positioning": "p2",
+        }
+        ev = {
+            "event_id": "e1", "entity_id": "main", "date": "2026-06-04", "category": "model",
+            "event_type": "release", "headline": "見出し", "summary": "サマリ",
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+            "related_entities": ["rel"],
+        }
+        ctx = gp.build_context([ent_main, ent_rel], [ev])
+        idx_html = gp.make_env().get_template("index.html.j2").render(**ctx, page="feed")
+        arc_html = gp.make_env().get_template("archive.html.j2").render(**ctx, page="archive")
+        # フィードに主+関連の両方が chip で出る
+        self.assertIn("MainKarte", idx_html)
+        self.assertIn("RelKarte", idx_html)
+        self.assertIn("karte-chip", idx_html)
+        # アーカイブにも主+関連の両方が chip で出る
+        self.assertIn("MainKarte", arc_html)
+        self.assertIn("RelKarte", arc_html)
 
     def test_ssg_meta_island_is_valid_json(self):
         with tempfile.TemporaryDirectory() as d:

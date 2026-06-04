@@ -56,6 +56,22 @@ a.entry:hover h3 { color: var(--accent); }
 .entry .src .tier { color: var(--cat); }
 .entry .time { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); }
 
+/* (2026-06-04) 英語タイトル対策の1行サマリ（タイトル直下） */
+.entry .summary-short {
+  margin: 2px 0 6px; color: var(--fg-sub); font-size: 13px; line-height: 1.55;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* (2026-06-04) 関連カルテ名を実名 chip で並べる（複数対応・カテゴリ色） */
+.entry .karte-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }
+.entry .karte-chip {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--cat);
+  border: 1px solid color-mix(in oklab, var(--cat) 40%, transparent);
+  padding: 2px 7px; border-radius: var(--r-sm);
+  display: inline-flex; align-items: center; white-space: nowrap; text-decoration: none;
+  transition: background .15s;
+}
+.entry .karte-chip:hover { background: color-mix(in oklab, var(--cat) 14%, transparent); }
+
 /* empty state */
 .empty { display: none; padding: var(--s-48) 0; text-align: center; color: var(--fg-mute); font-family: var(--font-mono); font-size: var(--t-sm); }
 .search-row { max-width: var(--maxw); margin: 0 auto; padding: 11px var(--s-24) 0; }
@@ -83,7 +99,7 @@ a.entry:hover h3 { color: var(--accent); }
     <div class="arc-head">
       <div class="kicker"><span class="label">アーカイブ / TIMELINE</span></div>
       <h1>過去ニュースのタイムライン</h1>
-      <p class="lead">日付レールに沿って時系列を遡る。カテゴリで絞り込むと、その文脈だけの流れが見えます。</p>
+      <p class="lead">日付レールに沿って時系列を遡る。各記事には英語タイトル対策の 1 行サマリと関連カルテ名（実名 chip）を併記。カテゴリで絞ると、その文脈だけの流れが見えます。</p>
     </div>
   </div>
 
@@ -92,7 +108,7 @@ a.entry:hover h3 { color: var(--accent); }
     <div class="search-row">
       <label class="search">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="6" cy="6" r="4.3"></circle><line x1="9.5" y1="9.5" x2="13" y2="13"></line></svg>
-        <input type="search" data-search placeholder="キーワードで絞り込む（見出し・出典）" aria-label="キーワード検索" />
+        <input type="search" data-search placeholder="キーワードで絞り込む（見出し・サマリ・カルテ名・出典）" aria-label="キーワード検索" />
       </label>
     </div>
     <div class="chip-row" data-filter-bar>
@@ -124,7 +140,13 @@ a.entry:hover h3 { color: var(--accent); }
             <div class="entry-main">
               <div class="top"><span class="cat-badge"><span class="gly">{{ e.glyph }}</span> {{ e.cat_label }}</span></div>
               <h3>{{ e.headline }}</h3>
+              {% if e.summary_short %}<p class="summary-short">{{ e.summary_short }}</p>{% endif %}
               <div class="src">{{ e.source }} · <span class="tier">{{ e.tier_label }}</span></div>
+              {% if e.karte_names %}
+              <div class="karte-chips">
+                {% for k in e.karte_names %}<span class="karte-chip">{{ k.name }}</span>{% endfor %}
+              </div>
+              {% endif %}
             </div>
             <div class="escore"><span class="num">{{ e.score }}</span><span class="lbl">SCORE</span></div>
           </a>
@@ -133,7 +155,13 @@ a.entry:hover h3 { color: var(--accent); }
             <div class="entry-main">
               <div class="top"><span class="cat-badge"><span class="gly">{{ e.glyph }}</span> {{ e.cat_label }}</span></div>
               <h3>{{ e.headline }}</h3>
+              {% if e.summary_short %}<p class="summary-short">{{ e.summary_short }}</p>{% endif %}
               <div class="src">{{ e.source }} · <span class="tier">{{ e.tier_label }}</span></div>
+              {% if e.karte_names %}
+              <div class="karte-chips">
+                {% for k in e.karte_names %}<span class="karte-chip">{{ k.name }}</span>{% endfor %}
+              </div>
+              {% endif %}
             </div>
             <div class="escore"><span class="num">{{ e.score }}</span><span class="lbl">SCORE</span></div>
           </div>

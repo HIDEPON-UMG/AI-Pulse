@@ -189,14 +189,16 @@ def validate_entity(d: dict) -> dict:
     return d
 
 
-def _validate_event_extras(d: dict, ctx: str) -> None:
-    """L2 デルタの任意拡張（出典URL・カルテ更新フラグ・要点・判断根拠）の形を固定する。
+def _validate_event_extras(d: dict, ctx: str, known_entity_ids: set | None = None) -> None:
+    """L2 デルタの任意拡張（出典URL・カルテ更新フラグ・要点・判断根拠・関連カルテ）の形を固定する。
 
     いずれも収集ジョブ(LLM)が埋める任意項目。無ければ SSG 側が従来表示にフォールバックする。
     - source_url: 記事の出典URL。フィードの飛び先に使う（http 必須）。
     - karte_updated: このデルタでカルテ(L1)が更新されたか。true なら UPDATE バッジを出す。
     - summary_points: フィードの箇条書き要約（3〜5件・非空文字列）。
     - rationale: 重要/影響/話題の3指標を「なぜそう判断したか」の根拠（3キー必須）。
+    - related_entities: 主 entity_id 以外の関連カルテ ID 配列（任意・後方互換の補助フィールド・案 B）。
+        1 件のニュースが複数 entity に紐づくときに並べる用。known_entity_ids が渡されたら参照整合まで見る。
     """
     su = d.get("source_url")
     if "source_url" in d:
@@ -226,20 +228,35 @@ def _validate_event_extras(d: dict, ctx: str) -> None:
                    if not (isinstance(rat.get(k), str) and rat.get(k))]
         if missing:
             raise SchemaError(f"{ctx}: rationale に重要/影響/話題の根拠欠落 {missing}")
+    rel = d.get("related_entities")
+    if rel not in (None, []):
+        if not isinstance(rel, list) or not all(isinstance(r, str) and r for r in rel):
+            raise SchemaError(f"{ctx}: related_entities は非空文字列の配列")
+        if len(rel) > 5:
+            raise SchemaError(f"{ctx}: related_entities は最大 5 件（実件数 {len(rel)}）")
+        if d.get("entity_id") in rel:
+            raise SchemaError(f"{ctx}: related_entities に主 entity_id={d['entity_id']!r} を含めない（重複表示の防止）")
+        if len(set(rel)) != len(rel):
+            raise SchemaError(f"{ctx}: related_entities に重複あり {rel!r}")
+        if known_entity_ids is not None:
+            missing_refs = [r for r in rel if r not in known_entity_ids]
+            if missing_refs:
+                raise SchemaError(f"{ctx}: related_entities の参照先 {missing_refs!r} が L1 に存在しない")
 
 
 def gemini_response_schema() -> dict:
     """Gemini API の response_schema (JSON mode) に渡す dict を返す。
 
-    _validate_event_extras と整合する形状（summary 20-200 / summary_points 3-5 件 / rationale 3 軸）
+    _validate_event_extras と整合する形状（summary 20-280 / summary_points 3-5 件 / rationale 3 軸）
     を Gemini 側にも強制し、Python 側のリトライ回数を減らす。enum は EVENT_TYPES / IMPORTANCE と一致。
     schema 違反の単一ソースを本モジュールに集約する目的で、llm_gemini.py はここから import する。
+    summary は 2026-06-04 にプロンプト指示 80-120 字 → 160-240 字へ倍量化したのに合わせて上限を引き上げた。
     """
     return {
         "type": "object",
         "required": ["summary", "summary_points", "rationale", "score", "importance", "event_type"],
         "properties": {
-            "summary": {"type": "string", "minLength": 20, "maxLength": 200},
+            "summary": {"type": "string", "minLength": 20, "maxLength": 280},
             "summary_points": {
                 "type": "array",
                 "minItems": 3,
@@ -274,7 +291,7 @@ def validate_event(d: dict, known_entity_ids: set) -> dict:
         raise SchemaError(f"{ctx}: score は 0-100 の int（実値 {d['score']!r}）")
     if d["entity_id"] not in known_entity_ids:
         raise SchemaError(f"{ctx}: 参照先 entity_id={d['entity_id']!r} が L1 に存在しない")
-    _validate_event_extras(d, ctx)
+    _validate_event_extras(d, ctx, known_entity_ids)
     return d
 
 

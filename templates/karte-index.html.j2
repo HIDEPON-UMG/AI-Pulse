@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<title>AI-Pulse — カルテ一覧</title>
+{% include "_head.html.j2" %}
+<style>
+.ki-head { padding: var(--s-32) 0 var(--s-24); border-bottom: 1px solid var(--border); }
+.ki-head .kicker { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; }
+.ki-head h1 {
+  font-weight: var(--w-bold); font-size: clamp(28px, 4.2vw, 44px); letter-spacing: -0.02em;
+  margin: var(--s-16) 0 var(--s-8); text-wrap: balance;
+}
+.ki-head .lead { color: var(--fg-sub); max-width: 64ch; margin: 0; font-size: var(--t-sm); }
+
+/* グループ（カテゴリ別セクション） */
+.ki-group { padding: var(--s-32) 0 var(--s-16); border-bottom: 1px solid var(--border-soft); }
+.ki-group:last-child { border-bottom: 0; }
+.ki-group-head { display: flex; align-items: baseline; gap: var(--s-16); flex-wrap: wrap; margin-bottom: var(--s-16); }
+.ki-group-head .gly {
+  font-size: 22px; line-height: 1; color: var(--cat); font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--cat) 18%, transparent);
+}
+.ki-group-head h2 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 20px;
+  margin: 0; color: var(--fg); letter-spacing: -0.01em;
+}
+.ki-group-head .count {
+  font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute);
+  letter-spacing: 0.08em;
+}
+
+/* カード grid */
+.ki-cards {
+  display: grid; gap: var(--s-16);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.ki-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: var(--s-16); background: var(--bg-elev);
+  border: 1px solid var(--border); border-left: 2px solid var(--cat);
+  border-radius: var(--r-sm); text-decoration: none; color: inherit;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.ki-card:hover {
+  background: var(--bg-elev-2); border-color: color-mix(in oklab, var(--cat) 55%, var(--border));
+  transform: translateY(-1px);
+}
+.ki-card h3 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 17px;
+  margin: 0; color: var(--fg); letter-spacing: -0.01em; line-height: 1.3;
+}
+.ki-card:hover h3 { color: var(--cat); }
+.ki-card .pos {
+  margin: 0; color: var(--fg-sub); font-size: 13px; line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ki-card .meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 4px; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute);
+}
+.ki-card .meta .vendor { color: var(--fg-sub); }
+.ki-card .meta .cat-mini {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--cat); font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .ki-cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+{% include "_header.html.j2" %}
+
+<main class="app-main">
+  <div class="wrap">
+    <div class="ki-head">
+      <div class="kicker"><span class="label">カルテ一覧 / KARTE INDEX</span></div>
+      <h1>各サービス・モデルの分析カルテ</h1>
+      <p class="lead">7 つのレンズ（カテゴリ）ごとに、注目サービス・モデル・規制を整理。気になるカードから個別カルテへ。<b style="color:var(--fg-sub);font-weight:500">全 {{ karte_total }} 件</b></p>
+    </div>
+  </div>
+
+  <div class="wrap">
+    {% for g in karte_index_groups %}
+    <section class="ki-group" data-cat="{{ g.cat }}">
+      <div class="ki-group-head">
+        <span class="gly" aria-hidden="true">{{ g.glyph }}</span>
+        <h2>{{ g.cat_label }}</h2>
+        <span class="count">{{ "%02d"|format(g.cards|length) }} 件</span>
+      </div>
+      <div class="ki-cards">
+        {% for it in g.cards %}
+        <a class="ki-card" href="{{ it.href }}" data-cat="{{ it.cat }}">
+          <h3>{{ it.name }}</h3>
+          <p class="pos">{{ it.positioning }}</p>
+          <div class="meta">
+            <span class="cat-mini">{{ it.glyph }} {{ it.cat_label }}</span>
+            <span class="vendor">{{ it.vendor }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+
+  {% include "_footer.html.j2" %}
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
