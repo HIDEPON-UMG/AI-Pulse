@@ -57,37 +57,62 @@
 }
 .ki-card:hover h3 { color: var(--cat); }
 
-/* (2026-06-04) カードの「直近アップデート」を 2 種並列で。
-   .upd.feed = フィード(events 最新) / .upd.karte = カルテ本体(entity.snapshot_date)。
-   何が更新されたかを一目で示すため接頭辞 (📰 / 📋) と種別ラベルを併記。
-   各々独立に fresh 判定し、7 日以内のものだけ accent 強調。 */
+/* (2026-06-04) カードの「直近アップデート」を 2 種並列で。位置はカード下方 (meta 直上)。
+   .upd.feed  = フィード(events 最新由来)         → accent (Claude Orange) で「動的な活発さ」を表現
+   .upd.karte = カルテ本体(entity.snapshot_date由来) → var(--cat) (カテゴリ色) で「このレンズの鮮度」を表現
+   各々独立に fresh (7 日以内) を判定して強調。 */
 .ki-card .upd-row {
   display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 6px;
 }
 .ki-card .upd {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-mono); font-size: 11.5px; line-height: 1;
   padding: 4px 9px; border-radius: var(--r-sm);
-  background: var(--bg-elev-2); color: var(--fg-sub);
-  border: 1px solid var(--border); letter-spacing: 0.02em;
+  color: var(--fg-sub); letter-spacing: 0.02em;
 }
 .ki-card .upd .kind {
   font-family: var(--font-head); font-size: 10.5px; font-weight: 700;
-  color: var(--fg-mute); letter-spacing: 0.06em;
+  letter-spacing: 0.06em;
 }
-.ki-card .upd .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-mute); flex: none; }
-.ki-card .upd .abs { color: var(--fg-mute); font-size: 10px; opacity: .85; }
-.ki-card .upd.fresh {
+.ki-card .upd .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.ki-card .upd .abs { font-size: 10px; opacity: .85; }
+
+/* feed: accent (Claude Orange) */
+.ki-card .upd.feed {
+  background: color-mix(in oklab, var(--accent) 7%, var(--bg-elev-2));
+  border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--border));
+}
+.ki-card .upd.feed .kind { color: color-mix(in oklab, var(--accent) 72%, var(--fg-mute)); }
+.ki-card .upd.feed .dot { background: color-mix(in oklab, var(--accent) 55%, var(--fg-mute)); }
+.ki-card .upd.feed .abs { color: color-mix(in oklab, var(--accent) 38%, var(--fg-mute)); }
+.ki-card .upd.feed.fresh {
   background: color-mix(in oklab, var(--accent) 20%, var(--bg-elev));
   color: var(--accent);
-  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
   font-weight: 700;
 }
-.ki-card .upd.fresh .kind { color: color-mix(in oklab, var(--accent) 70%, var(--fg-sub)); }
-.ki-card .upd.fresh .dot {
-  background: var(--accent); box-shadow: 0 0 6px var(--accent);
+.ki-card .upd.feed.fresh .kind { color: color-mix(in oklab, var(--accent) 82%, var(--fg-sub)); }
+.ki-card .upd.feed.fresh .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.ki-card .upd.feed.fresh .abs { color: color-mix(in oklab, var(--accent) 60%, var(--fg-sub)); }
+
+/* karte: カテゴリ色 (var(--cat)) */
+.ki-card .upd.karte {
+  background: color-mix(in oklab, var(--cat) 7%, var(--bg-elev-2));
+  border: 1px solid color-mix(in oklab, var(--cat) 24%, var(--border));
 }
-.ki-card .upd.fresh .abs { color: color-mix(in oklab, var(--accent) 55%, var(--fg-sub)); }
+.ki-card .upd.karte .kind { color: color-mix(in oklab, var(--cat) 72%, var(--fg-mute)); }
+.ki-card .upd.karte .dot { background: color-mix(in oklab, var(--cat) 55%, var(--fg-mute)); }
+.ki-card .upd.karte .abs { color: color-mix(in oklab, var(--cat) 38%, var(--fg-mute)); }
+.ki-card .upd.karte.fresh {
+  background: color-mix(in oklab, var(--cat) 20%, var(--bg-elev));
+  color: var(--cat);
+  border-color: color-mix(in oklab, var(--cat) 45%, var(--border));
+  font-weight: 700;
+}
+.ki-card .upd.karte.fresh .kind { color: color-mix(in oklab, var(--cat) 82%, var(--fg-sub)); }
+.ki-card .upd.karte.fresh .dot { background: var(--cat); box-shadow: 0 0 6px var(--cat); }
+.ki-card .upd.karte.fresh .abs { color: color-mix(in oklab, var(--cat) 60%, var(--fg-sub)); }
 .ki-card .pos {
   margin: 0; color: var(--fg-sub); font-size: 13px; line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -131,6 +156,8 @@
       <div class="ki-cards">
         {% for it in g.cards %}
         <a class="ki-card" href="{{ it.href }}" data-cat="{{ it.cat }}">
+          <h3>{{ it.name }}</h3>
+          <p class="pos">{{ it.positioning }}</p>
           <div class="upd-row">
             {% if it.feed_updated_rel %}
             <span class="upd feed{% if it.feed_updated_fresh %} fresh{% endif %}" title="フィード(直近ニュース) 最終 {{ it.feed_updated_abs }}">
@@ -145,8 +172,6 @@
             </span>
             {% endif %}
           </div>
-          <h3>{{ it.name }}</h3>
-          <p class="pos">{{ it.positioning }}</p>
           <div class="meta">
             <span class="cat-mini">{{ it.glyph }} {{ it.cat_label }}</span>
             <span class="vendor">{{ it.vendor }}</span>
