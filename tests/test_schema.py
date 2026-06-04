@@ -232,5 +232,40 @@ class TestSchemaContract(unittest.TestCase):
         self.assertTrue(ok["source_url"].startswith("https://"))
 
 
+class TestEntityComparisonCoverage(unittest.TestCase):
+    """ユーザー指摘 (2026-06-04): 新規 entity 追加時に comparison.cols を付け忘れる class of bugs。
+
+    なぜ重要か: comparison は optional だが、同レンズに 1 件でも持つ entity があれば
+    その category は「比較表で見せる」設計判断が確定している (= 既存カルテが table を描画する
+    前提)。新規追加 entity を comparison 無しで通すと、同じレンズの中で「表に載るカルテ」と
+    「表に何も出ないカルテ」が混在する穴あき状態になる。これは optional のままだと型検査で
+    弾けないため、契約テスト 1 件で本番データの「same-category consistency」として locked-in
+    する (feedback_check_design_principles の 4 段目: 個別 smoke でなく境界 1 件でクラスを封じる)。
+    """
+
+    def test_comparison_presence_is_consistent_within_category(self):
+        """本番 entities.jsonl で、同 category に comparison を持つ entity が 1 つでもあれば、
+        その category の全 entity が comparison を持つ。"""
+        entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+        by_cat: dict[str, list[dict]] = {}
+        for e in entities:
+            by_cat.setdefault(e["category"], []).append(e)
+        violations: list[str] = []
+        for cat, items in by_cat.items():
+            has_cmp = [e for e in items if e.get("comparison")]
+            missing = [e for e in items if not e.get("comparison")]
+            if has_cmp and missing:
+                violations.append(
+                    f"category={cat!r}: comparison 有 {len(has_cmp)} / 欠落 {len(missing)} "
+                    f"(欠落 entity: {[e['entity_id'] for e in missing]})"
+                )
+        self.assertFalse(
+            violations,
+            "同 category 内で comparison の有無が混在しています。"
+            "1 つでも持つカテゴリは全 entity が持つように揃えてください:\n  - "
+            + "\n  - ".join(violations),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
