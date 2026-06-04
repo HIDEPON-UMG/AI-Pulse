@@ -1,0 +1,324 @@
+{
+  "n": 11,
+  "judged": 10,
+  "completion": {
+    "flash-lite": 11,
+    "qwen3:14b": 11,
+    "35B-A3B": 11
+  },
+  "model_dim_avg": {
+    "flash-lite": {
+      "factual": 3.9,
+      "summary_quality": 3.9,
+      "points_quality": 3.9,
+      "rationale_quality": 1.8
+    },
+    "qwen3:14b": {
+      "factual": 3.2,
+      "summary_quality": 3.3,
+      "points_quality": 2.8,
+      "rationale_quality": 2.8
+    },
+    "35B-A3B": {
+      "factual": 3.3,
+      "summary_quality": 4.0,
+      "points_quality": 3.7,
+      "rationale_quality": 4.2
+    }
+  },
+  "model_overall": {
+    "flash-lite": 3.375,
+    "qwen3:14b": 3.025,
+    "35B-A3B": 3.8
+  },
+  "per_sample": [
+    {
+      "event_id": "2026-06-03-claudeop-gem01",
+      "scores": {
+        "flash-lite": {
+          "factual": 2,
+          "summary_quality": 3,
+          "points_quality": 2,
+          "rationale_quality": 1,
+          "comment": "Summary and points contain a factual error regarding a specific test trap (\"法的/保険の要求書トラップ\") that is not detailed in the provided article text. The rationale provides only labels without explanation."
+        },
+        "qwen3:14b": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "The summary and points are highly factual and capture the essence of the article well. The rationale provides good explanations for impact and buzz, demonstrating logical depth."
+        },
+        "35B-A3B": {
+          "factual": 4,
+          "summary_quality": 4,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "The summary and points are comprehensive and mostly factual, with a minor inference about the specific nature of the \"legal\" trap. The rationale is exceptionally well-reasoned, providing detailed explanations for buzz, impact, and importance."
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-claudeop-gem03",
+      "scores": {
+        "qwen3:14b": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 2,
+          "comment": "要約と要点抽出は正確で、記事の主要な情報を網羅しています。しかし、rationaleのimpactとbuzzがほぼ同じ内容で、論理的な深さに欠けます。"
+        },
+        "35B-A3B": {
+          "factual": 2,
+          "summary_quality": 5,
+          "points_quality": 2,
+          "rationale_quality": 4,
+          "comment": "要約は非常に優れており、記事の背景と広範な影響まで含めています。rationaleも論理的で深みがあります。しかし、summary_pointsの4点目で「Rajesh Jha」という人物名と内部メモの内容が記事本文にない捏造であり、事実正確性が大きく損なわれています。"
+        },
+        "flash-lite": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 5,
+          "rationale_quality": 2,
+          "comment": "要約と要点抽出は非常に正確で、特にClaudeモデル自体は引き続き利用可能であるという重要な詳細も含まれています。要点も網羅的で具体的です。しかし、rationaleは非常に表面的で、論理的な深さや具体的な含意の指摘がほとんどありません。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-claudeop-gem05",
+      "scores": {
+        "35B-A3B": {
+          "factual": 4,
+          "summary_quality": 5,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "Summary is comprehensive and well-structured. Summary points are mostly accurate, but one point and the importance rationale include minor inferences not explicitly stated in the source text (e.g., '復旧まで数十分で対応されたものの')."
+        },
+        "flash-lite": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 5,
+          "rationale_quality": 1,
+          "comment": "The summary and summary points are factually accurate and well-extracted. However, the rationale section is very weak, only providing 'mid' labels without any explanation, which significantly reduces its quality as per instructions."
+        },
+        "qwen3:14b": {
+          "factual": 2,
+          "summary_quality": 2,
+          "points_quality": 2,
+          "rationale_quality": 3,
+          "comment": "The summary and summary points contain self-referential text about markdown/formatting ('下線 された', '==マーカー== された'). This is a significant content generation flaw as it refers to elements not present in the source article. The rationale for importance is just a label."
+        }
+      }
+    },
+    {
+      "event_id": "2026-05-29-devin-gem03",
+      "scores": {
+        "flash-lite": {
+          "factual": 2,
+          "summary_quality": 2,
+          "points_quality": 2,
+          "rationale_quality": 4,
+          "comment": "記事に存在しない「エンジニアの89%のコードをコミット」という情報が捏造されており、事実正確性が著しく低い。また、「多くの苦痛」という表現も記事にはありません。この重大な事実誤認により、要約とポイントの品質も大きく損なわれています。rationaleは論理的ですが、誤った情報に基づいている部分があります。"
+        },
+        "qwen3:14b": {
+          "factual": 1,
+          "summary_quality": 1,
+          "points_quality": 1,
+          "rationale_quality": 2,
+          "comment": "記事に存在しない「エンジニアが書いたコードの89%がDevinによって書かれている」という情報に加え、「コードの保守やプラットフォーム移行」といった具体的なタスクも捏造されており、事実正確性が極めて低い。要約とポイントの品質は、これらの複数の重大な事実誤認によって完全に損なわれています。rationaleのimportanceは単なる値ラベルの反復で深みがありません。"
+        },
+        "35B-A3B": {
+          "factual": 2,
+          "summary_quality": 2,
+          "points_quality": 2,
+          "rationale_quality": 3,
+          "comment": "記事に存在しない「Devinがコミットされたコードの89%を占めている」という情報が捏造されており、事実正確性が著しく低い。この重大な事実誤認により、要約とポイントの品質も大きく損なわれています。rationaleは論理的ですが、buzzとimpactの根拠にこの誤情報が含まれているため、その説得力が低下しています。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-29-cursor-gem03",
+      "scores": {
+        "35B-A3B": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "全ての採点軸において非常に高い品質。要約は網羅的かつ正確で、要点も具体的かつ詳細。論理的根拠も深く、含意や波及効果まで言及されている。"
+        },
+        "flash-lite": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "要約と要点ともに非常に正確で網羅性も高い。論理的根拠も深く、具体的な影響や背景を適切に説明している。"
+        },
+        "qwen3:14b": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 2,
+          "comment": "要約と要点は正確だが、他の候補と比較して情報量がやや少ない。特に、rationaleのimportanceが単なるラベルの繰り返しであり、指示に反しているため大きく減点。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-22-cursor-gem05",
+      "scores": {
+        "flash-lite": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 1,
+          "comment": "Summaryとsummary_pointsは記事本文に忠実で、情報量も適切です。しかし、rationaleは各項目について具体的な説明がなく、単にラベルを繰り返しているだけなので、品質が低いです。"
+        },
+        "qwen3:14b": {
+          "factual": 3,
+          "summary_quality": 4,
+          "points_quality": 3,
+          "rationale_quality": 4,
+          "comment": "summaryで「買収する計画を発表」とありますが、本文では「買収する権利を持つ」とあり、ニュアンスが異なります。summary_pointsの1点目も、「xAIと提携する選択肢」と「100億ドルで共同開発」を混同しており、本文の事実と異なります。rationaleのimpactとbuzzは詳細な説明があり良いですが、importanceはラベルのみです。"
+        },
+        "35B-A3B": {
+          "factual": 2,
+          "summary_quality": 3,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "summaryに「来年中に$60Bで買収する権利を持つ」とありますが、本文では「今年後半に(later this year)」とあり、時期に関する重大な事実誤認があります。summary_pointsは正確で具体性も高いです。rationaleは各項目について非常に詳細かつ論理的な説明がされており、品質が非常に高いです。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-flux-gem01",
+      "scores": {
+        "qwen3:14b": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 3,
+          "comment": "要約は主要な情報を網羅していますが、表現がやや間接的です。要点も適切に抽出されています。しかし、rationaleのimportanceとimpactの理由付けが重複しており、深掘りが不足しています。"
+        },
+        "35B-A3B": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "要約は非常に簡潔かつ網羅的で、記事の核心を的確に捉えています。要点も具体的で、Black Forest Labsへの言及や「創造的に自由」といった詳細が含まれています。rationaleは、importance、impact、buzzのそれぞれについて、論理的かつ深い考察がされており、非常に優れています。"
+        },
+        "flash-lite": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 5,
+          "rationale_quality": 1,
+          "comment": "要約は詳細で、スコセッシ監督の哲学にも触れており良いです。要点も包括的で具体的です。しかし、rationaleの項目がラベルのみで、説明が一切ないため、評価基準に照らして大幅な減点となります。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-03-physical-gem01",
+      "scores": {
+        "35B-A3B": {
+          "factual": 3,
+          "summary_quality": 4,
+          "points_quality": 3,
+          "rationale_quality": 4,
+          "comment": "要約は主要な点をよく捉えていますが、サマリーポイントに「郭松教授」と「アジア太平洋地域」という、記事本文にない情報が含まれており、事実正確性とポイントの品質を損なっています。根拠の質は良好です。"
+        },
+        "flash-lite": {
+          "factual": 4,
+          "summary_quality": 5,
+          "points_quality": 4,
+          "rationale_quality": 1,
+          "comment": "要約は非常に優れており、記事の主要な側面を簡潔かつ包括的にまとめています。サマリーポイントも概ね正確ですが、「アジア太平洋地域」という表現は記事本文に明示されていません。根拠のセクションは「high」と繰り返すだけで、説明が全くなく、品質が非常に低いです。"
+        },
+        "qwen3:14b": {
+          "factual": 2,
+          "summary_quality": 3,
+          "points_quality": 2,
+          "rationale_quality": 3,
+          "comment": "要約とサマリーポイントには、「Prof. GUO Song」や「アジア太平洋地域」など、記事本文にない複数の事実誤認が含まれています。要約は記事の重要な詳細をいくつか見落としています。根拠の「impact」と「buzz」は良いですが、「importance」は説明が不足しています。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-physical-gem02",
+      "scores": {
+        "flash-lite": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 1,
+          "comment": "Summary and points are excellent, accurately reflecting the article's core message and details. However, the rationale section merely repeats parts of the article without adding analytical depth, which is a significant drawback according to the instructions."
+        },
+        "qwen3:14b": {
+          "factual": 3,
+          "summary_quality": 4,
+          "points_quality": 3,
+          "rationale_quality": 3,
+          "comment": "The summary is good and covers key aspects. However, one summary point distorts the causal relationship between physical intelligence and market potential (linking 'Physical Intelligence の進化により' directly to 'ロボティクス業界が世界GDPの50％に達する可能性がある'). The rationale for impact and buzz is well-explained, but 'importance' is just a label, which reduces the rationale quality score."
+        },
+        "35B-A3B": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "The summary and points are highly comprehensive and accurate, covering almost all significant details from the article's key takeaways. The rationale section is exceptionally well-developed, offering deep logical explanations for importance, impact, and buzz, going beyond mere repetition of labels or article text."
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-23-devin-gem05",
+      "scores": {
+        "qwen3:14b": {
+          "factual": 1,
+          "summary_quality": 2,
+          "points_quality": 1,
+          "rationale_quality": 2,
+          "comment": "The candidate fabricates previous funding details ($10.2B valuation) and mentions adopting companies (Dell, Cisco) not present in the article. The amount to raise is slightly exaggerated from 'hundreds of millions' to 'hundreds of billions'."
+        },
+        "35B-A3B": {
+          "factual": 1,
+          "summary_quality": 2,
+          "points_quality": 1,
+          "rationale_quality": 2,
+          "comment": "The candidate fabricates multiple previous funding details ($4B, $10.2B valuation, $4B amount to raise) and mentions adopting companies (Dell, Cisco) not present in the article."
+        },
+        "flash-lite": {
+          "factual": 1,
+          "summary_quality": 2,
+          "points_quality": 1,
+          "rationale_quality": 1,
+          "comment": "The candidate fabricates 'enterprise features' in the summary and provides completely made-up details about a previous funding round (date, amount, valuation) in the points. The rationale quality is very poor, simply repeating 'high' without any explanation."
+        }
+      }
+    }
+  ],
+  "latency": {
+    "qwen3:14b": [
+      19.583493947982788,
+      11.478763580322266,
+      11.317160367965698,
+      13.373207330703735,
+      13.651132345199585,
+      10.912905216217041,
+      10.443750143051147,
+      11.914856433868408,
+      10.835428714752197,
+      12.409140586853027,
+      11.655860662460327
+    ],
+    "35B-A3B": [
+      30.13410973548889,
+      14.280702352523804,
+      13.783008813858032,
+      14.495466470718384,
+      12.83611536026001,
+      13.801214933395386,
+      12.711558818817139,
+      12.357212543487549,
+      20.203675985336304,
+      27.143878936767578,
+      17.75138759613037
+    ]
+  }
+}

@@ -1,0 +1,327 @@
+{
+  "n": 11,
+  "judged": 10,
+  "completion": {
+    "flash-lite-現状": 11,
+    "35B-現状": 11,
+    "35B-対策": 11
+  },
+  "dim_avg": {
+    "flash-lite-現状": {
+      "factual": 4.9,
+      "summary_quality": 4.3,
+      "points_quality": 4.3,
+      "rationale_quality": 3.7
+    },
+    "35B-現状": {
+      "factual": 4.5,
+      "summary_quality": 4.1,
+      "points_quality": 4.0,
+      "rationale_quality": 4.3
+    },
+    "35B-対策": {
+      "factual": 4.2,
+      "summary_quality": 4.5,
+      "points_quality": 4.7,
+      "rationale_quality": 4.6
+    }
+  },
+  "overall": {
+    "flash-lite-現状": 4.3,
+    "35B-現状": 4.225,
+    "35B-対策": 4.5
+  },
+  "delta_factual_treat_minus_base": -0.2999999999999998,
+  "delta_factual_vs_flashlite": -0.7000000000000002,
+  "per_sample": [
+    {
+      "event_id": "2026-06-03-claudeop-gem01",
+      "scores": {
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "記事の主要な事実を正確に抽出し、簡潔にまとめている。要点も適切に網羅されており、論理的な根拠も明確である。"
+        },
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 5,
+          "comment": "記事の主要な事実を正確に抽出し、簡潔にまとめている。論理的な根拠は特に優れており、「importance」で単一テストの限界に言及するなど、深い洞察が見られる。"
+        },
+        "35B-対策": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "記事の主要な事実を非常に正確かつ詳細に抽出している。要約と要点リストは網羅性が高く、Opus 4.8の改善点と問題点の両方を具体的に示している。論理的な根拠も深みがある。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-claudeop-gem03",
+      "scores": {
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "記事の主要な事実を正確に捉え、要約とポイントで理由と背景を網羅している。rationaleもそれぞれの観点から論理的に説明されている。"
+        },
+        "35B-対策": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "記事の主要な事実と重要なニュアンス（Anthropicとの完全な断絶ではない点、実験フェーズ終了）を正確に捉えている。要約とポイントの網羅性が高く、rationaleも非常に論理的で深みがある。"
+        },
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "記事の主要な事実とニュアンスを正確に捉えている。要約とポイントは簡潔で分かりやすい。rationaleも論理的に説明されている。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-claudeop-gem05",
+      "scores": {
+        "35B-対策": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "全ての情報が記事本文に基づいており、捏造や誤りがありません。要約は簡潔で、主要なポイントを網羅しています。各ポイントも具体的で、記事の重要な側面を捉えています。rationaleも単なるラベルではなく、具体的な理由付けがされており、非常に質の高い抽出です。"
+        },
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 1,
+          "comment": "記事本文の事実を正確に抽出しており、捏造はありません。要約とポイントは主要な情報を簡潔にまとめていますが、記事の後半で強調されているAIへの依存度増加といった文脈がやや不足しています。rationaleは単に「high」と記述されているだけで、論理的な深さが全くなく、指示に反しています。"
+        },
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "記事本文の事実を正確に抽出しており、捏造はありません。要約は簡潔で、ポイントは網羅性と具体性があります。特にrationaleは、各評価軸に対して具体的な理由付けと深い考察がされており、非常に優れています。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-07-cursor-gem01",
+      "scores": {
+        "35B-現状": {
+          "factual": 4,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 5,
+          "comment": "要約とポイントにおいて、資金調達交渉の時期（2026年4月）と20億ドルARR達成時期（2026年4月）に本文とのわずかな不正確さがあります。本文では、600億ドル評価額の交渉は「early 2026」とされ、20億ドルARRは「February 2026」に達成されたと更新されています。しかし、捏造はなく、要点と論理的深さは良好です。"
+        },
+        "35B-対策": {
+          "factual": 4,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "要約とポイントにおいて、20億ドルARR達成時期（2026年4月）に本文とのわずかな不正確さがあります。本文では「February 2026」に達成されたと更新されています。しかし、資金調達交渉の時期は「2026年初頭」と正確です。全体的に最も網羅性が高く、要約の質も優れています。論理的深さも非常に良好です。"
+        },
+        "flash-lite-現状": {
+          "factual": 4,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 5,
+          "comment": "要約とポイントにおいて、20億ドルARR達成時期（2026年4月）に本文とのわずかな不正確さがあります。本文では「February 2026」に達成されたと更新されています。資金調達交渉の時期は「2026年初頭」と正確です。要約とポイントは適切にまとめられており、論理的深さも良好です。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-29-cursor-gem03",
+      "scores": {
+        "35B-対策": {
+          "factual": 2,
+          "summary_quality": 3,
+          "points_quality": 4,
+          "rationale_quality": 3,
+          "comment": "要約文で「米下院両党議員団」とあるが、記事本文では「Two Republican-led House committees」と明記されており、事実と異なるためfactualを減点。rationaleのimportanceで「初の事例」と断定している点も本文からは読み取れない。"
+        },
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 5,
+          "rationale_quality": 3,
+          "comment": "要約と要点抽出は非常に正確で、記事の主要な情報を網羅している。rationaleのimportanceは、内容を反復するに留まり、論理的な深さに欠ける。"
+        },
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "要約、要点、rationaleの全てにおいて非常に質が高い。特にrationaleは、単なるラベルの反復ではなく、論理的な深さを持って説明されている。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-22-cursor-gem05",
+      "scores": {
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "記事本文の事実を正確に抽出し、捏造や誤解釈が一切ありません。要約とポイントは簡潔かつ網羅的で、論理的な深さも兼ね備えています。"
+        },
+        "35B-現状": {
+          "factual": 1,
+          "summary_quality": 2,
+          "points_quality": 2,
+          "rationale_quality": 3,
+          "comment": "複数の重大な事実誤認と捏造があります。「エラート・ムスク」という人名の誤り、「来年の株式市場デビュー」という本文にない時期の言及、「2025年に登場した」というツールの開始時期の誤りなど、厳密な本文照合で大きく減点されます。要約とポイントの品質もこれらの誤りにより低下しています。"
+        },
+        "35B-対策": {
+          "factual": 4,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "概ね正確ですが、「技術基盤の再編が進む」という表現は、本文の「モデルの知能を大幅にスケールアップする」という記述から推測されるものであり、本文に直接明記されている事実ではありません。この解釈の追加により、わずかに減点しました。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-flux-gem01",
+      "scores": {
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 4,
+          "rationale_quality": 5,
+          "comment": "本文の事実を正確に抽出し、要約とラショナルは非常に質の高い内容です。ポイントにおいて、主演俳優の一人が省略されているため、網羅性の点でわずかに改善の余地があります。"
+        },
+        "35B-対策": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "本文の事実を正確に抽出し、要約、ポイント、ラショナルともに非常に質の高い内容です。特に、主演俳優を両名記載している点で網羅性が優れています。"
+        },
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 4,
+          "rationale_quality": 5,
+          "comment": "本文の事実を正確に抽出し、要約とラショナルは非常に質の高い内容です。ポイントが細かく分けられていますが、主演俳優に関する言及がないため、網羅性の点でわずかに改善の余地があります。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-03-physical-gem01",
+      "scores": {
+        "35B-対策": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "記事本文の情報を正確に抽出し、要点を簡潔にまとめている。サマリーポイントは網羅的で具体的。rationaleも各項目について論理的な説明がされており、非常に質の高い抽出である。"
+        },
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 1,
+          "comment": "記事本文の情報を正確に抽出しており、要点もよくまとまっている。サマリーポイントも網羅性が高い。しかし、rationaleが単に「high」と記述されているだけで、論理的な説明が一切なく、指示に反しているため大きく減点する。"
+        },
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 3,
+          "rationale_quality": 5,
+          "comment": "記事本文の情報を正確に抽出しており、rationaleも論理的な説明がされている。しかし、サマリーポイントが他の候補と比較して網羅性に欠ける部分がある（例：支援する戦略産業、世界モデルの活用、人材育成などへの言及が少ない）。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-06-02-physical-gem02",
+      "scores": {
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "全体的に記事の要点を正確に捉え、簡潔にまとめられています。要点も網羅性が高く、根拠も明確で良いです。"
+        },
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 1,
+          "comment": "要約と要点は正確で良いですが、rationaleのbuzzセクションが要約の繰り返しになっており、指示に反します。"
+        },
+        "35B-対策": {
+          "factual": 2,
+          "summary_quality": 3,
+          "points_quality": 4,
+          "rationale_quality": 4,
+          "comment": "要約中の「数万億ドル規模の収益創出」という記述は、本文の「数兆ドル規模の収益」と「数十兆ドル規模の時価総額」を混同しており、事実誤認があるためfactualを減点しました。"
+        }
+      }
+    },
+    {
+      "event_id": "2026-04-23-devin-gem05",
+      "scores": {
+        "35B-現状": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "全ての情報が記事本文に正確に基づいています。要約、要点、根拠のいずれも質が高く、論理的で具体的です。特に、競合他社や主要顧客に関する情報も適切に盛り込まれており、網羅性も優れています。"
+        },
+        "35B-対策": {
+          "factual": 5,
+          "summary_quality": 5,
+          "points_quality": 5,
+          "rationale_quality": 5,
+          "comment": "全ての情報が記事本文に正確に基づいています。要約、要点、根拠のいずれも質が高く、論理的で具体的です。Aと同様に、競合他社や主要顧客に関する情報も適切に盛り込まれており、網羅性も優れています。"
+        },
+        "flash-lite-現状": {
+          "factual": 5,
+          "summary_quality": 4,
+          "points_quality": 4,
+          "rationale_quality": 5,
+          "comment": "全ての情報が記事本文に正確に基づいています。根拠は論理的で質が高いです。要約と要点も良いですが、競合他社（Anthropic, OpenAI）や主要顧客（Dell, Cisco）に関する言及がAやBに比べて少ないため、網羅性でわずかに劣ります。"
+        }
+      }
+    }
+  ],
+  "latency": {
+    "flash-lite-現状": [],
+    "35B-現状": [
+      13.877934694290161,
+      17.763689756393433,
+      17.57204580307007,
+      17.243993043899536,
+      16.26193618774414,
+      17.718305587768555,
+      19.369951248168945,
+      17.983778953552246,
+      18.06586480140686,
+      15.83167839050293,
+      18.47177243232727
+    ],
+    "35B-対策": [
+      17.145587682724,
+      17.36927580833435,
+      16.059518337249756,
+      16.19277548789978,
+      20.041341304779053,
+      17.916626691818237,
+      17.132583618164062,
+      14.139752864837646,
+      16.39955735206604,
+      16.308335304260254,
+      15.934457778930664
+    ]
+  }
+}

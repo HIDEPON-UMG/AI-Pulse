@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja" data-palette="ion">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ローカル LLM 抽出置換 調査レポート — AI-Pulse</title>
+  <style>
+    /* ============================================================
+       AI-Pulse Design Tokens 継承（static/theme.css / DESIGN.md）
+       色・フォント・余白・角丸はこの CSS 変数のみ参照（直書き禁止）
+       外部 CDN 依存なし・全インライン・オフラインで開ける単一 HTML
+       ============================================================ */
+    :root {
+      --bg:         oklch(0.178 0.004 265);
+      --bg-elev:    oklch(0.220 0.005 265);
+      --bg-elev-2:  oklch(0.268 0.006 265);
+      --fg:         oklch(0.952 0.003 265);
+      --fg-sub:     oklch(0.745 0.007 265);
+      --fg-mute:    oklch(0.560 0.008 265);
+      --border:     oklch(0.300 0.006 265);
+      --border-soft:oklch(0.252 0.006 265);
+      --accent:     oklch(0.82 0.130 205);
+      --accent-2:   oklch(0.72 0.140 222);
+      --accent-fg:  oklch(0.17 0.030 230);
+      --accent-weak: color-mix(in oklab, var(--accent) 14%, transparent);
+      /* model identity colors（カテゴリ accent から流用） */
+      --m-fl:  oklch(0.84 0.130 82);   /* flash-lite = amber  */
+      --m-q:   oklch(0.74 0.135 256);  /* qwen3:14b  = blue   */
+      --m-35:  oklch(0.81 0.140 158);  /* 35B-A3B    = green  */
+      --sev-warn: oklch(0.84 0.130 82);
+      --sev-err:  oklch(0.72 0.175 28);
+      --sev-ok:   oklch(0.81 0.140 158);
+      --font-head:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho",serif;
+      --font-body:"Noto Serif JP",Georgia,serif;
+      --font-sans:"Noto Sans JP",system-ui,-apple-system,sans-serif;
+      --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+      --s-4:4px; --s-8:8px; --s-16:16px; --s-24:24px; --s-32:32px; --s-48:48px;
+      --r-sm:4px; --r-md:8px; --r-lg:14px;
+      --shadow-2: 0 2px 10px oklch(0 0 0 / 0.40), 0 1px 0 oklch(0 0 0 / 0.50);
+      --maxw: 1080px;
+    }
+    *,*::before,*::after{box-sizing:border-box;}
+    html{scroll-behavior:smooth;}
+    body{
+      margin:0; background:var(--bg); color:var(--fg);
+      font-family:var(--font-body); font-size:16px; line-height:1.75;
+      -webkit-font-smoothing:antialiased;
+    }
+    .container{max-width:var(--maxw); margin:0 auto; padding:var(--s-48) var(--s-24) var(--s-48);}
+
+    /* Header */
+    .hd{padding-bottom:var(--s-24); border-bottom:1px solid var(--border); margin-bottom:var(--s-24);}
+    .eyebrow{color:var(--accent); font-family:var(--font-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase;}
+    h1{font-family:var(--font-head); font-weight:700; font-size:clamp(26px,3.6vw,40px); line-height:1.15; letter-spacing:-.01em; margin:var(--s-16) 0 var(--s-8);}
+    .lead{color:var(--fg-sub); font-size:18px; margin:var(--s-8) 0 var(--s-16);}
+    .badges{display:flex; gap:var(--s-8); flex-wrap:wrap; margin-top:var(--s-16);}
+    .badge{display:inline-block; background:var(--accent-weak); color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:3px 12px; font-family:var(--font-mono); font-size:11.5px; letter-spacing:.03em;}
+
+    h2{font-family:var(--font-head); font-weight:700; font-size:24px; letter-spacing:-.01em; margin:0 0 var(--s-16); color:var(--fg);}
+    h3{font-family:var(--font-head); font-weight:700; font-size:18px; margin:var(--s-32) 0 var(--s-8); color:var(--fg);}
+    p{margin:0 0 var(--s-16);}
+    a{color:var(--accent); text-decoration:none;}
+    a:hover{text-decoration:underline;}
+    strong{color:var(--fg); font-weight:700;}
+    em{color:var(--fg-sub); font-style:italic;}
+
+    /* Tabs */
+    .tabs{display:flex; gap:var(--s-4); border-bottom:1px solid var(--border); margin-bottom:var(--s-32); overflow-x:auto;}
+    .tab{background:none; border:none; padding:var(--s-8) var(--s-16); font-family:var(--font-sans); font-size:14px; color:var(--fg-mute); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap;}
+    .tab:hover{color:var(--fg);}
+    .tab.active{color:var(--accent); border-bottom-color:var(--accent); font-weight:500;}
+    .panel{display:none;}
+    .panel.active{display:block; animation:fade 160ms ease-out;}
+    @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+
+    /* Cards & callouts */
+    .card{background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s-24); box-shadow:var(--shadow-2);}
+    .grid2{display:grid; grid-template-columns:1fr 1fr; gap:var(--s-16); margin:var(--s-16) 0;}
+    .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-16); margin:var(--s-16) 0;}
+    .callout{border-left:3px solid var(--accent); background:var(--accent-weak); padding:var(--s-16); border-radius:0 var(--r-md) var(--r-md) 0; margin:var(--s-16) 0;}
+    .callout.warn{border-left-color:var(--sev-warn); background:color-mix(in oklab,var(--sev-warn) 12%,transparent);}
+    .callout.err{border-left-color:var(--sev-err); background:color-mix(in oklab,var(--sev-err) 12%,transparent);}
+    .callout.ok{border-left-color:var(--sev-ok); background:color-mix(in oklab,var(--sev-ok) 12%,transparent);}
+    .callout .tag{font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--fg-sub); display:block; margin-bottom:4px;}
+    .callout p:last-child{margin-bottom:0;}
+
+    /* Tables */
+    table{width:100%; border-collapse:collapse; margin:var(--s-16) 0; font-family:var(--font-sans); font-size:14px;}
+    th,td{text-align:left; padding:var(--s-8) var(--s-16); border-bottom:1px solid var(--border-soft); vertical-align:top;}
+    th{font-weight:600; color:var(--fg-sub); font-size:12px; letter-spacing:.03em; text-transform:uppercase;}
+    td.num,th.num{text-align:right; font-family:var(--font-mono); font-size:13px;}
+    tr.best td{background:color-mix(in oklab,var(--m-35) 10%,transparent);}
+    .win{color:var(--m-35); font-weight:700;}
+    .lose{color:var(--sev-err);}
+
+    code{font-family:var(--font-mono); font-size:13px; background:var(--bg-elev-2); padding:2px 6px; border-radius:var(--r-sm); border:1px solid var(--border-soft); color:var(--fg);}
+    pre{background:var(--bg-elev-2); border:1px solid var(--border-soft); border-radius:var(--r-md); padding:var(--s-16); overflow-x:auto; font-family:var(--font-mono); font-size:13px; line-height:1.6; margin:var(--s-16) 0; color:var(--fg-sub);}
+
+    ul,ol{margin:0 0 var(--s-16); padding-left:var(--s-24);}
+    li{margin-bottom:var(--s-8);}
+
+    /* model swatch + legend */
+    .legend{display:flex; gap:var(--s-24); flex-wrap:wrap; margin:var(--s-8) 0 var(--s-16); font-family:var(--font-sans); font-size:13px; color:var(--fg-sub);}
+    .sw{display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle;}
+
+    /* SVG */
+    .fig{background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s-16); margin:var(--s-16) 0;}
+    .fig svg{width:100%; height:auto; display:block;}
+    .b-fl{fill:var(--m-fl);} .b-q{fill:var(--m-q);} .b-35{fill:var(--m-35);}
+    .grid-line{stroke:var(--border-soft); stroke-width:1;}
+    .axis-txt{fill:var(--fg-mute); font-family:var(--font-mono); font-size:11px;}
+    .bar-val{fill:var(--fg-sub); font-family:var(--font-mono); font-size:10px; text-anchor:middle;}
+    .grp-txt{fill:var(--fg); font-family:var(--font-sans); font-size:12.5px; text-anchor:middle;}
+    .flow-box{fill:var(--bg-elev-2); stroke:var(--border-strong,var(--border)); stroke-width:1;}
+    .flow-txt{fill:var(--fg); font-family:var(--font-sans); font-size:12px; text-anchor:middle;}
+    .flow-sub{fill:var(--fg-mute); font-family:var(--font-mono); font-size:10px; text-anchor:middle;}
+    .flow-arrow{stroke:var(--accent); stroke-width:1.5;}
+
+    .rec{background:linear-gradient(180deg,var(--accent-weak),transparent); border:1px solid var(--accent); border-radius:var(--r-lg); padding:var(--s-24); margin:var(--s-16) 0;}
+    .rec h3{margin-top:0; color:var(--accent);}
+    .kpi{font-family:var(--font-mono); font-size:28px; font-weight:700; color:var(--fg); line-height:1;}
+    .kpi small{display:block; font-family:var(--font-sans); font-size:12px; color:var(--fg-mute); font-weight:400; margin-top:4px;}
+
+    .foot{margin-top:var(--s-48); padding-top:var(--s-16); border-top:1px solid var(--border); color:var(--fg-mute); font-size:13px;}
+
+    @media (max-width:760px){
+      .grid2,.grid3{grid-template-columns:1fr;}
+      .container{padding:var(--s-32) var(--s-16);}
+    }
+    @media print{.tabs{display:none;} .panel{display:block !important; page-break-after:always;}}
+  </style>
+</head>
+<body>
+<main class="container">
+  <header class="hd">
+    <div class="eyebrow">EVAL · 2026-06-04 · AI-Pulse</div>
+    <h1>ローカル LLM 抽出置換 調査レポート</h1>
+    <p class="lead">AI-Pulse の記事抽出を Gemini API からローカル LLM（Ollama / RTX5080 16GB）へ置換できるか — 4 段階の eval と盲検ジャッジ採点による定量判断。</p>
+    <div class="badges">
+      <span class="badge">N=10 盲検採点</span>
+      <span class="badge">3 contestant</span>
+      <span class="badge">gemini-flash judge</span>
+      <span class="badge">結論: 35B≈flash-lite 互角</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="summary">概要・推奨</button>
+    <button class="tab" data-tab="quant">定量結果</button>
+    <button class="tab" data-tab="evidence">詳細エビデンス</button>
+    <button class="tab" data-tab="trade">強みの交換</button>
+    <button class="tab" data-tab="decision">決定マトリクス</button>
+    <button class="tab" data-tab="impl">実装前提作業</button>
+  </nav>
+
+  <!-- ===== 概要・推奨 ===== -->
+  <section id="summary" class="panel active">
+    <h2>エグゼクティブサマリ</h2>
+    <p><strong>品質は 35B-A3B ≈ flash-lite の互角（強みの交換）</strong>。qwen3:14b は明確に 3 番手。盲検ジャッジ総合は 35B-A3B <strong>3.80</strong> &gt; flash-lite 3.38 &gt; qwen3:14b 3.02（各 1-5）。ただし総合の逆転は <strong>rationale 次元がほぼ単独で駆動</strong>しており、<strong>factual（事実忠実度）はむしろ flash-lite が上</strong>。</p>
+
+    <div class="callout">
+      <span class="tag">動機の正確な理解</span>
+      <p><strong>ローカル化は「品質向上」ではない</strong>。コストは flash-lite で既に <code>$0.015/76件</code>。動機は <strong>APIクォータ非依存・オフライン自走・考察記事(essay)の同モデル一本化・環境活用</strong>。品質は「維持」が正しい理解。</p>
+    </div>
+
+    <div class="rec">
+      <h3>Claude 推奨：抽出は 35B-A3B 一本化</h3>
+      <div class="grid3">
+        <div><div class="kpi">3.80<small>盲検総合（最良）</small></div></div>
+        <div><div class="kpi">~22分<small>76件直列（夜間OK）</small></div></div>
+        <div><div class="kpi">×0<small>API クォータ依存</small></div></div>
+      </div>
+      <p style="margin-bottom:0;">essay と同モデル・判定品質最良・運用単純。<strong>qwen3:14b は見送り</strong>（品質3番手・速度差は夜間バッチで僅少）。<strong>ハイブリッド配線</strong>（local 失敗/GPU 占有時に Gemini フォールバック）。最大の watch-item は <strong>factual 忠実度</strong>（ローカルは固有名詞捏造がやや多い）。</p>
+    </div>
+
+    <h3>調査の流れ（4 段階）</h3>
+    <div class="fig">
+      <svg viewBox="0 0 880 120" role="img" aria-label="調査の4段階フロー">
+        <defs>
+          <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0 0 L7 3 L0 6 Z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        <g>
+          <rect class="flow-box" x="10" y="34" width="190" height="52" rx="8"/>
+          <text class="flow-txt" x="105" y="56">① 実機プローブ</text>
+          <text class="flow-sub" x="105" y="74">think:false + schema OK</text>
+        </g>
+        <path class="flow-arrow" d="M205 60 L225 60" marker-end="url(#ar)"/>
+        <g>
+          <rect class="flow-box" x="230" y="34" width="190" height="52" rx="8"/>
+          <text class="flow-txt" x="325" y="56">② 2-way / ③ 4-way</text>
+          <text class="flow-sub" x="325" y="74">強調脱落・maxLen 語中切れ</text>
+        </g>
+        <path class="flow-arrow" d="M425 60 L445 60" marker-end="url(#ar)"/>
+        <g>
+          <rect class="flow-box" x="450" y="34" width="200" height="52" rx="8"/>
+          <text class="flow-txt" x="550" y="56">④ 盲検ジャッジ N=12</text>
+          <text class="flow-sub" x="550" y="74">条件公平化・定量採点</text>
+        </g>
+        <path class="flow-arrow" d="M655 60 L675 60" marker-end="url(#ar)"/>
+        <g>
+          <rect class="flow-box" x="680" y="34" width="190" height="52" rx="8" style="stroke:var(--accent);"/>
+          <text class="flow-txt" x="775" y="56">35B-A3B 推奨</text>
+          <text class="flow-sub" x="775" y="74">品質互角＋非機能</text>
+        </g>
+      </svg>
+    </div>
+
+    <h3>ローカル化の動機（コスト以外）</h3>
+    <table>
+      <thead><tr><th>動機</th><th>ローカル化の効きどころ</th></tr></thead>
+      <tbody>
+        <tr><td>API クォータ非依存</td><td>Google が Free Tier を 50-80% 削減済み。RPD 1000 が将来の収集件数増で天井</td></tr>
+        <tr><td>オフライン自走</td><td>API キー管理・外部 API 障害（先日の Claude 障害のような）から独立</td></tr>
+        <tr><td>考察記事(essay)の追加</td><td>長文生成は Gemini Free Tier の quota を食う。35B-A3B ならローカルで青天井</td></tr>
+        <tr><td>環境活用・実験</td><td>RTX5080 + Ollama を実運用に乗せる</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 定量結果 ===== -->
+  <section id="quant" class="panel">
+    <h2>盲検ジャッジ採点（最も厳密な比較）</h2>
+    <div class="callout">
+      <span class="tag">方法</span>
+      <p>N=11（本文取得成功）/ 採点 10 件（3 モデル全成功サンプル・1 件はジャッジ 503 で欠測）。<strong>評価条件を計画アーキに合わせて公平化</strong>：強調契約を無効化（強調はコード付与へ移す決定済）+ maxLength を 400 に緩和（語中切れ除去）。3 モデル同条件・temp 0.4。<code>gemini-2.5-flash</code> が本文を見て盲検採点（候補 A/B/C を index ローテーションで shuffle・モデル名隠蔽・マークアップは評価対象外）。</p>
+    </div>
+    <div class="callout warn">
+      <span class="tag">バイアス注記</span>
+      <p>ジャッジが Gemini 系のため <strong>flash-lite 有利の系統誤差</strong>リスクあり → rubric を客観軸（事実=本文照合 / 完全性=切れ / rationale=ラベル反復減点）に寄せて緩和。<strong>結果はその予想に反し 35B が flash-lite を上回った</strong>ため、35B 評価はバイアスを差し引いても堅い。</p>
+    </div>
+
+    <div class="legend">
+      <span><span class="sw" style="background:var(--m-fl)"></span>flash-lite（Gemini基準）</span>
+      <span><span class="sw" style="background:var(--m-q)"></span>qwen3:14b</span>
+      <span><span class="sw" style="background:var(--m-35)"></span>35B-A3B</span>
+    </div>
+
+    <div class="fig">
+      <svg viewBox="0 0 740 320" role="img" aria-label="盲検ジャッジ次元別スコア棒グラフ（1-5）">
+        <!-- gridlines + y axis (0..5) -->
+        <line class="grid-line" x1="60" y1="280" x2="720" y2="280"/>
+        <line class="grid-line" x1="60" y1="228" x2="720" y2="228"/>
+        <line class="grid-line" x1="60" y1="176" x2="720" y2="176"/>
+        <line class="grid-line" x1="60" y1="124" x2="720" y2="124"/>
+        <line class="grid-line" x1="60" y1="72"  x2="720" y2="72"/>
+        <line class="grid-line" x1="60" y1="20"  x2="720" y2="20"/>
+        <text class="axis-txt" x="52" y="284" text-anchor="end">0</text>
+        <text class="axis-txt" x="52" y="232" text-anchor="end">1</text>
+        <text class="axis-txt" x="52" y="180" text-anchor="end">2</text>
+        <text class="axis-txt" x="52" y="128" text-anchor="end">3</text>
+        <text class="axis-txt" x="52" y="76"  text-anchor="end">4</text>
+        <text class="axis-txt" x="52" y="24"  text-anchor="end">5</text>
+
+        <!-- factual: 3.90 / 3.20 / 3.30 -->
+        <rect class="b-fl" x="70"  y="77"  width="30" height="203"/>
+        <rect class="b-q"  x="104" y="114" width="30" height="166"/>
+        <rect class="b-35" x="138" y="108" width="30" height="172"/>
+        <text class="bar-val" x="85"  y="71">3.9</text>
+        <text class="bar-val" x="119" y="108">3.2</text>
+        <text class="bar-val" x="153" y="102">3.3</text>
+        <text class="grp-txt" x="119" y="300">factual</text>
+
+        <!-- summary: 3.90 / 3.30 / 4.00 -->
+        <rect class="b-fl" x="202" y="77"  width="30" height="203"/>
+        <rect class="b-q"  x="236" y="108" width="30" height="172"/>
+        <rect class="b-35" x="270" y="72"  width="30" height="208"/>
+        <text class="bar-val" x="217" y="71">3.9</text>
+        <text class="bar-val" x="251" y="102">3.3</text>
+        <text class="bar-val" x="285" y="66">4.0</text>
+        <text class="grp-txt" x="251" y="300">summary</text>
+
+        <!-- points: 3.90 / 2.80 / 3.70 -->
+        <rect class="b-fl" x="334" y="77"  width="30" height="203"/>
+        <rect class="b-q"  x="368" y="134" width="30" height="146"/>
+        <rect class="b-35" x="402" y="88"  width="30" height="192"/>
+        <text class="bar-val" x="349" y="71">3.9</text>
+        <text class="bar-val" x="383" y="128">2.8</text>
+        <text class="bar-val" x="417" y="82">3.7</text>
+        <text class="grp-txt" x="383" y="300">points</text>
+
+        <!-- rationale: 1.80 / 2.80 / 4.20 -->
+        <rect class="b-fl" x="466" y="186" width="30" height="94"/>
+        <rect class="b-q"  x="500" y="134" width="30" height="146"/>
+        <rect class="b-35" x="534" y="62"  width="30" height="218"/>
+        <text class="bar-val" x="481" y="180">1.8</text>
+        <text class="bar-val" x="515" y="128">2.8</text>
+        <text class="bar-val" x="549" y="56">4.2</text>
+        <text class="grp-txt" x="515" y="300">rationale</text>
+
+        <!-- 総合: 3.38 / 3.02 / 3.80 -->
+        <rect class="b-fl" x="598" y="104" width="30" height="176"/>
+        <rect class="b-q"  x="632" y="123" width="30" height="157"/>
+        <rect class="b-35" x="666" y="82"  width="30" height="198"/>
+        <text class="bar-val" x="613" y="98">3.4</text>
+        <text class="bar-val" x="647" y="117">3.0</text>
+        <text class="bar-val" x="681" y="76">3.8</text>
+        <text class="grp-txt" x="647" y="300" style="font-weight:700">総合</text>
+      </svg>
+    </div>
+
+    <table>
+      <thead><tr><th>モデル</th><th class="num">factual</th><th class="num">summary</th><th class="num">points</th><th class="num">rationale</th><th class="num">総合</th><th class="num">Δ総合</th></tr></thead>
+      <tbody>
+        <tr><td>flash-lite</td><td class="num win">3.90</td><td class="num">3.90</td><td class="num win">3.90</td><td class="num lose">1.80</td><td class="num">3.38</td><td class="num">基準</td></tr>
+        <tr><td>qwen3:14b</td><td class="num">3.20</td><td class="num">3.30</td><td class="num">2.80</td><td class="num">2.80</td><td class="num">3.02</td><td class="num lose">−0.35</td></tr>
+        <tr class="best"><td><strong>35B-A3B</strong></td><td class="num">3.30</td><td class="num win">4.00</td><td class="num">3.70</td><td class="num win">4.20</td><td class="num"><strong>3.80</strong></td><td class="num win">+0.42</td></tr>
+      </tbody>
+    </table>
+
+    <h3>スループット・完走率</h3>
+    <div class="grid2">
+      <div class="card">
+        <table style="margin:0;">
+          <thead><tr><th>モデル</th><th class="num">1件平均</th><th class="num">76件直列</th></tr></thead>
+          <tbody>
+            <tr><td>qwen3:14b</td><td class="num">12.5s</td><td class="num">約16分</td></tr>
+            <tr><td>35B-A3B</td><td class="num">17.2s</td><td class="num">約22分</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:13px; color:var(--fg-mute); margin:var(--s-8) 0 0;">4-way で 35B が 44s だったのは強調リトライで膨れていたため。強調を外すと ~17s に短縮。</p>
+      </div>
+      <div class="card">
+        <p style="margin-top:0;"><strong>完走率（強調無効条件）</strong></p>
+        <p style="font-size:32px; font-family:var(--font-mono); color:var(--m-35); margin:0;">11/11 全モデル</p>
+        <p style="font-size:13px; color:var(--fg-mute); margin:var(--s-8) 0 0;">qwen3 の脱落（4-way で 2/4）は強調契約が原因と確定。強調をコード付与に移せば消える。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 詳細エビデンス ===== -->
+  <section id="evidence" class="panel">
+    <h2>詳細エビデンス（ジャッジコメント根拠）</h2>
+    <p>総合スコアの内訳を理解するため、ジャッジの個別コメント（<code>2026-06-04_blind_judge_raw.json</code>）から要点を引用する。</p>
+
+    <h3>① flash-lite の rationale が低い（1.80）＝ ラベル反復</h3>
+    <p>ジャッジは 7/10 で flash-lite の rationale を減点。これは捏造でなく正当な指摘。</p>
+    <pre>claudeop-gem05 / flash-lite:
+  "the rationale section is very weak, only providing 'mid' labels
+   without any explanation"
+flux-gem01 / flash-lite:
+  "rationale の項目がラベルのみで、説明が一切ないため大幅な減点"</pre>
+
+    <h3>② 35B の rationale が突出（4.20）＝ 含意・矛盾まで踏み込む</h3>
+    <pre>flux-gem01 / 35B:
+  "importance、impact、buzz のそれぞれについて、論理的かつ
+   深い考察がされており、非常に優れている"
+（4-way devin 記事）35B は「人間を代替しない」発言と
+  「89% が AI コミット」の矛盾を自ら指摘</pre>
+
+    <div class="callout err">
+      <span class="tag">watch-item</span>
+      <p><strong>③ ローカルは factual 捏造がやや多い</strong>（factual 3.2-3.3 vs flash-lite 3.90）。ニュース DB では最重要のリスク。</p>
+    </div>
+    <pre>claudeop-gem03 / 35B:
+  "「Rajesh Jha」という人物名と内部メモの内容が記事本文に
+   ない捏造であり、事実正確性が大きく損なわれている"
+physical-gem01 / qwen3:
+  "「Prof. GUO Song」や「アジア太平洋地域」など、記事本文に
+   ない複数の事実誤認"</pre>
+
+    <h3>④ qwen3 は markdown 自己言及をリーク</h3>
+    <pre>claudeop-gem05 / qwen3:
+  "self-referential text about markdown/formatting
+   ('下線 された', '==マーカー== された')"</pre>
+    <p>強調検証を無効化してもプロンプトに強調指示が残るため qwen3 はリークし続ける。→ <strong>強調コード化はプロンプトからの強調指示除去も必須</strong>。</p>
+
+    <div class="callout warn">
+      <span class="tag">全モデル共通</span>
+      <p><strong>⑤ 一部の捏造は本文 3000 字打切り由来</strong>。devin 系で全モデルが「89% のコードを Devin がコミット」や過去調達額を捏造（factual 1-2）。モデル差でなく <code>MAX_BODY_CHARS=3000</code> の打切りで本文が欠け、モデルが学習知識で穴埋めした結果。<strong>本文取得改善で全モデル改善余地</strong>。</p>
+    </div>
+  </section>
+
+  <!-- ===== 強みの交換 ===== -->
+  <section id="trade" class="panel">
+    <h2>「強みの交換」の構図（最重要の解釈）</h2>
+    <table>
+      <thead><tr><th>次元</th><th>勝者</th><th>差の内容</th></tr></thead>
+      <tbody>
+        <tr><td>factual 忠実度</td><td><strong style="color:var(--m-fl)">flash-lite</strong></td><td>local が固有名詞捏造で −0.6</td></tr>
+        <tr><td>summary</td><td>35B ≈ flash-lite</td><td>ほぼ同等</td></tr>
+        <tr><td>points</td><td>flash-lite ≳ 35B</td><td>flash-lite やや上</td></tr>
+        <tr><td>rationale 深さ</td><td><strong class="win">35B-A3B</strong></td><td>flash-lite が +2.4 で大敗（ラベル化）</td></tr>
+      </tbody>
+    </table>
+    <div class="callout ok">
+      <span class="tag">結論</span>
+      <p>総合では 35B が上だが、それは <strong>35B が rationale で大きく勝ち、flash-lite が factual で勝つ</strong>という交換。<strong>コア抽出（factual/summary/points）は flash-lite ≳ 35B</strong>。つまり<strong>品質は実質互角</strong>。ローカル化は「品質向上」でなく「品質維持 + 非機能要件（クォータ/offline/essay 一本化）」で評価すべき。</p>
+    </div>
+
+    <h3>3 モデルの性格</h3>
+    <div class="grid3">
+      <div class="card">
+        <p style="margin-top:0;"><span class="sw" style="background:var(--m-fl)"></span><strong>flash-lite</strong></p>
+        <p style="margin-bottom:0; font-size:14px; color:var(--fg-sub);">事実忠実・要点網羅が堅い。rationale が不安定にラベル退化。API クォータ依存。</p>
+      </div>
+      <div class="card">
+        <p style="margin-top:0;"><span class="sw" style="background:var(--m-q)"></span><strong>qwen3:14b</strong></p>
+        <p style="margin-bottom:0; font-size:14px; color:var(--fg-sub);">最速(~16分)。factual・points 低く markdown リークあり。明確に 3 番手。</p>
+      </div>
+      <div class="card">
+        <p style="margin-top:0;"><span class="sw" style="background:var(--m-35)"></span><strong>35B-A3B</strong></p>
+        <p style="margin-bottom:0; font-size:14px; color:var(--fg-sub);">rationale 突出・指示遵守強・堅牢。やや遅い(~22分)。固有名詞捏造が watch-item。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 決定マトリクス ===== -->
+  <section id="decision" class="panel">
+    <h2>最終モデル選定（決定マトリクス）</h2>
+    <table>
+      <thead><tr><th>案</th><th>品質</th><th>速度</th><th>運用</th><th>非機能</th></tr></thead>
+      <tbody>
+        <tr class="best"><td><strong>35B-A3B 一本化（推奨）</strong></td><td>互角（rationale 勝・factual 負）</td><td>~22分/76（夜間OK）</td><td>essay と同モデル・1モデル常駐で単純</td><td>◎ クォータ非依存</td></tr>
+        <tr><td>qwen3:14b</td><td>3 番手（factual/points 低・leak）</td><td>~16分/76（最速）</td><td>essay と別モデル → ロード切替</td><td>◎ クォータ非依存</td></tr>
+        <tr><td>flash-lite 維持</td><td>基準</td><td>API</td><td>現状維持</td><td>✗ 依存継続</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <span class="tag">解決済みの重要発見</span>
+      <p>flash-lite の rationale 低スコアは<strong>実在</strong>でした。本番 <code>events.jsonl</code> は rationale 充実ですが、これは <strong>flash（gemini-2.5-flash）出力で確定済み</strong>。eval したのは <strong>flash-lite</strong>。つまり <strong>flash=充実 / flash-lite=不安定にラベル退化（7/10）/ 35B=一貫充実</strong>。
+      <br><br>→ <strong>副次発見：以前結論づけた flash→flash-lite のコスト切替は rationale 品質を劣化させるリスク</strong>（4サンプルでは偶然 full だった）。<strong>35B なら flash 級 rationale をクォータ非依存で得られる</strong>ため、この点は 35B 推奨を補強。</p>
+    </div>
+
+    <h3>未解決の論点 / 留意</h3>
+    <ul>
+      <li><strong>factual 捏造の本文打切り寄与</strong>：<code>MAX_BODY_CHARS</code> 引上げ + 本文抽出改善で全モデルの factual が上がる可能性。ローカル採否と分離して検討。</li>
+      <li><strong>N=10・単一 Gemini 系ジャッジ</strong>の限界。サンプル増 / 別系統ジャッジ（Claude 等）で確度は上がるが、方向性（35B≈flash-lite・qwen3 劣後）は安定。</li>
+    </ul>
+  </section>
+
+  <!-- ===== 実装前提作業 ===== -->
+  <section id="impl" class="panel">
+    <h2>確定後の実装前提作業</h2>
+    <p>モデル選定とは独立に、ローカル置換には以下が必要。LLM 境界が <code>tools/llm_local.py</code> 1 箇所のため、config の backend スイッチで可逆。</p>
+
+    <table>
+      <thead><tr><th>#</th><th>作業</th><th>目的</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>プロンプトから強調指示を除去 + 強調は <code>tools/rewrite_emphasis.py</code> で<strong>コード付与</strong></td><td>qwen3 リーク・flash-lite 脱落を同時解消</td></tr>
+        <tr><td>2</td><td><code>maxLength</code> を緩和（280→~400）またはローカル用スキーマで撤廃</td><td>summary の語中切れ防止</td></tr>
+        <tr><td>3</td><td><code>collect_rss</code> に config backend スイッチ + フォールバック配線</td><td>local 失敗/GPU 占有時に Gemini へ縮退</td></tr>
+        <tr><td>4</td><td><code>MAX_BODY_CHARS</code> 引上げ検討</td><td>打切り由来の factual 捏造を全モデルで抑制</td></tr>
+        <tr><td>5</td><td>契約テスト 1 件（ローカルが同契約 dict を返す）</td><td>個別 smoke でなく境界 1 件で locked-in</td></tr>
+      </tbody>
+    </table>
+
+    <h3>本調査で新設・変更したファイル</h3>
+    <table>
+      <thead><tr><th>パス</th><th>種別</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td><code>tools/llm_local.py</code></td><td>add</td><td>Ollama 版バックエンド（llm_gemini と同契約・プロンプト/スキーマ/検証を再利用）</td></tr>
+        <tr><td><code>tools/eval_local_extraction.py</code></td><td>add</td><td>N-way 比較（flash/flash-lite/qwen3/35B）</td></tr>
+        <tr><td><code>tools/eval_blind_judge.py</code></td><td>add</td><td>盲検ジャッジ採点（条件公平化・rubric 採点・集計）</td></tr>
+        <tr><td><code>tools/config.py</code></td><td>edit</td><td><code>OLLAMA_*</code> 設定追記</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="tag">次セッションの入り口</span>
+      <p>「35B-A3B 一本化で §実装前提作業 1〜5 に着手して」と伝えれば実装フェーズに入れる。本 HTML と <code>docs/eval/2026-06-04_blind_judge_raw.json</code> が一次資料。</p>
+    </div>
+  </section>
+
+  <div class="foot">
+    AI-Pulse 調査レポート · 2026-06-04 · 関連 Markdown: 2026-06-04_local_llm_investigation.md / 2026-06-04_blind_judge.md / 2026-06-04_qwen3_vs_gemini.md
+  </div>
+</main>
+
+<script>
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const t = tab.dataset.tab;
+      document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === tab));
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === t));
+    });
+  });
+</script>
+</body>
+</html>
