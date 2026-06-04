@@ -31,8 +31,9 @@
 /* feed list */
 .feed { list-style: none; margin: 0; padding: var(--s-8) 0 0; }
 .story {
-  display: grid; grid-template-columns: 160px 300px 1fr;
-  gap: var(--s-16) var(--s-24); align-items: start;
+  display: grid; grid-template-columns: 100px 300px 1fr;
+  /* (2026-06-05) スコアと画像の横隙間を詰める要望: 列幅 160→100、列間 gap 24→8 */
+  gap: var(--s-16) var(--s-8); align-items: start;
   padding: var(--s-24) var(--s-16); margin: 0 calc(var(--s-16) * -1);
   border-bottom: 1px solid var(--border-soft);
   border-left: 2px solid transparent;
@@ -120,9 +121,9 @@
   .story .karte-chip { font-size: 15px; padding: 5px 10px; }
 }
 
-/* タブレット (600〜860px): スコア 2 倍 (64→128) + サムネ 1.5 倍 (160→240) */
+/* タブレット (600〜860px): スコア列も詰める (128→80) + サムネ 1.5 倍 (160→240) */
 @media (min-width: 601px) and (max-width: 860px) {
-  .story { grid-template-columns: 128px 240px 1fr; }
+  .story { grid-template-columns: 80px 240px 1fr; }
 }
 
 /* lead feature (first story bigger) */
