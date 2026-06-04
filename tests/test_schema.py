@@ -233,36 +233,36 @@ class TestSchemaContract(unittest.TestCase):
 
 
 class TestEntityComparisonCoverage(unittest.TestCase):
-    """ユーザー指摘 (2026-06-04): 新規 entity 追加時に comparison.cols を付け忘れる class of bugs。
+    """ユーザー指摘 (2026-06-04): comparison は「比較対象が存在しない (= 同 category 内に
+    entity が 1 件しか無い) ときだけ optional」であり、2 件以上あるなら必須である。
+    schema 上は型として optional のままだが (regulation など category 単独 entity 用)、
+    本番データの「比較対象がある以上は表で見せる」設計意図を契約テスト 1 件で locked-in する
+    (feedback_check_design_principles の 4 段目)。
 
-    なぜ重要か: comparison は optional だが、同レンズに 1 件でも持つ entity があれば
-    その category は「比較表で見せる」設計判断が確定している (= 既存カルテが table を描画する
-    前提)。新規追加 entity を comparison 無しで通すと、同じレンズの中で「表に載るカルテ」と
-    「表に何も出ないカルテ」が混在する穴あき状態になる。これは optional のままだと型検査で
-    弾けないため、契約テスト 1 件で本番データの「same-category consistency」として locked-in
-    する (feedback_check_design_principles の 4 段目: 個別 smoke でなく境界 1 件でクラスを封じる)。
+    弱い旧版「1 件でも comparison があれば全件必須」は『category 初の 1 件目を持たずに通す』
+    抜け穴があり、ユーザー意図 (= 比較対象がある時点で必須) より緩かったため強化。
     """
 
-    def test_comparison_presence_is_consistent_within_category(self):
-        """本番 entities.jsonl で、同 category に comparison を持つ entity が 1 つでもあれば、
-        その category の全 entity が comparison を持つ。"""
+    def test_comparison_is_required_when_category_has_peers(self):
+        """本番 entities.jsonl で、同 category に entity が 2 つ以上ある (= 比較対象が
+        存在する) 場合、その category の全 entity は comparison を持つ。"""
         entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
         by_cat: dict[str, list[dict]] = {}
         for e in entities:
             by_cat.setdefault(e["category"], []).append(e)
         violations: list[str] = []
         for cat, items in by_cat.items():
-            has_cmp = [e for e in items if e.get("comparison")]
+            if len(items) < 2:  # 単独 entity の category は optional 許容
+                continue
             missing = [e for e in items if not e.get("comparison")]
-            if has_cmp and missing:
+            if missing:
                 violations.append(
-                    f"category={cat!r}: comparison 有 {len(has_cmp)} / 欠落 {len(missing)} "
-                    f"(欠落 entity: {[e['entity_id'] for e in missing]})"
+                    f"category={cat!r} ({len(items)} 件): comparison 欠落 "
+                    f"{[e['entity_id'] for e in missing]} (比較対象がいるので必須)"
                 )
         self.assertFalse(
             violations,
-            "同 category 内で comparison の有無が混在しています。"
-            "1 つでも持つカテゴリは全 entity が持つように揃えてください:\n  - "
+            "比較対象がいる category で comparison 欠落:\n  - "
             + "\n  - ".join(violations),
         )
 
