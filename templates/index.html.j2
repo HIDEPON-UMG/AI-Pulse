@@ -7,9 +7,16 @@
 /* ---- Feed-specific ---- */
 .feed-head { padding: var(--s-32) 0 var(--s-24); border-bottom: 1px solid var(--border); }
 .feed-head .kicker { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; }
+/* (2026-06-05) 「TODAY'S THEME」キャプション: h1 のテーマ見出しが「今日の主役カルテ + カテゴリ」
+   を主張するセクション、であることを冒頭で明示。.label の mono + uppercase + letter-spacing を継承し、
+   accent 色で僅かに目立たせる。block 化して h1 直前に独立段で置く。 */
+.feed-head .theme-label {
+  display: inline-block; margin: var(--s-16) 0 var(--s-4);
+  color: var(--accent); font-size: var(--t-label);
+}
 .feed-head h1 {
   font-weight: var(--w-bold); font-size: clamp(32px, 4.8vw, 54px); letter-spacing: -0.02em;
-  margin: var(--s-16) 0 var(--s-8); text-wrap: balance;
+  margin: var(--s-4) 0 var(--s-8); text-wrap: balance;
 }
 /* News-Grasp 流の「行下半分マーカー」: 主語とカテゴリ名にだけ accent 色の太い下線を敷く。
    theme.css の全面塗り mark を override（specificity: 0,0,2,1 > 0,0,0,1）。
@@ -118,7 +125,9 @@
   .story .thumb { aspect-ratio: 16 / 9; }
   .story h2 { font-size: 18px; }
   .story .score .num { font-size: 36px; }
-  .story .karte-chip { font-size: 15px; padding: 5px 10px; }
+  /* モバイルは 1fr で可変幅 (≈ 画面幅-96px)、ASCII 21字でも 15px なら収まる想定。
+     desktop の inline style (font_size=自動縮小) を !important で打ち消し 15px に統一。 */
+  .story .karte-chip { font-size: 15px !important; padding: 5px 10px !important; }
 }
 
 /* タブレット (600〜860px): スコア 80 + サムネ 2/3 化で 240→160 */
@@ -248,6 +257,7 @@
         <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
         <span class="label">新着フィード / TIME-ORDERED</span>
       </div>
+      <span class="label theme-label">TODAY&rsquo;S THEME</span>
       <h1 data-digest>今日、生成AIで何が起きたか。</h1>
       <p class="lead">本日（{{ ref_date_label }}）の更新分だけをまとめた濃いめのフィード。過去分は<a href="archive.html" style="color:var(--accent);text-decoration:underline">アーカイブ</a>、各サービスの分析は<a href="karte-index.html" style="color:var(--accent);text-decoration:underline">カルテ一覧</a>へ。</p>
     </div>
@@ -286,7 +296,7 @@
       </li>
       {% endif %}
       {% for s in feed %}
-      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a,details'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a,details'))location.href='{{ s.karte }}'"{% endif %}>
+      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}" data-entname="{{ s.ent_name }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a,details'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a,details'))location.href='{{ s.karte }}'"{% endif %}>
         <div class="score">
           <div class="num">{{ s.score }}</div>
           <div class="lbl">SCORE</div>
@@ -299,7 +309,7 @@
             <span class="karte-label">— 関連カルテ —</span>
             <div class="karte-chips">
               {% if s.karte_updated %}<span class="upd-badge">UPDATE</span>{% endif %}
-              {% for k in s.karte_names %}<a class="karte-chip" href="{{ k.href }}">{{ k.name }}</a>{% endfor %}
+              {% for k in s.karte_names %}<a class="karte-chip" style="font-size:{{ k.font_size }}px;padding:{{ k.py }}px {{ k.px }}px" href="{{ k.href }}">{{ k.name }}</a>{% endfor %}
             </div>
           </div>
           {% endif %}

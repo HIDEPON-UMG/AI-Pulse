@@ -149,20 +149,49 @@ def _auto_rationale(ev: dict) -> dict:
     }
 
 
+def _karte_fit_metrics(name: str, container_px: int = 198, base_px: int = 22, min_px: int = 11) -> dict:
+    """カルテ名 `name` がサムネ列 `container_px` に収まる font-size と padding を返す。
+
+    トップフィードのサムネ列は 200px 固定。カルテ chip は white-space:nowrap のため、
+    base 22px のままだと "Physical Intelligence" (21 字) のような長文 ASCII カルテ名が
+    サムネ画像の右端を超えて溢れる。境界 1 箇所 (本関数) で chip 寸法を逆算し、テンプレに
+    インライン style で渡すことで物理的に封じる ([feedback_check_design_principles] §2)。
+
+    chip 全幅 ≈ fs × (chars_em + padding_em_total) + border
+      - chars_em: ASCII=0.6em / CJK=1.0em (mono font 想定)
+      - padding_em_total: base 17px@22px = 0.773em の左右合計 ≈ 1.546em
+      - border: 1px × 2 = 2px (固定)
+    max fs = (container_px - border) / (chars_em + padding_em_total)
+    fs は base_px 〜 min_px でクランプ。padding は fs に比例 (round 整数)。
+    """
+    if not name:
+        return {"font_size": base_px, "py": 9, "px": 17}
+    chars_em = sum(1.0 if ord(c) > 0x7F else 0.6 for c in name)
+    padding_em_total = 17 * 2 / base_px  # ≈ 1.545
+    border = 2
+    max_fs = (container_px - border) / (chars_em + padding_em_total)
+    fs = int(min(base_px, max(min_px, max_fs)))
+    r = fs / base_px
+    py = max(5, round(9 * r))
+    px = max(8, round(17 * r))
+    return {"font_size": fs, "py": py, "px": px}
+
+
 def _karte_names(ev: dict, ent_by_id: dict) -> list[dict]:
-    """主 entity と related_entities を解決して [{name, href}, ...] の順序付きリストを返す。
+    """主 entity と related_entities を解決して [{name, href, font_size, py, px}, ...] の順序付きリストを返す。
 
     主カルテを先頭・関連カルテをデータ記載順に並べる。entity_id が L1 に無い場合はスキップ。
     related_entities の参照整合は schema 側で担保済み（known_entity_ids チェック）。
+    font_size/py/px は _karte_fit_metrics でカルテ名長に応じて自動縮小 (サムネ列 200px に収める)。
     """
     items: list[dict] = []
     primary = ent_by_id.get(ev["entity_id"])
     if primary:
-        items.append({"name": primary["name"], "href": f"karte-{ev['entity_id']}.html"})
+        items.append({"name": primary["name"], "href": f"karte-{ev['entity_id']}.html", **_karte_fit_metrics(primary["name"])})
     for rid in ev.get("related_entities") or []:
         ent = ent_by_id.get(rid)
         if ent:
-            items.append({"name": ent["name"], "href": f"karte-{rid}.html"})
+            items.append({"name": ent["name"], "href": f"karte-{rid}.html", **_karte_fit_metrics(ent["name"])})
     return items
 
 
@@ -203,6 +232,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "score": ev["score"],
         "headline": ev["headline"],
         "headline_ja": ev.get("headline_ja") or "",
+        "ent_name": ent["name"] if ent else "",
         "summary": summary,
         "source": ev["source"],
         "tier": ev["source_tier"],

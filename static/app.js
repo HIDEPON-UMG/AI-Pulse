@@ -119,11 +119,24 @@
       return (+b.dataset.score || 0) > (+a.dataset.score || 0) ? b : a;
     });
     var cat = top.dataset.catname || "生成AI";
+    var entname = (top.dataset.entname || "").trim();
     var hEl = top.querySelector("h2");
     var h = hEl ? hEl.textContent.trim() : "";
-    var subj = h.split(/[\u2014\u2013-]/)[0].trim() || h;
-    el.innerHTML =
-      "<mark>" + escHtml(subj) + "</mark> \u2014 " +
+    /* (2026-06-05) 主語マーカー規則見直し:
+       旧 dash split (h.split(/[\u2014\u2013-]/)) は英文見出しに dash が無いと見出し全文を <mark> 化していた
+       (例: "DeepSeek slated to raise $7 billion ..." 全文が緑塗り事故)。
+       新ルール: story の主 entity 名 (data-entname) が見出しに含まれる時のみ、
+       その部分文字列のみ <mark>。含まれない場合はマーク無しで素の見出しを出す。 */
+    var html;
+    if (entname && h.indexOf(entname) >= 0) {
+      var i = h.indexOf(entname);
+      html = escHtml(h.slice(0, i)) +
+             "<mark>" + escHtml(entname) + "</mark>" +
+             escHtml(h.slice(i + entname.length));
+    } else {
+      html = escHtml(h);
+    }
+    el.innerHTML = html + " \u2014 " +
       "\u672c\u65e5\u306f<mark>" + escHtml(cat) + "</mark>\u304c\u4e3b\u5f79\u3002";
   }
 

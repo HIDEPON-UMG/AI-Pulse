@@ -112,6 +112,45 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("MainKarte", arc_html)
         self.assertIn("RelKarte", arc_html)
 
+    def test_karte_chip_font_shrinks_to_fit_thumb_column(self):
+        """サムネ列 200px に長文カルテ名 chip が収まるよう font_size を自動縮小する。
+
+        なぜ重要か: 2026-06-05 ユーザー報告で "Physical Intelligence" (21 字 ASCII) chip が
+        サムネ画像の右端を超え SUMMARY 領域に被った。境界 1 関数 `_karte_fit_metrics` で
+        chip 全幅を逆算し base 22→13px 程度に縮小、テンプレが inline style で出力する設計を
+        ([feedback_check_design_principles] §2 境界 1 箇所集約)、ここで locked-in する。
+        """
+        # 長文 ASCII (21字 "Physical Intelligence") は base 22 から縮小される
+        m_long = gp._karte_fit_metrics("Physical Intelligence")
+        self.assertLess(m_long["font_size"], 22, "長文 chip が縮小されていない")
+        self.assertGreaterEqual(m_long["font_size"], 11, "下限 11px を割っている")
+        # padding も font_size に比例
+        self.assertLessEqual(m_long["px"], 17)
+        # 短文 ASCII (6字 "OpenAI") は base 22 を維持
+        m_short = gp._karte_fit_metrics("OpenAI")
+        self.assertEqual(m_short["font_size"], 22)
+        # 空文字でも例外を出さない
+        m_empty = gp._karte_fit_metrics("")
+        self.assertEqual(m_empty["font_size"], 22)
+        # index.html の chip に inline style (font-size, padding) が出力される
+        ent = {
+            "entity_id": "physical-intelligence", "name": "Physical Intelligence",
+            "kind": "model", "domain": "robotics", "offering": "commercial",
+            "vendor": "PI", "category": "physical",
+            "snapshot_date": "2026-06-04", "positioning": "p",
+        }
+        ev = {
+            "event_id": "e1", "entity_id": "physical-intelligence",
+            "date": "2026-06-04", "category": "physical",
+            "event_type": "release", "headline": "test", "summary": "s",
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ctx = gp.build_context([ent], [ev])
+        idx_html = gp.make_env().get_template("index.html.j2").render(**ctx, page="feed")
+        self.assertIn('class="karte-chip" style="font-size:', idx_html)
+        # 縮小値 (< 22) が style に書かれている
+        self.assertRegex(idx_html, r'karte-chip" style="font-size:1\dpx;padding:\d+px \d+px"')
+
     def test_ssg_meta_island_is_valid_json(self):
         with tempfile.TemporaryDirectory() as d:
             r = gp.generate(Path(d))
