@@ -352,18 +352,22 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
     for cat in CAT_META:
         cards = sorted(
             [
+                # feed_* = フィード(events 最新)由来 / karte_* = カルテ本体(entity.snapshot_date)由来。
+                # 2 種を別バッジで並列表示し「何が更新されたか」を一目で示す (2026-06-04)。
                 {
                     "id": e["entity_id"], "name": e["name"], "cat": cat,
                     "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"],
                     "positioning": e["positioning"], "vendor": e["vendor"],
                     "href": f"karte-{e['entity_id']}.html",
-                    "updated_rel": (_human_rel(ref, latest_by_entity[e["entity_id"]])
-                                    if e["entity_id"] in latest_by_entity else None),
-                    "updated_abs": (latest_by_entity[e["entity_id"]].isoformat()
-                                    if e["entity_id"] in latest_by_entity else None),
-                    # 7日以内の新鮮なカルテは強調色、それ以外は控えめ色で「一目」を出す。
-                    "updated_fresh": (e["entity_id"] in latest_by_entity and
-                                      (ref - latest_by_entity[e["entity_id"]]).days <= 7),
+                    "feed_updated_rel": (_human_rel(ref, latest_by_entity[e["entity_id"]])
+                                         if e["entity_id"] in latest_by_entity else None),
+                    "feed_updated_abs": (latest_by_entity[e["entity_id"]].isoformat()
+                                         if e["entity_id"] in latest_by_entity else None),
+                    "feed_updated_fresh": (e["entity_id"] in latest_by_entity and
+                                           (ref - latest_by_entity[e["entity_id"]]).days <= 7),
+                    "karte_updated_rel": _human_rel(ref, _d(e["snapshot_date"])),
+                    "karte_updated_abs": e["snapshot_date"],
+                    "karte_updated_fresh": (ref - _d(e["snapshot_date"])).days <= 7,
                 }
                 for e in entities if e["category"] == cat
             ],

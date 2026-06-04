@@ -66,6 +66,23 @@ class TestGenerate(unittest.TestCase):
             self.assertIn("ki-card", html)
             self.assertIn("ki-group", html)
 
+    def test_karte_index_has_feed_and_karte_update_badges(self):
+        """ユーザー要件 2026-06-04:「何が更新されたか」を一目で示すため、
+        カルテ一覧の各カードは『📰 フィード』(events 最新) と『📋 カルテ』(entity.snapshot_date)
+        の 2 バッジを並列で持つ。snapshot_date は ENTITY_REQUIRED なので必ず出る。"""
+        with tempfile.TemporaryDirectory() as d:
+            gp.generate(Path(d))
+            html = (Path(d) / "karte-index.html").read_text(encoding="utf-8")
+            # ラッパと両バッジ class が描画される
+            self.assertIn("upd-row", html)
+            self.assertIn("upd feed", html)
+            self.assertIn("upd karte", html)
+            # 接頭辞ラベル (HTML エンティティ化されても本体絵文字は素のまま autoescape 対象外)
+            self.assertIn("📰 フィード", html)
+            self.assertIn("📋 カルテ", html)
+            # 全 entity に snapshot_date があるので、karte バッジは少なくとも全件分は描画される
+            self.assertGreaterEqual(html.count('class="upd karte'), len(self.entities))
+
     def test_related_entities_render_as_karte_chips(self):
         """related_entities が指定された event は、主+関連の実カルテ名がフィード/アーカイブで chip 描画される。"""
         ent_main = {

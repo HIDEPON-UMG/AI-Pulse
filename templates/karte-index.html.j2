@@ -48,20 +48,32 @@
   transform: translateY(-1px);
 }
 .ki-card h3 {
-  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 17px;
-  margin: 0; color: var(--fg); letter-spacing: -0.01em; line-height: 1.3;
+  /* (2026-06-04) 17px → clamp(26px,3vw,34px) に拡大。カードの主役を h3 にする。
+     line-height 1.25 でディスクリプタも詰まりすぎず可読性確保。 */
+  font-family: var(--font-head); font-weight: var(--w-bold);
+  font-size: clamp(26px, 3vw, 34px);
+  margin: var(--s-4) 0 var(--s-4); color: var(--fg);
+  letter-spacing: -0.02em; line-height: 1.25;
 }
 .ki-card:hover h3 { color: var(--cat); }
 
-/* (2026-06-04) カードの「直近アップデート」を一目で。h3 の上に独立バッジで配置。
-   7 日以内の新鮮カルテは fresh クラスで accent 強調、それ以外は控えめなニュートラル色。 */
+/* (2026-06-04) カードの「直近アップデート」を 2 種並列で。
+   .upd.feed = フィード(events 最新) / .upd.karte = カルテ本体(entity.snapshot_date)。
+   何が更新されたかを一目で示すため接頭辞 (📰 / 📋) と種別ラベルを併記。
+   各々独立に fresh 判定し、7 日以内のものだけ accent 強調。 */
+.ki-card .upd-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
 .ki-card .upd {
-  align-self: flex-start;
-  display: inline-flex; align-items: center; gap: 7px;
+  display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-mono); font-size: 11.5px; line-height: 1;
   padding: 4px 9px; border-radius: var(--r-sm);
   background: var(--bg-elev-2); color: var(--fg-sub);
   border: 1px solid var(--border); letter-spacing: 0.02em;
+}
+.ki-card .upd .kind {
+  font-family: var(--font-head); font-size: 10.5px; font-weight: 700;
+  color: var(--fg-mute); letter-spacing: 0.06em;
 }
 .ki-card .upd .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-mute); flex: none; }
 .ki-card .upd .abs { color: var(--fg-mute); font-size: 10px; opacity: .85; }
@@ -71,6 +83,7 @@
   border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
   font-weight: 700;
 }
+.ki-card .upd.fresh .kind { color: color-mix(in oklab, var(--accent) 70%, var(--fg-sub)); }
 .ki-card .upd.fresh .dot {
   background: var(--accent); box-shadow: 0 0 6px var(--accent);
 }
@@ -118,11 +131,20 @@
       <div class="ki-cards">
         {% for it in g.cards %}
         <a class="ki-card" href="{{ it.href }}" data-cat="{{ it.cat }}">
-          {% if it.updated_rel %}
-          <span class="upd{% if it.updated_fresh %} fresh{% endif %}" title="最終更新 {{ it.updated_abs }}">
-            <span class="dot" aria-hidden="true"></span>{{ it.updated_rel }}<span class="abs">{{ it.updated_abs }}</span>
-          </span>
-          {% endif %}
+          <div class="upd-row">
+            {% if it.feed_updated_rel %}
+            <span class="upd feed{% if it.feed_updated_fresh %} fresh{% endif %}" title="フィード(直近ニュース) 最終 {{ it.feed_updated_abs }}">
+              <span class="kind">📰 フィード</span>
+              <span class="dot" aria-hidden="true"></span>{{ it.feed_updated_rel }}<span class="abs">{{ it.feed_updated_abs }}</span>
+            </span>
+            {% endif %}
+            {% if it.karte_updated_rel %}
+            <span class="upd karte{% if it.karte_updated_fresh %} fresh{% endif %}" title="カルテ本体 最終 {{ it.karte_updated_abs }}">
+              <span class="kind">📋 カルテ</span>
+              <span class="dot" aria-hidden="true"></span>{{ it.karte_updated_rel }}<span class="abs">{{ it.karte_updated_abs }}</span>
+            </span>
+            {% endif %}
+          </div>
           <h3>{{ it.name }}</h3>
           <p class="pos">{{ it.positioning }}</p>
           <div class="meta">
