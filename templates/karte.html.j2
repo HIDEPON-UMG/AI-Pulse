@@ -150,10 +150,20 @@
 /* future scenario */
 .future { display: grid; gap: 12px; }
 .future .step {
-  display: grid; grid-template-columns: auto 1fr; gap: var(--s-16); align-items: start;
+  display: grid; grid-template-columns: auto 1fr; gap: var(--s-16); align-items: center;
   padding: var(--s-16); background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm);
 }
-.future .step .h { font-family: var(--font-mono); font-size: var(--t-label); color: var(--cat); padding-top: 2px; white-space: nowrap; }
+/* 時間軸ラベル「近/中/遠」: 明朝 + 流体大サイズ + accent→cat の対角グラデで時間軸を一発で示す。
+   背景グラデを文字に焼き込むため background-clip: text。`color: transparent` を併用しないと
+   旧 Safari/古い WebKit でフォールバック色が出る。lock-alpha 系の表示崩れは無いことを実機検証で確認 */
+.future .step .h {
+  font-family: var(--font-head); font-weight: var(--w-bold);
+  font-size: clamp(22px, 2.4vw, 28px); line-height: 1.1; letter-spacing: -0.01em;
+  padding: 0 var(--s-8); white-space: nowrap; min-width: 2.5em; text-align: center;
+  background: linear-gradient(135deg, var(--accent), var(--cat));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
 .future .step .c h3 { font-family: var(--font-head); font-size: var(--t-h3); margin: 0 0 4px; font-weight: var(--w-med); }
 .future .step .c p { margin: 0; color: var(--fg-sub); font-size: var(--t-sm); }
 .future .guess { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); border: 1px dashed var(--border-strong); padding: 1px 6px; border-radius: 2px; margin-left: 8px; }
@@ -201,6 +211,98 @@
 .mk.tri { color: var(--fg-mute); }
 .verdict-legend { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute); margin-top: 12px; line-height: 1.8; }
 .verdict-legend b { color: var(--fg-sub); }
+
+/* 関連ニュース feed（カルテ最下段・index.html の .story と同じ表現を最小限で移植）
+   theme.css の category-binding（[data-cat]）はカルテ <body data-cat> で当たる。
+   各 .story にも data-cat を入れ直して --cat / --cat-solid を切替える */
+.karte-feed { padding: var(--s-32) 0 0; clear: both; }
+.karte-feed > h2 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: var(--t-h2);
+  letter-spacing: -0.01em; margin: 0 0 var(--s-16); display: flex; align-items: center; gap: 10px;
+}
+.karte-feed > h2::before { content: ""; width: 4px; height: 18px; background: var(--cat); border-radius: 1px; }
+.karte-feed .desc { color: var(--fg-sub); font-size: var(--t-sm); margin: -8px 0 var(--s-16); }
+.karte-feed .feed { list-style: none; margin: 0; padding: var(--s-8) 0 0; }
+.karte-feed .story {
+  display: grid; grid-template-columns: 64px 160px 1fr;
+  gap: var(--s-16) var(--s-24); align-items: start;
+  padding: var(--s-24) var(--s-16); margin: 0 calc(var(--s-16) * -1);
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 2px solid transparent;
+  transition: background .16s, border-color .16s;
+}
+.karte-feed .story:hover { background: var(--bg-elev); border-left-color: var(--cat); }
+.karte-feed .story[data-href] { cursor: pointer; }
+.karte-feed .story .score { padding-top: 2px; }
+.karte-feed .story .score .num { font-family: var(--font-mono); font-weight: 700; font-size: 22px; line-height: 1; color: var(--cat); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.karte-feed .story .score .lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: .18em; color: var(--fg-mute); margin-top: 4px; }
+.karte-feed .story .score .date { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); margin-top: 10px; line-height: 1.35; }
+.karte-feed .story .score .date span { display: block; font-size: 10px; margin-top: 1px; opacity: .8; }
+.karte-feed .story .thumb-col { display: flex; flex-direction: column; gap: 8px; }
+.karte-feed .story .thumb {
+  width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
+  background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.karte-feed .story .thumb[src=""] { visibility: hidden; }
+.karte-feed .story .body { min-width: 0; }
+.karte-feed .story .meta-row { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; margin-bottom: var(--s-8); }
+.karte-feed .story h3 {
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 21px;
+  letter-spacing: -0.01em; line-height: 1.45; margin: 0 0 8px; color: var(--fg);
+}
+.karte-feed .story:hover h3 { color: var(--accent); }
+/* 本文も index と同じく薄背景 + 左帯で囲み、フォントは 1 回り拡大して読みやすくする */
+.karte-feed .story .summary {
+  margin: 0; color: var(--fg); font-size: 16px; line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  background: color-mix(in oklab, var(--cat) 7%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--cat) 45%, transparent);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+}
+.karte-feed .story .summary-points {
+  margin: 4px 0 0; padding: 11px 13px; list-style: none;
+  background: color-mix(in oklab, var(--cat) 7%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--cat) 45%, transparent);
+  border-radius: var(--r-sm);
+}
+.karte-feed .story .summary-points li { position: relative; padding-left: 1.1em; color: var(--fg); font-size: 15px; line-height: 1.7; margin: 4px 0; }
+.karte-feed .story .summary-points li::before { content: "—"; position: absolute; left: 0; color: var(--cat); }
+.karte-feed .story .src { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); flex-wrap: wrap; }
+.karte-feed .story .src .tier { color: var(--cat); font-weight: var(--w-med); }
+/* News-Grasp 流の本文強調 3 種（index と同一・意味分け）: 太字↔下半分マーカー↔波線下線で視覚分離 */
+.karte-feed .story .summary-points b, .karte-feed .story .summary b { color: var(--fg); font-weight: 700; }
+.karte-feed .story .summary-points u, .karte-feed .story .summary u {
+  text-decoration: underline wavy;
+  text-decoration-color: var(--cat);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  font-weight: 600;
+}
+.karte-feed .story .summary-points mark, .karte-feed .story .summary mark {
+  background: linear-gradient(180deg, transparent 60%, color-mix(in oklab, var(--cat) 42%, transparent) 60%);
+  color: var(--fg); padding: 0 3px; border-radius: 0;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+/* スマホ縦積み: index と同じ 2行ルール */
+@media (max-width: 600px) {
+  .karte-feed .story {
+    grid-template-columns: 56px 1fr;
+    grid-template-rows: auto auto;
+    gap: var(--s-8);
+  }
+  .karte-feed .story .score { grid-column: 1; grid-row: 1; }
+  .karte-feed .story .thumb-col { grid-column: 2; grid-row: 1; }
+  .karte-feed .story .body { grid-column: 1 / -1; grid-row: 2; }
+  .karte-feed .story .thumb { aspect-ratio: 16 / 9; }
+  .karte-feed .story h3 { font-size: 15px; }
+  .karte-feed .story .score .num { font-size: 19px; }
+}
+.karte-feed .empty {
+  padding: var(--s-32) var(--s-16); text-align: center; color: var(--fg-mute);
+  font-family: var(--font-mono); font-size: var(--t-sm);
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+}
 
 /* confidence bar */
 .conf .meter { height: 8px; background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; margin: 6px 0 8px; }
@@ -409,6 +511,40 @@
         </div>
       </aside>
     </div>
+
+    {# 関連ニュース: このエンティティを主・関連いずれかで含む events を新しい順で全件出す。
+       SCORE_MIN フィルタは外す（カルテはアーカイブ的役割を兼ねる）。
+       index.html の .story と同じ表現を `.karte-feed` 下で再現する。 #}
+    <section class="karte-feed">
+      <h2>関連ニュース</h2>
+      <p class="desc">このカルテに紐づくニュース全件（新しい順）。</p>
+      {% if k.feed_items %}
+      <ul class="feed">
+        {% for s in k.feed_items %}
+        <li class="story" data-cat="{{ s.cat }}" data-score="{{ s.score }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a,details'))window.open('{{ s.source_url }}','_blank','noopener')"{% endif %}>
+          <div class="score">
+            <div class="num">{{ s.score }}</div>
+            <div class="lbl">SCORE</div>
+            <div class="date">{{ s.date_md }}<span>{{ s.date_rel }}</span></div>
+          </div>
+          <div class="thumb-col">
+            <img class="thumb" {% if s.thumb %}data-thumb="{{ s.thumb }}"{% endif %} alt="" loading="lazy" />
+          </div>
+          <div class="body">
+            <div class="meta-row">
+              <span class="cat-badge"><span class="gly">{{ s.glyph }}</span> {{ s.cat_label }}</span>
+            </div>
+            <h3>{{ s.headline }}</h3>
+            {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p | emph }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary | emph }}</p>{% endif %}
+            <span class="src">出典 <b style="color:var(--fg-sub);font-weight:500">{{ s.source }}</b> · <span class="tier">{{ s.tier_label }}</span>{% if s.source_url %} · <a href="{{ s.source_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--cat)">記事を開く ↗</a>{% endif %}</span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty">このエンティティを参照するニュースはまだありません。</div>
+      {% endif %}
+    </section>
   </div>
 
   {% include "_footer.html.j2" %}

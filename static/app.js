@@ -101,7 +101,15 @@
 
   function boot() { initPalette(); initFilter(); initThumbs(); initDigest(); }
 
-  /* ---- Dynamic daily digest headline (derived from top-score story) ---- */
+  /* ---- Dynamic daily digest headline (derived from top-score story) ----
+     News-Grasp 流の「行下半分マーカー」(linear-gradient 60% 区切り) を主語とカテゴリ名に当てる。
+     textContent ではなく innerHTML を使うため、ユーザ供給文字列は escHtml で必ずエスケープ。
+     CSS 側は .feed-head h1 mark で theme.css の全面塗り mark を override する。 */
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
   function initDigest() {
     var el = document.querySelector("[data-digest]");
     if (!el) return;
@@ -114,7 +122,9 @@
     var hEl = top.querySelector("h2");
     var h = hEl ? hEl.textContent.trim() : "";
     var subj = h.split(/[\u2014\u2013-]/)[0].trim() || h;
-    el.textContent = subj + " \u2014 \u672c\u65e5\u306f" + cat + "\u304c\u4e3b\u5f79\u3002";
+    el.innerHTML =
+      "<mark>" + escHtml(subj) + "</mark> \u2014 " +
+      "\u672c\u65e5\u306f<mark>" + escHtml(cat) + "</mark>\u304c\u4e3b\u5f79\u3002";
   }
 
   /* ---- Thumbnails: real image if present, else category fallback ---- */

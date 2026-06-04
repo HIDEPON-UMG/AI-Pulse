@@ -219,5 +219,106 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn('class="summary-points"', html2)
 
 
+    def test_karte_feed_items_include_main_and_related_events(self):
+        """カルテ最下段「関連ニュース」は、主 entity_id 一致 + related_entities に含まれる
+        events を **新しい順で全件** 入れる（SCORE_MIN フィルタは外す = カルテはアーカイブ的役割）。
+
+        なぜ重要か: 「このカルテに紐づくニュース」を1ページで網羅できることがカルテの価値。
+        SCORE_MIN で間引くと、過去の小ネタが消えて履歴が読めなくなる回帰になる。
+        related_entities も拾わないと「複数カルテに同時影響」した events が片側にしか出ない。
+        """
+        ent_main = {
+            "entity_id": "main", "name": "MainKarte", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-04", "positioning": "p",
+        }
+        ent_rel = {
+            "entity_id": "rel", "name": "RelKarte", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "W", "category": "model",
+            "snapshot_date": "2026-06-04", "positioning": "p2",
+        }
+        ent_other = {
+            "entity_id": "other", "name": "Other", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "X", "category": "model",
+            "snapshot_date": "2026-06-04", "positioning": "p3",
+        }
+        # main 直接（高 score）/ main 直接（低 score、SCORE_MIN 以下のはず）/ rel に main を related で含む / 無関係
+        ev_main_hi = {
+            "event_id": "m1", "entity_id": "main", "date": "2026-06-04", "category": "model",
+            "event_type": "release", "headline": "Main 高スコア", "summary": "s",
+            "score": 95, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ev_main_lo = {
+            "event_id": "m2", "entity_id": "main", "date": "2026-06-03", "category": "model",
+            "event_type": "release", "headline": "Main 低スコア", "summary": "s",
+            "score": 1, "importance": "low", "source": "src", "source_tier": "T3",
+        }
+        ev_rel_with_main = {
+            "event_id": "r1", "entity_id": "rel", "date": "2026-06-02", "category": "model",
+            "event_type": "release", "headline": "Rel から main 参照", "summary": "s",
+            "score": 70, "importance": "mid", "source": "src", "source_tier": "T2",
+            "related_entities": ["main"],
+        }
+        ev_other = {
+            "event_id": "o1", "entity_id": "other", "date": "2026-06-01", "category": "model",
+            "event_type": "release", "headline": "無関係", "summary": "s",
+            "score": 80, "importance": "mid", "source": "src", "source_tier": "T2",
+        }
+        ctx = gp.build_context(
+            [ent_main, ent_rel, ent_other],
+            [ev_main_hi, ev_main_lo, ev_rel_with_main, ev_other],
+        )
+        kartes_by_id = {k["id"]: k for k in ctx["kartes"]}
+        main_feed = kartes_by_id["main"]["feed_items"]
+        ids = [s["id"] for s in main_feed]
+        # 主 entity_id 一致 (m1, m2) + related_entities 一致 (r1) の 3 件、無関係 o1 は入らない
+        self.assertEqual(set(ids), {"m1", "m2", "r1"})
+        # SCORE_MIN フィルタは外す = 低スコア m2 も入る
+        self.assertIn("m2", ids)
+        # 新しい順 (date desc): m1 (06-04) → m2 (06-03) → r1 (06-02)
+        self.assertEqual(ids, ["m1", "m2", "r1"])
+        # 無関係 other カルテには影響しない
+        other_ids = [s["id"] for s in kartes_by_id["other"]["feed_items"]]
+        self.assertEqual(other_ids, ["o1"])
+        # テンプレでも .karte-feed セクションに描画される
+        html = gp.make_env().get_template("karte.html.j2").render(
+            **ctx, page="karte", k=kartes_by_id["main"])
+        self.assertIn("karte-feed", html)
+        self.assertIn("Main 高スコア", html)
+        self.assertIn("Main 低スコア", html)
+        self.assertIn("Rel から main 参照", html)
+        self.assertNotIn("無関係", html)
+
+
+    def test_existing_events_use_diverse_emphasis(self):
+        """既存 events.jsonl の各 event は 3 種強調記法（**太字** / ==マーカー== / __下線__）
+        を使い分けて意味分け表示できる状態にある（プロンプト絶対条件 1 / 2 の集計版）。
+
+        なぜ重要か: rewrite_emphasis でデータ全体に意味分けを当てた後、回帰で「太字一色」状態に
+        戻らないように下限を locked-in する。Gemini ゲート（llm_gemini._check_shape）と二段構え。
+        - 強調記法ゼロの event は 0 件（プロンプト絶対条件 2）。
+        - 太字以外（==/__）を 1 つ以上使う event の比率が 40% 以上（rewrite 直後で 58%、
+          将来の追加が単一カテゴリに偏っても 40% 下限を割らない設計）。
+        """
+        import re
+        RE_ANY = re.compile(r"\*\*[^*\n]+\*\*|==[^=\n]+==|__[^_\n]+__")
+        RE_DIVERSE = re.compile(r"==[^=\n]+==|__[^_\n]+__")
+        no_emph = []
+        diverse_count = 0
+        for e in self.events:
+            text = (e.get("summary") or "") + "\n" + "\n".join(e.get("summary_points") or [])
+            if not RE_ANY.search(text):
+                no_emph.append(e["event_id"])
+            if RE_DIVERSE.search(text):
+                diverse_count += 1
+        self.assertEqual(no_emph, [], f"強調記法ゼロの event: {no_emph}")
+        ratio = diverse_count / len(self.events)
+        self.assertGreaterEqual(
+            ratio, 0.40,
+            f"==/__ を使う event が {diverse_count}/{len(self.events)} ({ratio:.0%}) "
+            f"= 40% 未満。プロンプト絶対条件 1（太字だけ禁止）が守られていない可能性"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

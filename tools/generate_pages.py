@@ -171,10 +171,17 @@ def _summary_short(ev: dict) -> str:
 
     タイムラインは情報密度を保つため short 表示。空 / headline と同義なら空文字を返し
     テンプレ側で {% if %} 非表示にする（捏造表示の防止）。
+
+    強調記法（** / == / __）は切り詰めで閉じない記号が残ると壊れて見えるため、
+    archive では先に全削除して plain にする（フィード本文だけが強調記法の対象）。
     """
     s = _clean_summary(ev.get("summary", ""), ev["headline"])
     if not s:
         return ""
+    # 強調記法を plain 化（archive は密圧縮で意味分けの恩恵が薄く、切り詰めで記号残りを防ぐ）
+    s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
+    s = re.sub(r"==([^=]+)==", r"\1", s)
+    s = re.sub(r"__([^_]+)__", r"\1", s)
     if len(s) > 60:
         s = s[:58].rstrip() + "…"
     return s
@@ -215,7 +222,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
     }
 
 
-def _karte(ent: dict, all_events: list[dict]) -> dict:
+def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> dict:
     cat = ent["category"]
     conf = ent.get("confidence") or {}
     total = sum(v for v in conf.values() if isinstance(v, int))
@@ -252,6 +259,15 @@ def _karte(ent: dict, all_events: list[dict]) -> dict:
     cmp = ent.get("comparison")
     comparison = ({"axes": schema.LENS_AXES.get(cat, []), "cols": cmp["cols"]}
                   if cmp and cmp.get("cols") else None)
+    # 関連ニュース: 主 entity_id 一致 + related_entities にこの entity_id が含まれるイベント全件
+    # （SCORE_MIN フィルタは外す。カルテはアーカイブ的役割も持つため）。all_events は既に
+    # 新しい順ソート済みなので filter のみで時系列順を維持する。
+    feed_items = [
+        _story(ev, ent_by_id, ref, feature=False)
+        for ev in all_events
+        if ev["entity_id"] == ent["entity_id"]
+        or ent["entity_id"] in (ev.get("related_entities") or [])
+    ]
     return {
         "id": ent["entity_id"], "name": ent["name"], "cat": cat,
         "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"],
@@ -269,6 +285,7 @@ def _karte(ent: dict, all_events: list[dict]) -> dict:
         "comparison": comparison,
         "future": modules.get("future") or [],
         "overview": ent.get("overview") or None,
+        "feed_items": feed_items,
     }
 
 
@@ -367,7 +384,7 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
         "feed": feed, "feed_count": len(feed),
         "feed_total_published": len(feed_events),  # 当日以外も含む全 published（参考表示）
         "groups": groups, "archive_count": len(all_events), "range_label": range_label,
-        "kartes": [_karte(ent, all_events) for ent in entities],
+        "kartes": [_karte(ent, all_events, ent_by_id, ref) for ent in entities],
         "karte_index_groups": karte_index_groups,
         "karte_total": len(entities),
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",

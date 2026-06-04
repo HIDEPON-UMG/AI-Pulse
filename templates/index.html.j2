@@ -11,6 +11,14 @@
   font-weight: var(--w-bold); font-size: clamp(32px, 4.8vw, 54px); letter-spacing: -0.02em;
   margin: var(--s-16) 0 var(--s-8); text-wrap: balance;
 }
+/* News-Grasp 流の「行下半分マーカー」: 主語とカテゴリ名にだけ accent 色の太い下線を敷く。
+   theme.css の全面塗り mark を override（specificity: 0,0,2,1 > 0,0,0,1）。
+   60% の閾値で「文字の下 4 割」にゴム引きしたような視認性。色は accent token 経由。 */
+.feed-head h1 mark {
+  background: linear-gradient(180deg, transparent 60%, color-mix(in oklab, var(--accent) 38%, transparent) 60%);
+  color: var(--fg); padding: 0 4px; border-radius: 0;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
 .feed-head .lead { color: var(--fg-sub); max-width: 64ch; margin: 0; font-size: var(--t-sm); }
 .dateline { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg); }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--imp-high); display: inline-block; box-shadow: 0 0 8px var(--imp-high); }
@@ -78,13 +86,13 @@
 .story .body { min-width: 0; }
 .story .meta-row { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; margin-bottom: var(--s-8); }
 .story h2 {
-  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 22px;
+  font-family: var(--font-head); font-weight: var(--w-bold); font-size: 25px;
   letter-spacing: -0.01em; line-height: 1.4; margin: 0 0 8px; color: var(--fg);
   text-wrap: pretty;
 }
 .story:hover h2 { color: var(--accent); }
 .story .summary {
-  margin: 0; color: var(--fg-sub); font-size: 15px; line-height: 1.75;
+  margin: 0; color: var(--fg-sub); font-size: 17px; line-height: 1.75;
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
 .story .src { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); flex-wrap: wrap; }
@@ -103,7 +111,7 @@
   /* 2行目: 本文(全幅) */
   .story .body { grid-column: 1 / -1; grid-row: 2; }
   .story .thumb { aspect-ratio: 16 / 9; }
-  .story h2 { font-size: 16px; }
+  .story h2 { font-size: 18px; }
   .story .score .num { font-size: 22px; }
 }
 
@@ -141,10 +149,39 @@
 .story .metric[data-tip]:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 /* (C) カルテ更新バッジ */
 .story .upd-badge { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .08em; font-weight: 700; color: var(--accent-fg); background: var(--accent); padding: 1px 5px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
-/* (2) News-Grasp 流の本文強調（**太字** / __下線__ / ==マーカー==） */
+/* (2) News-Grasp 流の本文強調 3 種を意味分けして視覚レイヤーを完全分離する:
+   - **太字** (<b>): 一般強調（固有名・サービス名・組織名）。フォントウェイトのみで主張を最小化。
+   - ==マーカー== (<mark>): 決定打となる結論・数値。下半分塗りで「ハイライト」感を強調（News-Grasp 風）。
+   - __下線__ (<u>): 動作・出来事・採用・引用。波線下線で「アクション」感を出し、塗りと完全に差別化。
+   3 種が同時に出ても視覚レイヤー（太字↔塗り↔下線）が違うため判別できる。 */
 .story .summary-points b, .story .summary b { color: var(--fg); font-weight: 700; }
-.story .summary-points u, .story .summary u { text-decoration: underline; text-decoration-color: var(--cat); text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
-.story .summary-points mark, .story .summary mark { background: color-mix(in oklab, var(--cat) 24%, transparent); color: var(--fg); padding: 0 3px; border-radius: 2px; }
+.story .summary-points u, .story .summary u {
+  text-decoration: underline wavy;
+  text-decoration-color: var(--cat);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  font-weight: 600;
+}
+.story .summary-points mark, .story .summary mark {
+  background: linear-gradient(180deg, transparent 60%, color-mix(in oklab, var(--cat) 42%, transparent) 60%);
+  color: var(--fg); padding: 0 3px; border-radius: 0;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+/* 節区切り (News-Grasp 流: 短い横線 + 英語スモールキャップス) を story 内のセクション境界に入れる。
+   タイトル↓本文の上に SUMMARY、本文↓評価理由折りたたみの上に EVALUATE を置き、構造を視覚化する。
+   色は category accent (cat) 経由、フォントは既存 .label と揃えた mono small-caps。 */
+.story .sect-rule {
+  display: flex; align-items: center; gap: var(--s-8);
+  margin: var(--s-16) 0 var(--s-8);
+}
+.story .sect-rule .ln {
+  display: block; flex: 0 0 auto;
+  width: 28px; height: 1.5px; background: var(--cat); border-radius: 1px;
+}
+.story .sect-rule .lbl {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.16em; color: var(--cat); text-transform: uppercase;
+}
 /* (5) 判断理由トグル（デフォルト閉じ・クリックで開く。3指標バーのホバーtooltipは併存） */
 .story .why { margin-top: 10px; }
 .story .why > summary {
@@ -160,6 +197,38 @@
 .story .why-list > div { display: grid; grid-template-columns: 36px 1fr; gap: var(--s-8); align-items: start; }
 .story .why-list dt { font-family: var(--font-mono); font-size: 10.5px; color: var(--cat); padding-top: 2px; }
 .story .why-list dd { margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--fg-sub); }
+
+/* (2026-06-04 ユーザー要件) 本文・判断理由を「カテゴリ色の薄背景＋左帯」で囲み読みやすくする。
+   濃度は 7% 程度に抑えて fg-sub テキストとの読みやすさを担保（色混ざりで字が沈まないこと）。
+   feature 記事の h2 も連動で 1 回り拡大し、要約箇条書きの本文サイズも 16px に上げる。 */
+.story.feature h2 { font-size: 30px; }
+.story .summary-points {
+  background: color-mix(in oklab, var(--cat) 7%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--cat) 45%, transparent);
+  border-radius: var(--r-sm);
+  padding: 12px 14px; margin-top: 8px;
+}
+.story .summary-points li { font-size: 16px; line-height: 1.7; color: var(--fg); margin: 5px 0; }
+.story .summary {
+  background: color-mix(in oklab, var(--cat) 7%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--cat) 45%, transparent);
+  border-radius: var(--r-sm);
+  padding: 12px 14px; color: var(--fg);
+}
+/* 判断理由本体 (.why-list) は色混ざりを避けるため濃度を 5% に抑える（dt が cat 色 mono のため重なる） */
+.story .why-list {
+  background: color-mix(in oklab, var(--cat) 5%, transparent);
+  border-left-color: color-mix(in oklab, var(--cat) 45%, transparent);
+  border-radius: var(--r-sm);
+  padding: 12px var(--s-16);
+}
+.story .why-list dd { color: var(--fg-sub); }
+@media (max-width: 600px) {
+  .story.feature h2 { font-size: 20px; }
+  .story .summary-points { padding: 10px 12px; }
+  .story .summary { padding: 10px 12px; }
+  .story .summary-points li { font-size: 14.5px; }
+}
 </style>
 </head>
 <body>
@@ -235,9 +304,10 @@
             <div class="metrics"><span class="metric" data-level="{{ s.importance }}"{% if s.rationale.importance %} data-tip="{{ s.rationale.importance }}" tabindex="0"{% endif %}><b>重要</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.impact }}"{% if s.rationale.impact %} data-tip="{{ s.rationale.impact }}" tabindex="0"{% endif %}><b>影響</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.buzz }}"{% if s.rationale.buzz %} data-tip="{{ s.rationale.buzz }}" tabindex="0"{% endif %}><b>話題</b><span class="bars"><i></i><i></i><i></i></span></span></div>
           </div>
           <h2>{{ s.headline }}</h2>
+          <div class="sect-rule"><span class="ln"></span><span class="lbl">Summary</span></div>
           {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p | emph }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary | emph }}</p>{% endif %}
-          <span class="src">出典 <b style="color:var(--fg-sub);font-weight:500">{{ s.source }}</b> · <span class="tier">{{ s.tier_label }}</span>{% if s.source_url %} · <a href="{{ s.source_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--cat)">記事を開く ↗</a>{% endif %}</span>
           {% if s.rationale and (s.rationale.importance or s.rationale.impact or s.rationale.buzz) %}
+          <div class="sect-rule"><span class="ln"></span><span class="lbl">Evaluate</span></div>
           <details class="why">
             <summary><span class="ic">▾</span> 判断理由（重要・影響・話題）</summary>
             <dl class="why-list">
@@ -247,6 +317,7 @@
             </dl>
           </details>
           {% endif %}
+          <span class="src">出典 <b style="color:var(--fg-sub);font-weight:500">{{ s.source }}</b> · <span class="tier">{{ s.tier_label }}</span>{% if s.source_url %} · <a href="{{ s.source_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--cat)">記事を開く ↗</a>{% endif %}</span>
         </div>
       </li>
       {% endfor %}

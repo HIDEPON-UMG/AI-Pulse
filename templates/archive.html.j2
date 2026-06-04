@@ -36,7 +36,8 @@
   display: grid; grid-template-columns: 1fr auto; gap: var(--s-16); align-items: center;
   padding: 14px var(--s-16); margin-bottom: 10px;
   background: var(--bg-elev); border: 1px solid var(--border);
-  border-left: 2px solid var(--cat); border-radius: var(--r-sm);
+  /* (2026-06-04) フィード/カルテと統一感を出すため左帯を 45% mix で柔らかく */
+  border-left: 2px solid color-mix(in oklab, var(--cat) 45%, transparent); border-radius: var(--r-sm);
   transition: background .15s, transform .15s;
 }
 .entry-main { min-width: 0; }
@@ -50,16 +51,22 @@
 .escore .lbl { font-size: 8.5px; letter-spacing: .16em; color: var(--fg-mute); margin-top: 4px; }
 a.entry:hover { background: var(--bg-elev-2); transform: translateX(2px); }
 .entry .top { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; margin-bottom: 6px; }
-.entry h3 { font-family: var(--font-head); font-weight: var(--w-med); font-size: 16px; margin: 0 0 4px; color: var(--fg); line-height: 1.45; }
+.entry h3 { font-family: var(--font-head); font-weight: var(--w-med); font-size: 18px; margin: 0 0 4px; color: var(--fg); line-height: 1.45; }
 a.entry:hover h3 { color: var(--accent); }
 .entry .src { font-family: var(--font-mono); font-size: var(--t-label); color: var(--fg-mute); }
 .entry .src .tier { color: var(--cat); }
 .entry .time { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); }
 
-/* (2026-06-04) 英語タイトル対策の1行サマリ（タイトル直下） */
+/* (2026-06-04 改) 英語タイトル対策の1行サマリ（タイトル直下）。
+   フィード/カルテと統一感を出すため、カテゴリ色 6% の薄背景 + 左帯 35% で控えめに囲む
+   （archive は密圧縮のため濃度はフィードより低めに抑える）。 */
 .entry .summary-short {
-  margin: 2px 0 6px; color: var(--fg-sub); font-size: 13px; line-height: 1.55;
+  margin: 2px 0 6px; color: var(--fg); font-size: 14px; line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  background: color-mix(in oklab, var(--cat) 6%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--cat) 35%, transparent);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
 }
 /* (2026-06-04) 関連カルテ名を実名 chip で並べる（複数対応・カテゴリ色） */
 /* (2026-06-04 改) chip 単体ではカルテ名と分かりにくいため、左にラベル「関連カルテ →」を付与。
