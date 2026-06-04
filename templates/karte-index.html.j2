@@ -52,6 +52,29 @@
   margin: 0; color: var(--fg); letter-spacing: -0.01em; line-height: 1.3;
 }
 .ki-card:hover h3 { color: var(--cat); }
+
+/* (2026-06-04) カードの「直近アップデート」を一目で。h3 の上に独立バッジで配置。
+   7 日以内の新鮮カルテは fresh クラスで accent 強調、それ以外は控えめなニュートラル色。 */
+.ki-card .upd {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1;
+  padding: 4px 9px; border-radius: var(--r-sm);
+  background: var(--bg-elev-2); color: var(--fg-sub);
+  border: 1px solid var(--border); letter-spacing: 0.02em;
+}
+.ki-card .upd .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-mute); flex: none; }
+.ki-card .upd .abs { color: var(--fg-mute); font-size: 10px; opacity: .85; }
+.ki-card .upd.fresh {
+  background: color-mix(in oklab, var(--accent) 20%, var(--bg-elev));
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  font-weight: 700;
+}
+.ki-card .upd.fresh .dot {
+  background: var(--accent); box-shadow: 0 0 6px var(--accent);
+}
+.ki-card .upd.fresh .abs { color: color-mix(in oklab, var(--accent) 55%, var(--fg-sub)); }
 .ki-card .pos {
   margin: 0; color: var(--fg-sub); font-size: 13px; line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -95,6 +118,11 @@
       <div class="ki-cards">
         {% for it in g.cards %}
         <a class="ki-card" href="{{ it.href }}" data-cat="{{ it.cat }}">
+          {% if it.updated_rel %}
+          <span class="upd{% if it.updated_fresh %} fresh{% endif %}" title="最終更新 {{ it.updated_abs }}">
+            <span class="dot" aria-hidden="true"></span>{{ it.updated_rel }}<span class="abs">{{ it.updated_abs }}</span>
+          </span>
+          {% endif %}
           <h3>{{ it.name }}</h3>
           <p class="pos">{{ it.positioning }}</p>
           <div class="meta">

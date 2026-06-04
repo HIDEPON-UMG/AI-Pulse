@@ -97,6 +97,27 @@ def _rel_label(ref: dt.date, d: dt.date) -> str:
     return "本日" if days <= 0 else f"{days}日前"
 
 
+def _human_rel(ref: dt.date, d: dt.date) -> str:
+    """カルテ一覧の「直近アップデート」用に、一目で経過時間が分かる粗い相対表記。
+    本日 / 昨日 / N日前 / 先週 / N週間前 / 先月 / Nヶ月前 / N年前 の段階表現。"""
+    days = (ref - d).days
+    if days <= 0:
+        return "本日更新"
+    if days == 1:
+        return "昨日"
+    if days < 7:
+        return f"{days} 日前"
+    if days < 14:
+        return "先週"
+    if days < 30:
+        return f"{days // 7} 週間前"
+    if days < 60:
+        return "先月"
+    if days < 365:
+        return f"{days // 30} ヶ月前"
+    return f"{days // 365} 年前"
+
+
 def _clean_summary(summary: str, headline: str) -> str:
     """RSS OGP 由来の要約を整形して返す。
     HTMLエンティティをデコード後、  出典名サフィックスを除去。
@@ -297,8 +318,19 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
     else:
         range_label = ""
 
+    # カルテごとの「直近更新日」: そのカルテに紐づく events(主 entity_id + related_entities)の最大 date。
+    # related_entities まで取るのは、複数カルテ紐づきイベントを「全関連カルテで更新扱い」にするため。
+    latest_by_entity: dict[str, dt.date] = {}
+    for ev in all_events:
+        d = _d(ev["date"])
+        ids = [ev["entity_id"]] + list(ev.get("related_entities") or [])
+        for eid in ids:
+            if eid not in latest_by_entity or d > latest_by_entity[eid]:
+                latest_by_entity[eid] = d
+
     # カルテ一覧（カテゴリ別カード）。CAT_META の宣言順をレンズ並びの単一ソースとして使う。
     # 名前は `cards` を使う（Jinja2 で `g.items` は dict.items メソッドと衝突するため）。
+    # 並び順: 直近アップデートが新しい順（同日内は名前昇順）。「動いている」カルテを上に出す。
     karte_index_groups: list[dict] = []
     for cat in CAT_META:
         cards = sorted(
@@ -308,10 +340,22 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
                     "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"],
                     "positioning": e["positioning"], "vendor": e["vendor"],
                     "href": f"karte-{e['entity_id']}.html",
+                    "updated_rel": (_human_rel(ref, latest_by_entity[e["entity_id"]])
+                                    if e["entity_id"] in latest_by_entity else None),
+                    "updated_abs": (latest_by_entity[e["entity_id"]].isoformat()
+                                    if e["entity_id"] in latest_by_entity else None),
+                    # 7日以内の新鮮なカルテは強調色、それ以外は控えめ色で「一目」を出す。
+                    "updated_fresh": (e["entity_id"] in latest_by_entity and
+                                      (ref - latest_by_entity[e["entity_id"]]).days <= 7),
                 }
                 for e in entities if e["category"] == cat
             ],
-            key=lambda x: x["name"].lower(),
+            key=lambda x: (
+                # 最新日が新しい順 (None は最後尾)
+                -(latest_by_entity[x["id"]].toordinal()
+                  if x["id"] in latest_by_entity else 0),
+                x["name"].lower(),
+            ),
         )
         if cards:
             karte_index_groups.append({

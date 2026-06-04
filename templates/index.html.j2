@@ -48,12 +48,19 @@
 }
 .story .thumb[src=""] { visibility: hidden; }
 /* (2026-06-04) 関連カルテ抽象ラベルを廃し、実カルテ名を chip で並べる（複数対応・カテゴリ色） */
+/* (2026-06-04 改) chip 単体ではカルテ名と分かりにくいため、上にラベル「関連カルテ」を付与。
+   さらにユーザー要望でフォントを 2 回り (11px→15px) 拡大し padding も比例で広げて判読性を上げる。 */
+.story .karte-wrap { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.story .karte-label {
+  font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-mute);
+  letter-spacing: 0.12em; text-transform: uppercase; line-height: 1;
+}
 .story .karte-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .story .karte-chip {
-  font-family: var(--font-mono); font-size: 11px; color: var(--cat);
+  font-family: var(--font-mono); font-size: 15px; color: var(--cat);
   border: 1px solid color-mix(in oklab, var(--cat) 45%, transparent);
-  padding: 4px 9px; border-radius: var(--r-sm);
-  display: inline-flex; align-items: center;
+  padding: 6px 11px; border-radius: var(--r-sm);
+  display: inline-flex; align-items: center; line-height: 1.2;
   transition: background .15s; white-space: nowrap; text-decoration: none;
 }
 .story .karte-chip:hover { background: color-mix(in oklab, var(--cat) 12%, transparent); }
@@ -213,9 +220,12 @@
         <div class="thumb-col">
           <img class="thumb" {% if s.thumb %}data-thumb="{{ s.thumb }}"{% endif %} alt="" loading="lazy" />
           {% if s.karte_updated or s.karte_names %}
-          <div class="karte-chips">
-            {% if s.karte_updated %}<span class="upd-badge">UPDATE</span>{% endif %}
-            {% for k in s.karte_names %}<a class="karte-chip" href="{{ k.href }}">{{ k.name }}</a>{% endfor %}
+          <div class="karte-wrap">
+            <span class="karte-label">— 関連カルテ —</span>
+            <div class="karte-chips">
+              {% if s.karte_updated %}<span class="upd-badge">UPDATE</span>{% endif %}
+              {% for k in s.karte_names %}<a class="karte-chip" href="{{ k.href }}">{{ k.name }}</a>{% endfor %}
+            </div>
           </div>
           {% endif %}
         </div>
