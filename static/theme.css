@@ -16,6 +16,20 @@
    ------------------------------------------------------------ */
 [hidden] { display: none !important; }
 
+/* (2026-06-05) 英語見出しの直下に日本語訳を小さく表示する共通スタイル。
+   親見出し (h2 = 25px / h3 = ~17px) より明確に小さく、色は fg-mute で副次扱い。
+   個別テンプレで上書きしたければ `.story h2 + .headline-ja` 等の隣接セレクタで増しがけ。 */
+.headline-ja {
+  font-family: var(--font-body); font-size: 14.5px; font-weight: var(--w-reg);
+  color: var(--fg-mute); line-height: 1.55; margin: 4px 0 0;
+  text-wrap: pretty;
+}
+.story h2 + .headline-ja { font-size: 16px; }
+@media (max-width: 600px) {
+  .story h2 + .headline-ja { font-size: 13.5px; }
+  .headline-ja { font-size: 13px; }
+}
+
 :root {
   /* ---- Typography -------------------------------------- */
   --font-head: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;

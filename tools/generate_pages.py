@@ -202,6 +202,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "glyph": CAT_META[cat]["glyph"],
         "score": ev["score"],
         "headline": ev["headline"],
+        "headline_ja": ev.get("headline_ja") or "",
         "summary": summary,
         "source": ev["source"],
         "tier": ev["source_tier"],
@@ -317,6 +318,7 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
         groups[-1]["entries"].append({
             "cat": ev["category"], "cat_label": CAT_META[ev["category"]]["label"],
             "glyph": CAT_META[ev["category"]]["glyph"], "headline": ev["headline"],
+            "headline_ja": ev.get("headline_ja") or "",
             "source": ev["source"], "tier": ev["source_tier"],
             "tier_label": TIER_LABEL.get(ev["source_tier"], ev["source_tier"]),
             "score": ev["score"],  # スコアは各記事タイル右端に表示（日付レールと混同しないため）

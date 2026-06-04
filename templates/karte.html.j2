@@ -535,6 +535,7 @@
               <span class="cat-badge"><span class="gly">{{ s.glyph }}</span> {{ s.cat_label }}</span>
             </div>
             <h3>{{ s.headline }}</h3>
+            {% if s.headline_ja %}<div class="headline-ja">{{ s.headline_ja }}</div>{% endif %}
             {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p | emph }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary | emph }}</p>{% endif %}
             <span class="src">出典 <b style="color:var(--fg-sub);font-weight:500">{{ s.source }}</b> · <span class="tier">{{ s.tier_label }}</span>{% if s.source_url %} · <a href="{{ s.source_url }}" target="_blank" rel="noopener noreferrer" style="color:var(--cat)">記事を開く ↗</a>{% endif %}</span>
           </div>

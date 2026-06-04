@@ -31,8 +31,8 @@
 /* feed list */
 .feed { list-style: none; margin: 0; padding: var(--s-8) 0 0; }
 .story {
-  display: grid; grid-template-columns: 100px 300px 1fr;
-  /* (2026-06-05) スコアと画像の横隙間を詰める要望: 列幅 160→100、列間 gap 24→8 */
+  display: grid; grid-template-columns: 100px 200px 1fr;
+  /* (2026-06-05) サムネ 2/3 化要望でサムネ列 300→200、スコア⇔画像隙間詰めは継続 (gap 8) */
   gap: var(--s-16) var(--s-8); align-items: start;
   padding: var(--s-24) var(--s-16); margin: 0 calc(var(--s-16) * -1);
   border-bottom: 1px solid var(--border-soft);
@@ -121,9 +121,9 @@
   .story .karte-chip { font-size: 15px; padding: 5px 10px; }
 }
 
-/* タブレット (600〜860px): スコア列も詰める (128→80) + サムネ 1.5 倍 (160→240) */
+/* タブレット (600〜860px): スコア 80 + サムネ 2/3 化で 240→160 */
 @media (min-width: 601px) and (max-width: 860px) {
-  .story { grid-template-columns: 80px 240px 1fr; }
+  .story { grid-template-columns: 80px 160px 1fr; }
 }
 
 /* lead feature (first story bigger) */
@@ -310,6 +310,7 @@
             <div class="metrics"><span class="metric" data-level="{{ s.importance }}"{% if s.rationale.importance %} data-tip="{{ s.rationale.importance }}" tabindex="0"{% endif %}><b>重要</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.impact }}"{% if s.rationale.impact %} data-tip="{{ s.rationale.impact }}" tabindex="0"{% endif %}><b>影響</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.buzz }}"{% if s.rationale.buzz %} data-tip="{{ s.rationale.buzz }}" tabindex="0"{% endif %}><b>話題</b><span class="bars"><i></i><i></i><i></i></span></span></div>
           </div>
           <h2>{{ s.headline }}</h2>
+          {% if s.headline_ja %}<div class="headline-ja">{{ s.headline_ja }}</div>{% endif %}
           <div class="sect-rule"><span class="ln"></span><span class="lbl">Summary</span></div>
           {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p | emph }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary | emph }}</p>{% endif %}
           {% if s.rationale and (s.rationale.importance or s.rationale.impact or s.rationale.buzz) %}
