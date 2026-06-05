@@ -351,35 +351,43 @@ mark {
 .foot-cats a:hover { color: var(--accent); }
 
 /* ============================================================
-   View Transitions (cross-document wipe) — 2026-06-05 ユーザー要件
+   View Transitions (cross-document slide) — 2026-06-05 ユーザー要件
    ============================================================
    全ページ遷移（タブクリック / ブラウザ back-forward / app.js initSwipeNav
-   の location.href）に横方向ワイプを当てる。Chromium 126+ / Safari 18.2+ で
-   `@view-transition { navigation: auto }` がクロスドキュメント遷移にも自動適用
-   される。未対応ブラウザ (現状 Firefox) は即時遷移にフォールバックするため、
-   JS 側のガードや polyfill は不要。
+   の location.href）にカルーセル型の横スライドを当てる。Chromium 126+ /
+   Safari 18.2+ で `@view-transition { navigation: auto }` がクロスドキュメント
+   遷移にも自動適用される。未対応ブラウザ (現状 Firefox) は即時遷移にフォール
+   バックするため JS 側のガードや polyfill は不要。
 
-   wipe 方向は一律「右へ消えて左から現れる」横 sweep に固定する。スワイプ方向
-   で反転させない理由: cross-document では新ドキュメントの :root へ state を
-   引き継げず data-direction で出し分ける実装はクロスブラウザで壊れやすい
-   (`navigation: auto` モードでは PageRevealEvent 経由のフックも限定的)。
-   方向反転より「全遷移に統一感のあるエフェクトを当てる」ことを優先した。 */
+   方式: 旧ページ (::view-transition-old) を transform で左へ押し出し、新ページ
+   (::view-transition-new) を右から transform で滑り込ませる。clip-path ベース
+   の "ワイプ" は背景が動かず違和感が出やすかったため、両ページが同一画面内で
+   並んで動く "カルーセル スライド" に変更 (2026-06-05 ユーザーフィードバック)。
+
+   滑らかさ:
+   - 0.45s に少し延ばし、視線が動きを追える長さに
+   - cubic-bezier(0.22, 1, 0.36, 1) = easeOutQuint で「最後すーっと止まる」感
+   - transform は GPU 合成 (Chrome / Safari とも translate は自動 layer 昇格)
+   - prefers-reduced-motion: reduce は 0.01s に短縮しアクセシビリティ要件遵守
+
+   方向: 一律「現ページが左へ、次ページが右から」の前進方向に固定。スワイプ
+   反転は cross-document では state 引き継ぎ不可で実装が壊れやすいため割り切り。 */
 @view-transition {
   navigation: auto;
 }
-@keyframes wipe-out-to-right {
-  from { clip-path: inset(0 0 0 0); }
-  to   { clip-path: inset(0 0 0 100%); }
+@keyframes slide-out-to-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
 }
-@keyframes wipe-in-from-left {
-  from { clip-path: inset(0 100% 0 0); }
-  to   { clip-path: inset(0 0 0 0); }
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
 }
 ::view-transition-old(root) {
-  animation: 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards wipe-out-to-right;
+  animation: 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards slide-out-to-left;
 }
 ::view-transition-new(root) {
-  animation: 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards wipe-in-from-left;
+  animation: 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards slide-in-from-right;
 }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),

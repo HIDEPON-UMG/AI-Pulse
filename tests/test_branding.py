@@ -200,14 +200,22 @@ class TestBrandingInvariants(unittest.TestCase):
             src, r"::view-transition-new\(root\)\s*\{[^}]*animation\s*:",
             "::view-transition-new(root) の animation が無い",
         )
-        # wipe (clip-path) 系の keyframes が定義されている
+        # スライド (transform translateX) 系の keyframes が定義されている
+        # (2026-06-05 ユーザーフィードバックで clip-path ワイプ → transform
+        # カルーセル スライドに変更。GPU 合成で滑らかに動く方式を locked-in)
         self.assertRegex(
-            src, r"@keyframes\s+wipe-out-to-right\b",
-            "wipe-out-to-right keyframes が無い",
+            src, r"@keyframes\s+slide-out-to-left\b",
+            "slide-out-to-left keyframes が無い (transform translateX 方式)",
         )
         self.assertRegex(
-            src, r"@keyframes\s+wipe-in-from-left\b",
-            "wipe-in-from-left keyframes が無い",
+            src, r"@keyframes\s+slide-in-from-right\b",
+            "slide-in-from-right keyframes が無い (transform translateX 方式)",
+        )
+        # transform: translateX を使う方式であることを明示的に縛る
+        # (将来 clip-path に戻すと "ワイプじゃない方式" になり UX 回帰)
+        self.assertRegex(
+            src, r"@keyframes\s+slide-[a-z-]+\s*\{[^}]*transform\s*:\s*translateX",
+            "スライド keyframes が transform: translateX を使っていない",
         )
         # アクセシビリティ: prefers-reduced-motion で短縮する分岐がある
         self.assertRegex(
