@@ -108,3 +108,56 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
         f"Ollama 呼び出しが尽きました（{attempt} 回試行）: "
         f"{type(last_err).__name__ if last_err else 'None'}: {last_err}"
     )
+
+
+def translate_headline_ja(
+    headline: str,
+    *,
+    entity_context: dict | None = None,
+) -> str:
+    """英語 headline を日本語に翻訳。llm_gemini.translate_headline_ja と同契約。
+
+    Ollama /api/chat に 1 ショットで投げる（リトライなし。失敗即 LLMError → hybrid 層で Gemini fallback）。
+    structured outputs は使わず純テキスト応答（短文・装飾不要のため）。
+    """
+    ctx_hints = ""
+    if entity_context:
+        names = [
+            str(entity_context.get(k, "")) for k in ("entity_name", "vendor", "name")
+        ]
+        names = [n for n in names if n]
+        if names:
+            ctx_hints = f"\n固有名詞ヒント（英語のまま残す）: {', '.join(names)}"
+    user = (
+        "次の英語見出しを 30〜50 字程度の自然な日本語に翻訳してください。"
+        "会社名・製品名・人名などの固有名詞はそのまま英語表記で残し、それ以外（動詞・名詞・"
+        "形容詞・前置詞など）はすべて日本語にしてください。装飾記号（マーカー・太字）は付けない。"
+        "純粋な日本語見出しだけを 1 行で返してください（前置き・引用符・code fence は不可）。"
+        f"\n\n英語見出し: {headline}"
+        f"{ctx_hints}"
+    )
+    req = {
+        "model": config.OLLAMA_MODEL,
+        "messages": [{"role": "user", "content": user}],
+        "think": False,
+        "stream": False,
+        "options": {"temperature": 0.2},
+    }
+    data = json.dumps(req).encode("utf-8")
+    url = f"{config.OLLAMA_HOST}/api/chat"
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(
+                url, data=data, headers={"Content-Type": "application/json"}
+            ),
+            timeout=config.OLLAMA_TIMEOUT_SEC,
+        ) as r:
+            resp = json.load(r)
+    except urllib.error.URLError as exc:
+        raise LLMError(
+            f"Ollama 接続失敗 (translate_headline_ja, {url}): {exc}"
+        ) from exc
+    text = (resp.get("message", {}).get("content") or "").strip()
+    if not text:
+        raise LLMError("Ollama が空応答 (translate_headline_ja / think=false 確認)")
+    return text.replace("\n", " ").strip().strip('"').strip("'").strip()

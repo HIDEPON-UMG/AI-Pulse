@@ -120,8 +120,12 @@
     });
     var cat = top.dataset.catname || "生成AI";
     var entname = (top.dataset.entname || "").trim();
+    /* (2026-06-05) headline_ja 優先表示: 英語 headline が長く 3 行 clamp で切れる事故を防ぐため、
+       カード内の .headline-ja があればそれを TODAY'S THEME の主見出しに採用する。
+       無ければ h2（英語のまま）にフォールバックし、CSS line-clamp 3 で安全網が効く。 */
+    var hjaEl = top.querySelector(".headline-ja");
     var hEl = top.querySelector("h2");
-    var h = hEl ? hEl.textContent.trim() : "";
+    var h = (hjaEl && hjaEl.textContent.trim()) || (hEl ? hEl.textContent.trim() : "");
     /* (2026-06-05) 主語マーカー規則見直し:
        旧 dash split (h.split(/[\u2014\u2013-]/)) は英文見出しに dash が無いと見出し全文を <mark> 化していた
        (例: "DeepSeek slated to raise $7 billion ..." 全文が緑塗り事故)。

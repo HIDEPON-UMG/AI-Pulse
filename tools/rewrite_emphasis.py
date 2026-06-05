@@ -6,17 +6,19 @@
 **2 つのモード**:
 - `rewrite_event` (レガシー振り分け): 既存 `**X**` を意味で `==X==` / `__X__` に振り直す。
   旧 prompt 時代の entry（**太字** 偏重）を後段で 3 種化する用途。
-- `add_emphasis_event` (新規プレーンテキスト付与): プレーンテキストから数値/動詞/固有名を検出して
-  `==X==` / `__X__` / `**X**` を新規付与する。新 prompt `extract_grounded.md` の plain text 出力に対応。
+- `add_emphasis_event` (新規付与): プレーンテキストから数値/動詞/固有名を検出して
+  `==X==` / `__X__` / `**X**` を新規付与する。
+  新 prompt `extract_grounded.md` の plain text 出力に対応。
 
 **振り分けルール**（優先度: 数値 > 動作 > 固有名）:
-- `**X**` のうち X 内に **数値表現**（金額・パーセント・倍率・規模）を含む → `==X==`（結論・決定打）。
+- `**X**` のうち X 内に **数値表現**（金額・%・倍率・規模）を含む → `==X==`（結論・決定打）。
 - `**X**` のうち X 内に **動詞性語**（発表・公開・採用・買収など）を含む → `__X__`（動作・出来事）。
 - それ以外（人名・組織名・サービス名・技術用語など固有名）→ `**X**` 維持。
-- `add_emphasis_event` モードでは entity_context から固有名候補（entity name / vendor / competitors）
+- `add_emphasis_event` では entity_context から固有名候補（name / vendor / competitors）
   を抽出し、本文に出現する場合のみ `**X**` を付与する（汎用 NER は持たない）。
 
-**冪等性**: いずれのモードも 2 回適用で結果不変。既存 `==X==` / `__X__` / `**X**` の内側は touched しない。
+**冪等性**: いずれのモードも 2 回適用で結果不変。
+既存 `==X==` / `__X__` / `**X**` の内側は touched しない。
 """
 from __future__ import annotations
 
@@ -266,13 +268,15 @@ def main() -> None:
         ev_step2, added = add_emphasis_event(ev_step1, entity_context=ctx)
         if added:
             n_added += 1
-            counters["mark_added"] += ev_step2["summary"].count("==") // 2 - ev_step1["summary"].count("==") // 2
-            counters["und_added"] += ev_step2["summary"].count("__") // 2 - ev_step1["summary"].count("__") // 2
-            counters["bold_added"] += ev_step2["summary"].count("**") // 2 - ev_step1["summary"].count("**") // 2
+            s1, s2 = ev_step1["summary"], ev_step2["summary"]
+            counters["mark_added"] += s2.count("==") // 2 - s1.count("==") // 2
+            counters["und_added"] += s2.count("__") // 2 - s1.count("__") // 2
+            counters["bold_added"] += s2.count("**") // 2 - s1.count("**") // 2
         out.append(json.dumps(ev_step2, ensure_ascii=False))
     EVENTS_PATH.write_text("\n".join(out) + "\n", encoding="utf-8")
     print(
-        f"[rewrite_emphasis] {n_rewritten}/{n_total} events rewrite + {n_added}/{n_total} add_emphasis "
+        f"[rewrite_emphasis] {n_rewritten}/{n_total} events rewrite + "
+        f"{n_added}/{n_total} add_emphasis "
         f"(summary 集計: ==追加={counters['mark_added']} / __追加={counters['und_added']} / "
         f"**追加={counters['bold_added']})"
     )

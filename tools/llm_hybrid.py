@@ -136,3 +136,50 @@ def generate_event_extras(
             return llm_gemini.generate_event_extras(article_text, meta)
 
     raise LLMError(f"未知の HYBRID_MODE: {mode!r}（local_first / gemini_first / gemini_only / local_only のいずれか）")
+
+
+def translate_headline_ja(
+    headline: str,
+    *,
+    entity_context: dict | None = None,
+    gpu_probe: Callable[[], int | None] | None = None,
+) -> str:
+    """英語 headline を日本語に翻訳。HYBRID_MODE に従い local / Gemini 切替。
+
+    境界 1 関数集約 ([[feedback_check_design_principles]] §2): collect_rss は
+    llm_hybrid.translate_headline_ja を呼ぶだけで、フォールバック判断 / GPU プロービング /
+    例外整理を意識しない（generate_event_extras と同じ分岐ルール）。
+    """
+    mode = config.HYBRID_MODE
+
+    if mode == "gemini_only":
+        return llm_gemini.translate_headline_ja(headline, entity_context=entity_context)
+
+    if mode == "local_only":
+        return llm_local.translate_headline_ja(headline, entity_context=entity_context)
+
+    if mode == "gemini_first":
+        try:
+            return llm_gemini.translate_headline_ja(
+                headline, entity_context=entity_context
+            )
+        except LLMError:
+            return llm_local.translate_headline_ja(
+                headline, entity_context=entity_context
+            )
+
+    if mode == "local_first":
+        if _gpu_busy(probe=gpu_probe):
+            return llm_gemini.translate_headline_ja(
+                headline, entity_context=entity_context
+            )
+        try:
+            return llm_local.translate_headline_ja(
+                headline, entity_context=entity_context
+            )
+        except LLMError:
+            return llm_gemini.translate_headline_ja(
+                headline, entity_context=entity_context
+            )
+
+    raise LLMError(f"未知の HYBRID_MODE: {mode!r}")

@@ -1,6 +1,7 @@
-"""日次速報ジョブ: Google News RSS -> publisher 本文 -> ハイブリッド LLM 要約 -> L2 events -> store.ingest_events
+"""日次速報: News RSS -> 本文 -> ハイブリッド LLM 要約 -> L2 events -> store.ingest_events
 
-依存: 標準ライブラリに加えて google-genai / trafilatura / googlenewsdecoder / python-dotenv / urllib (Ollama)。
+依存: 標準ライブラリに加えて google-genai / trafilatura / googlenewsdecoder /
+python-dotenv / urllib (Ollama)。
 Gemini API キーは AI-Pulse/.env の GEMINI_API_KEY を読む（.env は .gitignore 済み）。
 Ollama サーバは localhost:11434 で起動済の前提（HYBRID_MODE=local_first がデフォルト）。
 Task Scheduler から run_daily.py 経由で毎日 7:00 に実行。
@@ -59,10 +60,33 @@ _T2_DOMAINS = frozenset({
 })
 
 # verify_quant の本文照合に使う数値表現パターン。rewrite_emphasis._NUM_RE を再利用して
-# 「強調候補の数値 = 検証対象の数値」を 1 ソースに固定する（[[feedback_check_design_principles]] §2）。
+# 「強調候補の数値 = 検証対象の数値」を 1 ソースに固定する
+# （[[feedback_check_design_principles]] §2）。
 _NUM_RE = rewrite_emphasis._NUM_RE
 # 半数超が本文に見つからなければ捏造疑いで skip（厳しすぎず緩すぎず・誤検出を抑える）。
 _QUANT_MISSING_RATIO_LIMIT = 0.5
+# headline_ja 自動翻訳の対象判定: ASCII 比率がこの閾値以上なら「英語見出し」とみなす。
+# 0.95 = ほぼ完全英語の見出しのみ翻訳（混在は触らない）。
+# 値の根拠: 「Rent The Runway, Perrier Team Up...」のような純英語タイトルだけを拾い、
+# 「Qwen 技術リード辞任の舞台裏」のような既に日本語混在の見出しを触らないため。
+_HEADLINE_JA_ASCII_THRESHOLD = 0.95
+
+
+def _ascii_ratio(text: str) -> float:
+    """文字列中の ASCII 文字（空白含む）の比率を返す。空文字は 0.0。"""
+    if not text:
+        return 0.0
+    ascii_n = sum(1 for c in text if ord(c) < 128)
+    return ascii_n / len(text)
+
+
+def _needs_headline_ja(headline: str) -> bool:
+    """headline が「英語見出し」として翻訳対象か判定。
+
+    判定: ASCII 比率が _HEADLINE_JA_ASCII_THRESHOLD 以上なら True。
+    空文字 / 既に日本語混在の見出しは False（= 触らない）。
+    """
+    return _ascii_ratio(headline) >= _HEADLINE_JA_ASCII_THRESHOLD
 
 
 def _source_tier(url: str) -> str:
@@ -143,7 +167,8 @@ def _make_event(entity: dict, item: dict, article: dict, extras: dict, idx: int)
     """RSS item + 取得本文 + LLM 出力 から L2 dict を組み立てる。
 
     article: fetch_article.extract() 返り値（publisher_url / publisher_name / og_image / text）
-    extras : llm_hybrid.generate_event_extras() 返り値（summary/summary_points/rationale/score/importance/event_type）
+    extras : llm_hybrid.generate_event_extras() 返り値
+        （summary/summary_points/rationale/score/importance/event_type）
     """
     entity_id = entity["entity_id"]
     category = entity["category"]
@@ -267,6 +292,20 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 continue
             try:
                 ev = _make_event(entity, item, article, extras, i)
+                # 2026-06-05 (追補13): 英語見出し（ASCII 比率 _HEADLINE_JA_ASCII_THRESHOLD 以上）
+                # なら headline_ja を翻訳付与。UI (index.html.j2 / app.js initDigest) は
+                # headline_ja があれば優先表示し、長い英語 h1 が CSS line-clamp 3 で
+                # 切れる事故を防ぐ。翻訳失敗は warn のみ・headline_ja 無しで通す。
+                if _needs_headline_ja(ev["headline"]):
+                    try:
+                        ev["headline_ja"] = llm_hybrid.translate_headline_ja(
+                            ev["headline"], entity_context=entity
+                        )
+                    except llm_hybrid.LLMError as exc:
+                        print(
+                            f"    skip-headline-ja ({entity_id}/{i}): {exc}",
+                            file=sys.stderr,
+                        )
                 schema.validate_event(ev, known_ids)
             except schema.SchemaError as exc:
                 skipped_validate += 1

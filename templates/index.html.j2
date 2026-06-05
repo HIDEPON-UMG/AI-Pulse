@@ -17,6 +17,12 @@
 .feed-head h1 {
   font-weight: var(--w-bold); font-size: clamp(32px, 4.8vw, 54px); letter-spacing: -0.02em;
   margin: var(--s-4) 0 var(--s-8); text-wrap: balance;
+  /* (2026-06-05) 最大 3 行で物理保証。LLM 生成 headline_ja が短ければ 1-2 行で収まり、
+     長い英語 headline が clamp 効いた時のための安全網（要約は LLM 側で 30-50 字以内に縛る）。 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 /* News-Grasp 流の「行下半分マーカー」: 主語とカテゴリ名にだけ accent 色の太い下線を敷く。
    theme.css の全面塗り mark を override（specificity: 0,0,2,1 > 0,0,0,1）。
