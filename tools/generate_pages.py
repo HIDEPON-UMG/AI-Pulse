@@ -425,14 +425,20 @@ def build_context(entities: list[dict], events: list[dict]) -> dict:
         "karte_total": len(entities),
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),
+        "site_url": config.SITE_URL,  # OGP 絶対 URL の組立に使う（_head.html.j2）
     }
 
 
-def _copy_assets() -> int:
+def _copy_assets(out_dir: Path) -> int:
+    """static/ 配下のホワイトリスト拡張子をすべて `out_dir` に流す。
+
+    本番 (OUT_DIR) でも tmp ディレクトリでも同じ経路を辿るよう out_dir を引数化した
+    （2026-06-05 改修: テストが OGP png 等のアセット貫通を検証できるようにするため）。
+    """
     n = 0
     for f in sorted(STATIC_DIR.iterdir()):
         if f.is_file() and f.suffix in ASSET_SUFFIXES:
-            shutil.copy2(f, OUT_DIR / f.name)
+            shutil.copy2(f, out_dir / f.name)
             n += 1
     return n
 
@@ -483,7 +489,7 @@ def generate(out_dir: Path = OUT_DIR) -> dict:
     ctx = build_context(entities, events)
     env = make_env()
     out_dir.mkdir(parents=True, exist_ok=True)
-    assets = _copy_assets() if out_dir == OUT_DIR else 0
+    assets = _copy_assets(out_dir)
     pages = []
     (out_dir / "index.html").write_text(
         env.get_template("index.html.j2").render(**ctx, page="feed"), encoding="utf-8"

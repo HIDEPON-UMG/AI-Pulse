@@ -1,7 +1,10 @@
 /* ============================================================
    AI-Pulse — Design Tokens
-   Theme: Dark base × Cool-tech (blue→cyan)
-   Palettes are switchable via [data-palette] on <html>.
+   Theme: Dark base × Cool-tech (azure mid)
+   Single palette (Azure Mid). Switchable palette UI was removed
+   2026-06-05 as visual noise. To pivot the brand color in future,
+   edit `--accent` / `--accent-2` / `--accent-fg` directly and
+   the matching tokens in DESIGN.md.
    ============================================================ */
 
 /* ------------------------------------------------------------
@@ -113,10 +116,14 @@
   --tier-2: oklch(0.81 0.120 200);
   --tier-3: oklch(0.62 0.012 252);
 
-  /* ---- Primary accent — Palette A "Cyan Signal" -------- */
-  --accent:      oklch(0.82 0.130 205);
-  --accent-2:    oklch(0.72 0.140 222);
-  --accent-fg:   oklch(0.17 0.030 230);
+  /* ---- Primary accent — Azure Mid (single palette, 2026-06-05) ----
+     Hue 230 (cobalt blue), L=0.68: dark bg #101113 上で十分な視認性を保ちつつ
+     旧 Cyan Signal (#36DCEC) の「明るすぎ」を解消。
+     accent-2 は同 hue でさらに濃い L=0.58 (#2862C2 相当)、深いリンク/枠線用。
+     accent-fg はアクセント面に乗る数少ない文字 (white text 系) で使う極淡シアン白。 */
+  --accent:      oklch(0.68 0.160 230);
+  --accent-2:    oklch(0.58 0.180 245);
+  --accent-fg:   oklch(0.96 0.012 230);
   --accent-weak: color-mix(in oklab, var(--accent) 16%, transparent);
   --glow:        color-mix(in oklab, var(--accent) 32%, transparent);
 
@@ -128,30 +135,6 @@
   /* layout */
   --maxw: 1180px;
   --header-h: 84px;
-}
-
-/* ---- Palette B "Azure Deep" ---------------------------- */
-[data-palette="azure"] {
-  --bg:        oklch(0.150 0.026 262);
-  --bg-elev:   oklch(0.192 0.028 262);
-  --bg-elev-2: oklch(0.232 0.030 262);
-  --border:    oklch(0.310 0.026 262);
-  --border-soft: oklch(0.258 0.022 262);
-  --accent:    oklch(0.70 0.155 254);
-  --accent-2:  oklch(0.62 0.165 262);
-  --accent-fg: oklch(0.97 0.01 250);
-}
-
-/* ---- Palette C "Ion" — near-black, electric cyan ------- */
-[data-palette="ion"] {
-  --bg:        oklch(0.135 0.012 200);
-  --bg-elev:   oklch(0.180 0.014 200);
-  --bg-elev-2: oklch(0.220 0.016 200);
-  --border:    oklch(0.305 0.016 200);
-  --border-soft: oklch(0.250 0.014 200);
-  --accent:    oklch(0.86 0.145 188);
-  --accent-2:  oklch(0.78 0.150 196);
-  --accent-fg: oklch(0.15 0.02 200);
 }
 
 /* ============================================================
@@ -257,20 +240,6 @@ mark {
   border-color: var(--border); box-shadow: inset 0 2px 0 var(--accent);
 }
 .header-spacer { flex: 1; }
-
-/* palette switcher */
-.palette-switch { display: flex; align-items: center; gap: 7px; align-self: flex-end; padding-bottom: 1px; }
-.palette-switch .pl-label { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); letter-spacing: .08em; }
-.palette-switch button {
-  width: 20px; height: 20px; border-radius: 50%; padding: 0; cursor: pointer;
-  border: 1px solid var(--border-strong); background: var(--sw); position: relative;
-  transition: transform .12s;
-}
-.palette-switch button:hover { transform: scale(1.12); }
-.palette-switch button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--fg); }
-.sw-cyan  { --sw: oklch(0.82 0.130 205); }
-.sw-azure { --sw: oklch(0.70 0.155 254); }
-.sw-ion   { --sw: oklch(0.86 0.145 188); }
 
 /* main scroll region */
 .app-main { padding-top: var(--header-h); }
@@ -395,7 +364,4 @@ mark {
   .brand .name { font-size: 22px; white-space: nowrap; }  /* ワードマークを1行に保つ */
   .app-nav { margin-left: 2px; }
   .app-nav a { padding: 5px 8px 6px; font-size: 13px; bottom: -8px; }
-  .palette-switch { gap: 5px; }
-  .palette-switch .pl-label { display: none; }   /* THEME ラベルは省スペースのため隠す */
-  .palette-switch button { width: 17px; height: 17px; }
 }

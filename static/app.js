@@ -1,6 +1,7 @@
 /* ============================================================
    AI-Pulse — shared behaviour
-   palette persistence · category filtering
+   category filtering · digest headline · thumbnail fallback
+   (palette switcher は 2026-06-05 に Azure Mid 単独へ集約・削除)
    ============================================================ */
 (function () {
   "use strict";
@@ -11,28 +12,6 @@
       e.preventDefault();
     }
   });
-
-  /* ---- Palette switcher (persisted) ---- */
-  var KEY = "aipulse-palette";
-  function applyPalette(p) {
-    if (p && p !== "cyan") document.documentElement.setAttribute("data-palette", p);
-    else document.documentElement.removeAttribute("data-palette");
-    document.querySelectorAll(".palette-switch button").forEach(function (b) {
-      b.setAttribute("aria-pressed", String(b.dataset.palette === (p || "cyan")));
-    });
-  }
-  function initPalette() {
-    var saved = "cyan";
-    try { saved = localStorage.getItem(KEY) || "cyan"; } catch (e) {}
-    applyPalette(saved);
-    document.querySelectorAll(".palette-switch button").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var p = b.dataset.palette;
-        applyPalette(p);
-        try { localStorage.setItem(KEY, p); } catch (e) {}
-      });
-    });
-  }
 
   /* ---- Category filter chips ---- */
   function initFilter() {
@@ -99,7 +78,65 @@
     render();
   }
 
-  function boot() { initPalette(); initFilter(); initThumbs(); initDigest(); }
+  /* ---- Mobile swipe navigation (フィード ↔ アーカイブ ↔ カルテ一覧) ----
+     ユーザー要件 2026-06-05: スマホで横スワイプして主要 3 ページを順序遷移したい。
+     - 順序: feed → archive → karte_index (左スワイプ = 次のページへ)
+     - 両端 (feed の右端 / karte_index の左端) では何もしない (循環しない)
+     - 個別カルテ (data-page="karte") では発火しない (戻る導線は親カルテ一覧経由)
+     - desktop (>= 769px) では発火しない (誤クリック防止 + マウス UX を変えない)
+     - スクロール領域内の縦スクロールと干渉しないよう、垂直移動が大きい時はキャンセル
+     - 0.6s 超のスローモーションも誤検知 (慎重なドラッグの可能性) としてキャンセル
+
+     なぜ document.body の touch event か:
+     ヘッダ・chip-bar・フィード本体すべてを横断するため body 上で listen し、
+     passive:true で縦スクロールの主経路を絶対に塞がない。preventDefault() は
+     呼ばず、判定後に location.href で遷移する。 */
+  function initSwipeNav() {
+    if (document.documentElement.clientWidth >= 769) return;  // desktop は対象外
+    var page = document.body.dataset.page || "";
+    var ORDER = ["feed", "archive", "karte_index"];
+    var idx = ORDER.indexOf(page);
+    if (idx < 0) return;  // 個別カルテなど ORDER 外は対象外
+    var TARGETS = {
+      "feed": "index.html",
+      "archive": "archive.html",
+      "karte_index": "karte-index.html",
+    };
+    var X_THRESHOLD = 60;   // 水平移動 60px 以上で発火 (人差し指ストロークの平均)
+    var Y_TOLERANCE = 50;   // 垂直 50px 超は縦スクロール意図とみなしキャンセル
+    var T_MAX = 600;        // 600ms 超は誤操作 / 慎重なドラッグでキャンセル
+
+    var x0 = 0, y0 = 0, t0 = 0, tracking = false;
+
+    document.body.addEventListener("touchstart", function (ev) {
+      if (ev.touches.length !== 1) { tracking = false; return; }
+      var t = ev.touches[0];
+      x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); tracking = true;
+    }, { passive: true });
+
+    document.body.addEventListener("touchend", function (ev) {
+      if (!tracking) return;
+      tracking = false;
+      var t = ev.changedTouches[0];
+      var dx = t.clientX - x0;
+      var dy = t.clientY - y0;
+      var dt = Date.now() - t0;
+      if (dt > T_MAX) return;
+      if (Math.abs(dy) > Y_TOLERANCE) return;       // 縦スクロール優先
+      if (Math.abs(dx) < X_THRESHOLD) return;       // 短すぎ
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // 角度が斜め過ぎ
+      var nextIdx = dx < 0 ? idx + 1 : idx - 1;     // 左スワイプ = 次、右 = 前
+      if (nextIdx < 0 || nextIdx >= ORDER.length) return;  // 両端で止める
+      var target = TARGETS[ORDER[nextIdx]];
+      if (target) location.href = target;
+    }, { passive: true });
+
+    document.body.addEventListener("touchcancel", function () {
+      tracking = false;
+    }, { passive: true });
+  }
+
+  function boot() { initFilter(); initThumbs(); initDigest(); initSwipeNav(); }
 
   /* ---- Dynamic daily digest headline (derived from top-score story) ----
      News-Grasp 流の「行下半分マーカー」(linear-gradient 60% 区切り) を主語とカテゴリ名に当てる。
@@ -127,7 +164,7 @@
     var hEl = top.querySelector("h2");
     var h = (hjaEl && hjaEl.textContent.trim()) || (hEl ? hEl.textContent.trim() : "");
     /* (2026-06-05) 主語マーカー規則見直し:
-       旧 dash split (h.split(/[\u2014\u2013-]/)) は英文見出しに dash が無いと見出し全文を <mark> 化していた
+       旧 dash split (h.split(/[—–-]/)) は英文見出しに dash が無いと見出し全文を <mark> 化していた
        (例: "DeepSeek slated to raise $7 billion ..." 全文が緑塗り事故)。
        新ルール: story の主 entity 名 (data-entname) が見出しに含まれる時のみ、
        その部分文字列のみ <mark>。含まれない場合はマーク無しで素の見出しを出す。 */
@@ -140,8 +177,8 @@
     } else {
       html = escHtml(h);
     }
-    el.innerHTML = html + " \u2014 " +
-      "\u672c\u65e5\u306f<mark>" + escHtml(cat) + "</mark>\u304c\u4e3b\u5f79\u3002";
+    el.innerHTML = html + " — " +
+      "本日は<mark>" + escHtml(cat) + "</mark>が主役。";
   }
 
   /* ---- Thumbnails: real image if present, else category fallback ---- */

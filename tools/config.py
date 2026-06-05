@@ -6,6 +6,12 @@ playground のスライダーで調整し「プロンプトとしてコピー」
 パラメータを 1 箇所に集約することで、収集系コードに数値を直書きしない。
 """
 
+# --- サイト公開 URL（OGP 絶対 URL に必須） ---
+# Twitter / Facebook の OGP パーサは og:image / og:url に絶対 URL を要求する。
+# GitHub Pages の公開先を一次ソースとして 1 箇所に持ち、Jinja から `site_url` で参照する。
+# 末尾スラッシュ必須（テンプレが `{{ site_url }}og-image.png` のように連結するため）。
+SITE_URL = "https://hidepon-umg.github.io/AI-Pulse/"
+
 SCORE_MIN = 50             # ニュース性スコア下限（これ未満は掲載しない）
 BREAKING_PER_CATEGORY = 5  # 速報 1 カテゴリあたり収集件数
 RECHECK_DAYS = 30          # カルテ再評価の既定周期（日）

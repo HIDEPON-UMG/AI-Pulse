@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: AI-Pulse
-description: Dark base × Cool-tech (blue→cyan) のエディトリアル・ニュース UI。NewsPicks 風の中性 near-black に明朝（Noto Serif JP）を重ね、7 レンズ各色＋グリフで一覧を瞬時分類する。姉妹サイト News-Grasp の gold / Claude.ai の orange とは温度感・主色で明確に区別する。
+description: Dark base × Cool-tech (azure mid) のエディトリアル・ニュース UI。NewsPicks 風の中性 near-black に明朝（Noto Serif JP）を重ね、7 レンズ各色＋グリフで一覧を瞬時分類する。姉妹サイト News-Grasp の gold / Claude.ai の orange とは温度感・主色で明確に区別する。主色は Azure Mid 単独（旧 3 パレット切替は 2026-06-05 に整理）。
 colors:
   # ---- Neutrals (Palette A default / near-black 漆黒) ----
   bg: "#101113"
@@ -13,10 +13,10 @@ colors:
   border: "#2C2E31"
   border-soft: "#212225"
   border-strong: "#45484C"
-  # ---- Primary accent: Palette A "Cyan Signal" ----
-  accent: "#36DCEC"
-  accent-2: "#00B7E3"
-  accent-fg: "#02121A"
+  # ---- Primary accent: Azure Mid (single palette, 2026-06-05) ----
+  accent: "#1F95D6"
+  accent-2: "#2862C2"
+  accent-fg: "#EAF1F8"
   # ---- Category accents (7 lenses / text-on-dark) ----
   c-model: "#70ADFE"
   c-editor: "#48D8DF"
@@ -161,7 +161,7 @@ components:
 - **明朝エディトリアル**: 見出し・記事タイトル・タグ・チップまで Noto Serif JP（明朝）。数値・コード・ラベルのみ JetBrains Mono の等幅。UI 一部の補助に Noto Sans JP。
 - **7 レンズ＝色＋グリフ**: 7 カテゴリそれぞれに固有アクセント色とグリフ（◆▲⬢◎■▶✦）を割り当て、読者は色とマークだけで一覧を瞬時に分類できる。
 - **硬質な角**: 角丸は 0〜4px に抑える。フル丸（pill）は「All」フィルタボタンなど限定用途のみ。
-- **切替パレット**: 主色は 3 案（Cyan Signal / Azure Deep / Ion）を `[data-palette]` で切替・永続化。既定は Cyan Signal。
+- **単一パレット (Azure Mid)**: 主色は `--accent`（`#1F95D6` 相当）に統一。読者向けの切替 UI は 2026-06-05 に廃止（旧 Cyan Signal は明るすぎ、Azure Deep / Ion は使い分けの実需が無かったため）。ブランドを動かす時は `static/theme.css` と本 DESIGN.md の `--accent` / `--accent-2` / `--accent-fg` をまとめて差し替える。
 
 > **News-Grasp / Claude.ai との区別（確定方針#7）**: 姉妹サイト News-Grasp は navy + cream + **gold** の角丸 0・ライト寄り。Claude.ai 公式トンマナは warm cream + **Claude Orange**。AI-Pulse は **ダーク基調 × シアン主色**で温度感・主色ともに明確に別物。gold / orange / cream は使わない。
 
@@ -173,7 +173,7 @@ components:
 
 すべて oklch（共有 L/C・hue 変化）で設計。frontmatter は hex 正規化値、以下表は **theme.css の正確な oklch** を併記する。
 
-### ニュートラル（Palette A "Cyan Signal" 既定）
+### ニュートラル（near-black 漆黒）
 
 | Token | oklch（正準） | hex | 用途 |
 |:--|:--|:--|:--|
@@ -187,13 +187,15 @@ components:
 | `border-soft` | `0.252 0.006 265` | `#212225` | 弱い区切り |
 | `border-strong` | `0.400 0.008 265` | `#45484C` | スコアバー地・強い枠 |
 
-### 主色アクセント（3 パレット切替）
+### 主色アクセント（単一 Azure Mid・2026-06-05〜）
 
-| Palette | accent | accent-2 | accent-fg | 性格 |
-|:--|:--|:--|:--|:--|
-| **A Cyan Signal**（既定） | `0.82 0.130 205` → `#36DCEC` | `0.72 0.140 222` → `#00B7E3` | `0.17 0.030 230` → `#02121A` | 明るいシアン。最も視認性が高い |
-| B Azure Deep | `0.70 0.155 254` → `#53A1FC` | `0.62 0.165 262` → `#4C82E8` | `#F4F8FF` | 青みの深いトーン（bg `#060B16`） |
-| C Ion | `0.86 0.145 188` → `#25EFE3` | `0.78 0.150 196` → `#00D4D7` | `#040A0A` | 漆黒地のエレクトリック・シアン（bg `#040A0A`） |
+| Token | oklch（正準） | hex | 用途 |
+|:--|:--|:--|:--|
+| `accent` | `0.68 0.160 230` | `#1F95D6` | ロゴ・リンク・カウント数値・フォーカス輪郭。dark bg 上で AA 通過 |
+| `accent-2` | `0.58 0.180 245` | `#2862C2` | 濃いめの hover / gradient 終点。`accent` より一段沈むコバルト |
+| `accent-fg` | `0.96 0.012 230` | `#EAF1F8` | `accent` 面に乗せる白文字（極淡シアン白で純白を避ける） |
+
+> 旧 3 パレット切替 (Cyan Signal / Azure Deep / Ion) は 2026-06-05 に廃止。ユーザー側の選択 UI も同時に削除し、`[data-palette]` セレクタは theme.css に存在しない。ブランド色を動かす時は上 3 トークンを `static/theme.css` と本表の両方で差し替える（lint 互換のため hex 正規化値を本表に持つ）。
 
 ### カテゴリアクセント（7 レンズ・共有 L/C・hue 変化）
 
@@ -332,7 +334,7 @@ text-on-dark 用の明色（`--cat`）と、バッジ塗り用の暗色 solid（
 - 数値・日付・スコア・出典は **等幅（JetBrains Mono）＋ `tabular-nums`** で桁を揃える
 - バッジ・選択 chip は **solid ベタ塗り＋白文字**で統一（記事ラベルとフィルタを同スタイルに）
 - 余白は **4 の倍数**で揃える。角丸は 0〜4px に抑える
-- 主色を変えたいときは `[data-palette]` の 3 案から選ぶ（個別に色を足さない）
+- 主色を変えたいときは `theme.css` の `--accent` / `--accent-2` / `--accent-fg` と DESIGN.md の対応 hex を**同時に**差し替える（読者向け切替 UI は提供しない方針）
 
 ### ❌ Don't
 
