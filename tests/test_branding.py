@@ -173,7 +173,50 @@ class TestBrandingInvariants(unittest.TestCase):
             "desktop (>=769px) 除外ガードが無く、PC でも誤動作しうる",
         )
 
-    # ---- (5) OGP 画像アセットが site/ にコピーされる ----
+    # ---- (5) View Transitions による wipe 遷移 ----
+
+    def test_theme_css_enables_cross_document_view_transitions(self):
+        """ユーザー要件 2026-06-05: ページ遷移にワイプエフェクトを当てたい。
+        theme.css の @view-transition / ::view-transition-* が
+        cross-document モードで設定されていることを locked-in する。
+
+        なぜ重要か: View Transitions API は CSS だけで宣言的に動くため、
+        将来 minify ツール等が `@view-transition` ルールを atrule 不明として
+        丸ごと落とす回帰や、`navigation: auto` を `none` に書き換える誤改修を
+        構造的に検出する。1 ファイル 1 ルールで class of bugs を封じる。
+        """
+        src = (ROOT / "static" / "theme.css").read_text(encoding="utf-8")
+        # cross-document モード (navigation: auto) が宣言されている
+        self.assertRegex(
+            src, r"@view-transition\s*\{\s*navigation\s*:\s*auto",
+            "@view-transition { navigation: auto } が theme.css に無い",
+        )
+        # 古いページ・新しいページ両方のアニメ宣言があること
+        self.assertRegex(
+            src, r"::view-transition-old\(root\)\s*\{[^}]*animation\s*:",
+            "::view-transition-old(root) の animation が無い",
+        )
+        self.assertRegex(
+            src, r"::view-transition-new\(root\)\s*\{[^}]*animation\s*:",
+            "::view-transition-new(root) の animation が無い",
+        )
+        # wipe (clip-path) 系の keyframes が定義されている
+        self.assertRegex(
+            src, r"@keyframes\s+wipe-out-to-right\b",
+            "wipe-out-to-right keyframes が無い",
+        )
+        self.assertRegex(
+            src, r"@keyframes\s+wipe-in-from-left\b",
+            "wipe-in-from-left keyframes が無い",
+        )
+        # アクセシビリティ: prefers-reduced-motion で短縮する分岐がある
+        self.assertRegex(
+            src,
+            r"@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)[^}]*\{[^{]*::view-transition",
+            "prefers-reduced-motion で View Transitions を短縮する分岐が無い",
+        )
+
+    # ---- (6) OGP 画像アセットが site/ にコピーされる ----
 
     def test_og_image_asset_exists_and_is_copied(self):
         """`static/og-image.png` が存在し、`_copy_assets` で site/ に流れる。

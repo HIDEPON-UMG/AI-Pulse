@@ -351,6 +351,44 @@ mark {
 .foot-cats a:hover { color: var(--accent); }
 
 /* ============================================================
+   View Transitions (cross-document wipe) — 2026-06-05 ユーザー要件
+   ============================================================
+   全ページ遷移（タブクリック / ブラウザ back-forward / app.js initSwipeNav
+   の location.href）に横方向ワイプを当てる。Chromium 126+ / Safari 18.2+ で
+   `@view-transition { navigation: auto }` がクロスドキュメント遷移にも自動適用
+   される。未対応ブラウザ (現状 Firefox) は即時遷移にフォールバックするため、
+   JS 側のガードや polyfill は不要。
+
+   wipe 方向は一律「右へ消えて左から現れる」横 sweep に固定する。スワイプ方向
+   で反転させない理由: cross-document では新ドキュメントの :root へ state を
+   引き継げず data-direction で出し分ける実装はクロスブラウザで壊れやすい
+   (`navigation: auto` モードでは PageRevealEvent 経由のフックも限定的)。
+   方向反転より「全遷移に統一感のあるエフェクトを当てる」ことを優先した。 */
+@view-transition {
+  navigation: auto;
+}
+@keyframes wipe-out-to-right {
+  from { clip-path: inset(0 0 0 0); }
+  to   { clip-path: inset(0 0 0 100%); }
+}
+@keyframes wipe-in-from-left {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+::view-transition-old(root) {
+  animation: 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards wipe-out-to-right;
+}
+::view-transition-new(root) {
+  animation: 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards wipe-in-from-left;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01s;
+  }
+}
+
+/* ============================================================
    モバイル（スマホ実機 390px 検証で追加）
    共有ヘッダを縮約し、パレット切替を画面内に収める。
    --header-h を縮めると app-main / chip-bar / 日付レールの
