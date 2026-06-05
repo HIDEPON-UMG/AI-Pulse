@@ -30,6 +30,12 @@ EVENT_TYPES = {"release", "funding", "pricing", "ma", "shutdown", "incident", "b
 SOURCE_TIERS = {"T1", "T2", "T3"}  # T1 公式/一次, T2 一次報道, T3 二次/個人
 IMPORTANCE = {"high", "mid", "low"}
 
+# rationale 各値の最低文字数。prompt は 40〜80 字を要求しているが、安全側で 20 字以上を
+# 「文章として最低限の情報量」のハードゲートにする。これ以下は "high"/"mid"/"low" や
+# 「高と判定」等のラベル反復とみなして弾く ([[feedback_check_design_principles]] §1:
+# illegal state を表現できなくする / §4: 契約テスト 1 件で不変条件を locked-in)。
+_RATIONALE_MIN_LEN = 20
+
 ENTITY_REQUIRED = (
     "entity_id", "name", "kind", "domain", "offering", "vendor",
     "category", "snapshot_date", "positioning",
@@ -228,6 +234,19 @@ def _validate_event_extras(d: dict, ctx: str, known_entity_ids: set | None = Non
                    if not (isinstance(rat.get(k), str) and rat.get(k))]
         if missing:
             raise SchemaError(f"{ctx}: rationale に重要/影響/話題の根拠欠落 {missing}")
+        # ラベル反復 ("high"/"mid"/"low" や「高と判定」等の短文) を物理的に弾く。
+        # prompt は 40〜80 字を要求しているが、安全側で 20 字以上を最低条件とする
+        # ([[feedback_check_design_principles]] §1: illegal state を表現できなくする)。
+        too_short = [
+            (k, len(rat[k]))
+            for k in ("importance", "impact", "buzz")
+            if len(rat[k]) < _RATIONALE_MIN_LEN
+        ]
+        if too_short:
+            raise SchemaError(
+                f"{ctx}: rationale の根拠が文章として短すぎる "
+                f"(各 {_RATIONALE_MIN_LEN} 字以上必須 / 実値 {too_short})"
+            )
     rel = d.get("related_entities")
     if rel not in (None, []):
         if not isinstance(rel, list) or not all(isinstance(r, str) and r for r in rel):
@@ -267,9 +286,9 @@ def gemini_response_schema() -> dict:
                 "type": "object",
                 "required": ["importance", "impact", "buzz"],
                 "properties": {
-                    "importance": {"type": "string"},
-                    "impact": {"type": "string"},
-                    "buzz": {"type": "string"},
+                    "importance": {"type": "string", "minLength": _RATIONALE_MIN_LEN},
+                    "impact": {"type": "string", "minLength": _RATIONALE_MIN_LEN},
+                    "buzz": {"type": "string", "minLength": _RATIONALE_MIN_LEN},
                 },
             },
             "score": {"type": "integer", "minimum": 0, "maximum": 100},

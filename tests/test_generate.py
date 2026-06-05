@@ -251,7 +251,10 @@ class TestGenerate(unittest.TestCase):
             "score": 90, "importance": "high", "source": "公式", "source_tier": "T1",
             "source_url": "https://example.com/article", "karte_updated": True,
             "summary_points": ["要点1", "要点2", "要点3"],
-            "rationale": {"importance": "重要の根拠", "impact": "影響の根拠", "buzz": "話題の根拠"},
+            "rationale": {
+                "importance": "主力モデルのメジャー更新で文脈処理・価格すべてに関わる基盤アップデートのため重要度を高と判定。",
+                "impact": "下流のコーディングツールが採用モデルを更新する波及があるため影響度を高と判定。",
+                "buzz": "Anthropic 公式発表でニュース性スコア90。注目が大きいため話題性を高と判定。"},
         }
         ctx = gp.build_context([ent], [rich])
         html = gp.make_env().get_template("index.html.j2").render(**ctx, page="feed")
@@ -260,8 +263,8 @@ class TestGenerate(unittest.TestCase):
         self.assertIn('class="summary-points"', html)                   # (D) 箇条書き
         self.assertIn("要点1", html)
         self.assertIn("要点3", html)
-        self.assertIn("重要の根拠", html)                                # (D) 判断根拠ツールチップ
-        self.assertIn("話題の根拠", html)
+        self.assertIn("重要度を高と判定", html)                          # (D) 判断根拠ツールチップ (Part 7 で 20+ 字必須化)
+        self.assertIn("話題性を高と判定", html)
         # source_url 無しはカルテへフォールバックし、要約は1文に戻る
         plain = {
             "event_id": "e2", "entity_id": "x", "date": "2026-06-02", "category": "model",

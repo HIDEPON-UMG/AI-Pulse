@@ -208,6 +208,104 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
     )
 
 
+def regenerate_rationale(
+    headline: str,
+    summary: str,
+    summary_points: list[str],
+    importance_label: str,
+    *,
+    entity_context: dict | None = None,
+) -> dict:
+    """既存 event の headline/summary/summary_points/importance ラベルから rationale 3 軸を再生成。
+
+    llm_local.regenerate_rationale と同契約 (collect_rss 側は llm_hybrid 経由で 1 関数として扱える)。
+    Gemini structured outputs で rationale 3 キー必須 + minLength=20 を schema 拘束し、Python 側で
+    も _check_shape 相当の長さ検証を行って schema 違反は 1 回だけ追記 retry する。
+    """
+    ctx_hints = ""
+    if entity_context:
+        names = [
+            str(entity_context.get(k, "")) for k in ("entity_name", "vendor", "name")
+        ]
+        names = [n for n in names if n]
+        if names:
+            ctx_hints = f"\n固有名詞ヒント（英語のまま残してよい）: {', '.join(names)}"
+    bullets = "\n".join(f"- {p}" for p in summary_points)
+    user_base = (
+        "あなたは AI-Pulse の編集者です。以下の event 情報から、判断理由 rationale を 3 軸"
+        "(importance, impact, buzz) で再生成してください。\n\n"
+        "[event 情報]\n"
+        f"headline: {headline}\n"
+        f"summary: {summary}\n"
+        f"summary_points:\n{bullets}\n"
+        f"importance ラベル: {importance_label}\n"
+        f"{ctx_hints}\n\n"
+        "[出力規約]\n"
+        f"- importance: なぜ重要度を {importance_label} と判定したか、本文記述に基づき 40〜80 字で具体的に説明\n"
+        "- impact: 影響度の根拠（波及範囲・規模）を 40〜80 字で具体的に説明\n"
+        "- buzz: 話題性の根拠（出典格・コミュニティ注目）を 40〜80 字で具体的に説明\n"
+        "- **\"high\"/\"mid\"/\"low\" など値ラベルを反復するだけの記述は禁止**\n"
+        "- 各値は最低 20 字以上の文章（短すぎる応答は schema 違反で弾かれる）\n"
+        "- 装飾記号（マーカー・太字・下線）は使わない\n\n"
+        "純粋な JSON だけを返してください（前置き・後置き・コードブロック禁止）。"
+    )
+    rationale_schema = {
+        "type": "object",
+        "required": ["importance", "impact", "buzz"],
+        "properties": {
+            "importance": {"type": "string", "minLength": 20},
+            "impact": {"type": "string", "minLength": 20},
+            "buzz": {"type": "string", "minLength": 20},
+        },
+    }
+    cfg = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_json_schema=rationale_schema,
+        temperature=0.2,
+    )
+    extra = ""
+    schema_retry_used = False
+    last_err: Exception | None = None
+    for attempt in range(2):  # 1 回 + 1 回 schema retry
+        user = user_base + (("\n\n" + extra) if extra else "")
+        _get_bucket().acquire()
+        try:
+            resp = _get_client().models.generate_content(
+                model=config.GEMINI_MODEL,
+                contents=user,
+                config=cfg,
+            )
+        except Exception as exc:
+            raise LLMError(f"Gemini regenerate_rationale 失敗: {exc}") from exc
+        raw = (resp.text or "").strip()
+        if not raw:
+            last_err = LLMError("Gemini が空応答 (regenerate_rationale)")
+            break
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            last_err = LLMError(f"JSON パース失敗 (regenerate_rationale): {exc}: {raw[:200]!r}")
+            break
+        missing = [k for k in ("importance", "impact", "buzz")
+                   if not (isinstance(payload.get(k), str) and len(payload[k]) >= 20)]
+        if not missing:
+            return payload
+        last_err = LLMError(f"rationale schema 違反 (短すぎ/欠落): {missing}")
+        if not schema_retry_used:
+            schema_retry_used = True
+            extra = (
+                f"前回の応答は schema 違反でした: {missing} が 20 字未満または欠落。"
+                "3 キー (importance, impact, buzz) すべてに 40〜80 字の文章を必ず埋めた "
+                "純粋な JSON だけを返してください。"
+            )
+            continue
+        break
+    raise LLMError(
+        f"Gemini regenerate_rationale が尽きました: "
+        f"{type(last_err).__name__ if last_err else 'None'}: {last_err}"
+    )
+
+
 def translate_headline_ja(
     headline: str,
     *,

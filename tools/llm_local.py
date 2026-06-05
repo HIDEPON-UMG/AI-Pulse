@@ -110,6 +110,142 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
     )
 
 
+def regenerate_rationale(
+    headline: str,
+    summary: str,
+    summary_points: list[str],
+    importance_label: str,
+    *,
+    entity_context: dict | None = None,
+) -> dict:
+    """既存 event の headline/summary/summary_points/importance ラベルから rationale 3 軸を再生成。
+
+    なぜ重要か (意図):
+      collect_rss 段階の generate_event_extras と異なり、article_text が手元に無い既存 event の
+      rationale を「文章」として再生成する境界。Part 7 で schema が rationale 各値 20 字以上を
+      強制したため、既存 events.jsonl の 72 件「単語のみ rationale」を一括補正するための専用関数。
+
+      Ollama /api/chat に structured outputs (3 キー必須 + minLength=20) で 1 ショット投入し、
+      schema 違反は 1 回だけ「厳密 JSON で出し直して」を追記して再投げ。失敗は LLMError で
+      llm_hybrid 層に投げ、Gemini フォールバックに任せる。
+
+    Args:
+        headline: イベント見出し（rationale の根拠材料）
+        summary: 160-240 字の要約（最も情報量が多い）
+        summary_points: 3-5 件の要点（多角的根拠）
+        importance_label: 既存 importance ラベル（"high"/"mid"/"low"）。なぜそのラベルと判定したかを文章で説明させる
+        entity_context: 任意。entity_name / vendor / name を「固有名詞ヒント」として渡す
+
+    Returns:
+        {"importance": str, "impact": str, "buzz": str} の dict。各値 20 字以上を schema で保証。
+
+    Raises:
+        LLMError: 接続失敗 / schema 違反 2 回 / JSON パース失敗
+    """
+    ctx_hints = ""
+    if entity_context:
+        names = [
+            str(entity_context.get(k, "")) for k in ("entity_name", "vendor", "name")
+        ]
+        names = [n for n in names if n]
+        if names:
+            ctx_hints = f"\n固有名詞ヒント（英語のまま残してよい）: {', '.join(names)}"
+    bullets = "\n".join(f"- {p}" for p in summary_points)
+    user = (
+        "あなたは AI-Pulse の編集者です。以下の event 情報から、判断理由 rationale を 3 軸"
+        "(importance, impact, buzz) で再生成してください。\n\n"
+        "[event 情報]\n"
+        f"headline: {headline}\n"
+        f"summary: {summary}\n"
+        f"summary_points:\n{bullets}\n"
+        f"importance ラベル: {importance_label}\n"
+        f"{ctx_hints}\n\n"
+        "[出力規約]\n"
+        f"- importance: なぜ重要度を {importance_label} と判定したか、本文記述に基づき 40〜80 字で具体的に説明\n"
+        "- impact: 影響度の根拠（波及範囲・規模）を 40〜80 字で具体的に説明\n"
+        "- buzz: 話題性の根拠（出典格・コミュニティ注目）を 40〜80 字で具体的に説明\n"
+        "- **\"high\"/\"mid\"/\"low\" など値ラベルを反復するだけの記述は禁止**\n"
+        "- 各値は最低 20 字以上の文章（短すぎる応答は schema 違反で弾かれる）\n"
+        "- 装飾記号（マーカー・太字・下線）は使わない\n\n"
+        "純粋な JSON だけを返してください（前置き・後置き・コードブロック禁止）。"
+    )
+    # 専用 schema (rationale 3 キーのみ / 各 minLength=20)
+    rationale_schema = {
+        "type": "object",
+        "required": ["importance", "impact", "buzz"],
+        "properties": {
+            "importance": {"type": "string", "minLength": 20},
+            "impact": {"type": "string", "minLength": 20},
+            "buzz": {"type": "string", "minLength": 20},
+        },
+    }
+    attempts = config.OLLAMA_MAX_RETRIES + 1
+    last_err: Exception | None = None
+    schema_retry_used = False
+    extra = ""
+    attempt = 0
+    while attempt < attempts:
+        attempt += 1
+        req = {
+            "model": config.OLLAMA_MODEL,
+            "messages": [{"role": "user", "content": user + (("\n\n" + extra) if extra else "")}],
+            "think": False,
+            "format": rationale_schema,
+            "stream": False,
+            "options": {"temperature": 0.2},
+        }
+        data = json.dumps(req).encode("utf-8")
+        url = f"{config.OLLAMA_HOST}/api/chat"
+        try:
+            with urllib.request.urlopen(
+                urllib.request.Request(
+                    url, data=data, headers={"Content-Type": "application/json"}
+                ),
+                timeout=config.OLLAMA_TIMEOUT_SEC,
+            ) as r:
+                resp = json.load(r)
+        except urllib.error.URLError as exc:
+            last_err = LLMError(f"Ollama 接続失敗 (regenerate_rationale, {url}): {exc}")
+            if attempt < attempts:
+                time.sleep(2.0)
+                continue
+            break
+        raw = (resp.get("message", {}).get("content") or "").strip()
+        if not raw:
+            last_err = LLMError("Ollama が空応答 (regenerate_rationale / think=false 確認)")
+            if attempt < attempts:
+                time.sleep(2.0)
+                continue
+            break
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            last_err = LLMError(f"JSON パース失敗 (regenerate_rationale): {exc}: {raw[:200]!r}")
+            if attempt < attempts:
+                time.sleep(2.0)
+                continue
+            break
+        # shape チェック (schema 違反は 1 度だけ追記 retry)
+        missing = [k for k in ("importance", "impact", "buzz")
+                   if not (isinstance(payload.get(k), str) and len(payload[k]) >= 20)]
+        if missing:
+            last_err = LLMError(f"rationale schema 違反 (短すぎ/欠落): {missing}")
+            if not schema_retry_used:
+                schema_retry_used = True
+                extra = (
+                    f"前回の応答は schema 違反でした: {missing} が 20 字未満または欠落。"
+                    "3 キー (importance, impact, buzz) すべてに 40〜80 字の文章を必ず埋めた "
+                    "純粋な JSON だけを返してください。"
+                )
+                continue
+            break
+        return payload
+    raise LLMError(
+        f"Ollama 呼び出しが尽きました (regenerate_rationale / {attempt} 回試行): "
+        f"{type(last_err).__name__ if last_err else 'None'}: {last_err}"
+    )
+
+
 def translate_headline_ja(
     headline: str,
     *,

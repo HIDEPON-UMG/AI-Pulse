@@ -150,11 +150,20 @@ class TestSchemaContract(unittest.TestCase):
         # rationale は重要/影響/話題の3キーを揃える（穴あき根拠を防ぐ）
         with self.assertRaises(schema.SchemaError):
             schema.validate_event({**base, "rationale": {"importance": "x", "impact": "y"}}, ids)
-        # 整形済みは通る
+        # rationale の各値が短すぎる（"high"/"mid" 等のラベル反復）は弾く
+        # ([[feedback_check_design_principles]] §1 + §4 / 2026-06-05 Part 7)
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "rationale": {"importance": "high", "impact": "high", "buzz": "high"}}, ids)
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_event({**base, "rationale": {"importance": "高と判定", "impact": "高と判定", "buzz": "高と判定"}}, ids)
+        # 整形済みは通る (各値 20 字以上の文章)
         ok = schema.validate_event(
             {**base, "source_url": "https://example.com/a", "karte_updated": True,
              "summary_points": ["p1", "p2", "p3"],
-             "rationale": {"importance": "i", "impact": "m", "buzz": "b"}}, ids)
+             "rationale": {
+                "importance": "最上位モデルのメジャー更新で基盤に関わるため重要度を高と判定。",
+                "impact": "下流のコーディングツールが採用モデルを更新する波及があるため影響度を高と判定。",
+                "buzz": "Anthropic 公式発表でニュース性スコア85。コミュニティ注目が大きく話題性を高と判定。"}}, ids)
         self.assertEqual(len(ok["summary_points"]), 3)
         self.assertTrue(ok["karte_updated"])
 

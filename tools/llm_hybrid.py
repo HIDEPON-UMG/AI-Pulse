@@ -138,6 +138,48 @@ def generate_event_extras(
     raise LLMError(f"未知の HYBRID_MODE: {mode!r}（local_first / gemini_first / gemini_only / local_only のいずれか）")
 
 
+def regenerate_rationale(
+    headline: str,
+    summary: str,
+    summary_points: list[str],
+    importance_label: str,
+    *,
+    entity_context: dict | None = None,
+    gpu_probe: Callable[[], int | None] | None = None,
+) -> dict:
+    """既存 event の headline/summary/summary_points から rationale 3 軸を再生成。
+
+    境界 1 関数集約 ([[feedback_check_design_principles]] §2): apply 系スクリプトは
+    llm_hybrid.regenerate_rationale を呼ぶだけで HYBRID_MODE 切替を意識しない
+    (generate_event_extras / translate_headline_ja と同じ分岐ルール)。
+    """
+    mode = config.HYBRID_MODE
+    args = (headline, summary, summary_points, importance_label)
+    kw = {"entity_context": entity_context}
+
+    if mode == "gemini_only":
+        return llm_gemini.regenerate_rationale(*args, **kw)
+
+    if mode == "local_only":
+        return llm_local.regenerate_rationale(*args, **kw)
+
+    if mode == "gemini_first":
+        try:
+            return llm_gemini.regenerate_rationale(*args, **kw)
+        except LLMError:
+            return llm_local.regenerate_rationale(*args, **kw)
+
+    if mode == "local_first":
+        if _gpu_busy(probe=gpu_probe):
+            return llm_gemini.regenerate_rationale(*args, **kw)
+        try:
+            return llm_local.regenerate_rationale(*args, **kw)
+        except LLMError:
+            return llm_gemini.regenerate_rationale(*args, **kw)
+
+    raise LLMError(f"未知の HYBRID_MODE: {mode!r}")
+
+
 def translate_headline_ja(
     headline: str,
     *,
