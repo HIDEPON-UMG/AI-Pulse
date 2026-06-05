@@ -97,5 +97,130 @@ class TestRewriteEmphasisEvent(unittest.TestCase):
         self.assertFalse(changed2, "冪等違反: 2 回目で changed が立ってはいけない")
 
 
+class TestAddEmphasisInline(unittest.TestCase):
+    """add_emphasis_event の決定論付与ロジック。
+
+    なぜ重要か（意図）:
+      2026-06-05 追補11 で extract_grounded.md (新 prompt) を「プレーンテキスト出力」に切替えた結果、
+      新規 entry は強調記法を一切持たない状態になり、UI の 3 種視覚レイヤー（黄マーカー / 波線下線 / 太字）が
+      無効化された。本テストは class of bug を 4 件で固定する:
+        1. プレーンテキスト中の数値表現は ==マーカー== で囲まれる
+        2. プレーンテキスト中の動詞性語は __下線__ で囲まれる
+        3. entity_context から渡された固有名候補は **太字** で囲まれる
+        4. 既存記法 (==/__/**) の内側は再付与されない（冪等性 + non-overlapping）
+    """
+
+    def test_plain_number_gets_mark(self):
+        """プレーンテキスト中の数値表現 (89% / $7B / 3 倍 など) は ==マーカー== に。"""
+        s = "Devin で 89% 上回り を達成"
+        out = rewrite_emphasis._add_inline_emphasis(s)
+        self.assertIn("==89%==", out, "%系数値はマーカー化される")
+
+    def test_plain_verb_gets_underline(self):
+        """プレーンテキスト中の動詞性語 (リリース / 発表 / 採用 など) は __下線__ に。"""
+        s = "Anthropic は Claude Opus 4.8 をリリースしました"
+        out = rewrite_emphasis._add_inline_emphasis(s)
+        self.assertIn("__リリース__", out, "動詞性語は下線化される")
+
+    def test_proper_noun_gets_bold_when_in_context(self):
+        """entity_context.name / vendor / competitors[].name は **太字** に。"""
+        s = "Anthropic は Claude Opus を発表"
+        out = rewrite_emphasis._add_inline_emphasis(
+            s, proper_nouns=["Anthropic", "Claude Opus"]
+        )
+        self.assertIn("**Anthropic**", out, "vendor 名は太字化される")
+        self.assertIn("**Claude Opus**", out, "entity 名は太字化される")
+        self.assertIn("__発表__", out, "動詞は下線化される（共存）")
+
+    def test_no_double_wrap_inside_existing_markup(self):
+        """既存 ==X== / __X__ / **X** の内側は再付与されない（non-overlapping）。"""
+        # 既に ==89%== / __リリース__ / **Anthropic** が付いている文字列
+        s = "==89%== の **Anthropic** が __リリース__ した"
+        out = rewrite_emphasis._add_inline_emphasis(
+            s, proper_nouns=["Anthropic"]
+        )
+        # 二重に囲まれていないか確認（=== や ==== が出現したら二重）
+        self.assertNotIn("====", out, "数値が二重マーカー化されてはいけない")
+        self.assertNotIn("****", out, "固有名が二重太字化されてはいけない")
+        self.assertNotIn("____", out, "動詞が二重下線化されてはいけない")
+
+    def test_add_emphasis_is_idempotent(self):
+        """add_emphasis_event を 2 回適用しても結果が変わらない（冪等性）。"""
+        s = "Anthropic は 89% の精度を達成し Claude Opus 4.8 をリリースしました"
+        proper = ["Anthropic", "Claude Opus 4.8"]
+        out1 = rewrite_emphasis._add_inline_emphasis(s, proper_nouns=proper)
+        out2 = rewrite_emphasis._add_inline_emphasis(out1, proper_nouns=proper)
+        self.assertEqual(out1, out2, "2 回目以降の付与で結果が変わってはいけない（冪等違反）")
+
+
+class TestAddEmphasisEvent(unittest.TestCase):
+    def test_add_emphasis_event_uses_entity_context(self):
+        """add_emphasis_event は entity_context から固有名を抽出し付与する。"""
+        ev = {
+            "summary": "Anthropic は Claude Opus 4.8 をリリースし 89% のスコアを達成",
+            "summary_points": [
+                "Claude Opus 4.8 が新リリース",
+                "ベンチマークで 89% を記録",
+            ],
+        }
+        entity_context = {
+            "name": "Claude Opus 4.8",
+            "vendor": "Anthropic",
+            "competitors": [{"name": "GPT-5"}],
+        }
+        new_ev, changed = rewrite_emphasis.add_emphasis_event(
+            ev, entity_context=entity_context
+        )
+        self.assertTrue(changed, "強調候補がある event は変更フラグが立つべき")
+        self.assertIn("**Anthropic**", new_ev["summary"], "vendor が太字化される")
+        self.assertIn("**Claude Opus 4.8**", new_ev["summary"], "entity name が太字化される")
+        self.assertIn("__リリース__", new_ev["summary"], "動詞が下線化される")
+        self.assertIn("==89%==", new_ev["summary"], "数値がマーカー化される")
+        self.assertIn("**Claude Opus 4.8**", new_ev["summary_points"][0])
+        self.assertIn("==89%==", new_ev["summary_points"][1])
+
+    def test_add_emphasis_event_idempotent(self):
+        """add_emphasis_event を 2 回呼んでも changed=False になる（冪等）。"""
+        ev = {
+            "summary": "Anthropic は 89% を達成しリリースした",
+            "summary_points": ["89% のスコア"],
+        }
+        ctx = {"name": "Claude Opus", "vendor": "Anthropic"}
+        new_ev, changed1 = rewrite_emphasis.add_emphasis_event(ev, entity_context=ctx)
+        self.assertTrue(changed1, "1 回目は changed=True")
+        _, changed2 = rewrite_emphasis.add_emphasis_event(new_ev, entity_context=ctx)
+        self.assertFalse(changed2, "冪等違反: 2 回目で changed が立ってはいけない")
+
+    def test_extract_proper_nouns_dedup_and_long_first(self):
+        """_extract_proper_nouns は重複削除 + 長一致優先で並べる。"""
+        ctx = {
+            "name": "Claude Opus 4.8",
+            "vendor": "Anthropic",
+            "offering": "Claude Opus 4.8",  # name と重複
+            "competitors": [{"name": "GPT-5"}, "Gemini Ultra"],
+            "relations": [{"name": "Anthropic"}],  # vendor と重複
+        }
+        nouns = rewrite_emphasis._extract_proper_nouns(ctx)
+        # 重複削除
+        self.assertEqual(len(set(nouns)), len(nouns), "固有名候補は重複しない")
+        # 長一致優先（長い方が先）
+        for i in range(len(nouns) - 1):
+            self.assertGreaterEqual(
+                len(nouns[i]), len(nouns[i + 1]),
+                "長一致優先のため長い順にソートされる"
+            )
+
+    def test_add_emphasis_event_no_context_only_numbers_and_verbs(self):
+        """entity_context が None でも数値と動詞は付与される（固有名のみスキップ）。"""
+        ev = {
+            "summary": "新サービスを 89% の精度でリリースした",
+            "summary_points": ["89% 精度を記録"],
+        }
+        new_ev, changed = rewrite_emphasis.add_emphasis_event(ev, entity_context=None)
+        self.assertTrue(changed, "数値・動詞があれば付与される")
+        self.assertIn("==89%==", new_ev["summary"])
+        self.assertIn("__リリース__", new_ev["summary"])
+
+
 if __name__ == "__main__":
     unittest.main()

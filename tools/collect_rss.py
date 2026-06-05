@@ -247,9 +247,13 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 skipped_llm += 1
                 print(f"    skip-llm ({entity_id}/{i}): {exc}", file=sys.stderr)
                 continue
-            # 強調記法のコード付与（プロンプトからは強調指示を除去済なので、ここで一括振り分け）
+            # 強調記法のコード付与（プロンプトからは強調指示を除去済なので、ここで一括付与）。
+            # 新 prompt はプレーンテキスト出力 → add_emphasis_event で数値/動詞/固有名を検出し
+            # `==X==` / `__X__` / `**X**` を新規付与する（entity_context で固有名候補を渡す）。
             ev_pre = {"summary": extras["summary"], "summary_points": extras["summary_points"]}
-            ev_rewritten, _ = rewrite_emphasis.rewrite_event(ev_pre)
+            ev_marked, _ = rewrite_emphasis.add_emphasis_event(ev_pre, entity_context=entity)
+            # レガシー entry 由来の `**X**` が残っていた場合の保険（冪等）
+            ev_rewritten, _ = rewrite_emphasis.rewrite_event(ev_marked)
             extras["summary"] = ev_rewritten["summary"]
             extras["summary_points"] = ev_rewritten["summary_points"]
             # 数値捏造ゲート（本文と機械照合）
