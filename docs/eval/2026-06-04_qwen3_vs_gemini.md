@@ -299,4 +299,14 @@ LLMError: Ollama 呼び出しが尽きました（2 回試行）: EmphasisShorta
 - [ ] qwen3:14b に置換
 - [ ] Qwen3.6-35B-A3B に置換
 - [ ] flash-lite 維持
-- [ ] ハイブリッド（通常ローカル・失敗/GPU占有時に Gemini フォールバック）
+- [x] ハイブリッド（通常ローカル・失敗/GPU占有時に Gemini フォールバック）
+
+> 2026-06-05 (Part 3 セッション) で **ハイブリッド本配線完了**。
+> - `tools/llm_hybrid.py` 新設、`tools/collect_rss.py:205` を `llm_hybrid` 経由に切替
+> - `OLLAMA_MODEL = hf.co/unsloth/Qwen3.6-35B-A3B-GGUF:UD-IQ3_XXS` / `temperature = 0.1` / `MAX_BODY_CHARS = 5000`
+> - `prompts/extract_grounded.md` 本線化（旧 `gemini_summarize.md` は `.archive/` へ）
+> - `tools/rewrite_emphasis.py` を collect_rss 経路に配線・`EmphasisShortageError` 系統廃止
+> - `tools/verify_quant.py` を collect_rss 経路に配線（数値捏造ゲート・skipped_quant 集計）
+> - 契約テスト `tests/test_llm_hybrid.py` (8) + `tests/test_rewrite_emphasis.py` (6) 新設
+> - **テスト 66/66 PASS** / `tools/llm_hybrid.py` ruff TID251/E501 解消
+> - 詳細: `docs/handoff_2026-06-05_session_close_part3.md`

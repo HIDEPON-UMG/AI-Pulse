@@ -6,6 +6,9 @@
     1. schema 違反は 1 回だけ追記再投げして 2 回目で諦める（無限リトライさせない）
     2. RPM トークンバケットが超過時に正しくブロックする（バースト 429 を防ぐ）
     3. 連続 5xx でリトライ尽きたら例外を上に飛ばす（None で ingest に漏れない）
+
+  2026-06-05 (追補11) で強調記法の責務は rewrite_emphasis に移管。emphasis 関連テストは
+  tests/test_rewrite_emphasis.py に移植済（[[feedback_check_design_principles]] §2）。
 """
 from __future__ import annotations
 
@@ -23,12 +26,11 @@ import llm_gemini  # noqa: E402
 from rate_limiter import TokenBucket  # noqa: E402
 
 _VALID_PAYLOAD = {
-    # 強調記法 3 種を意味分けして全部含む。==/__ のいずれかが無いと _check_shape の emphasis チェックで落ちる
-    "summary": "**Claude Opus** は __公開__ され、ベンチで ==89% Devin 上回り== と報告されたサンプル要約です" + "あ" * 20,
+    "summary": "Claude Opus は公開され、ベンチで Devin を上回ったとされるサンプル要約です" + "あ" * 20,
     "summary_points": [
-        "**Anthropic** は __正式リリース__ を実施",
-        "ベンチ ==89%== を超える結果を計測",
-        "**API 価格** は据え置きで提供",
+        "Anthropic は正式リリースを実施",
+        "ベンチ 89% を超える結果を計測",
+        "API 価格は据え置きで提供",
     ],
     "rationale": {"importance": "重要度の根拠サンプル", "impact": "影響度の根拠サンプル", "buzz": "話題性の根拠サンプル"},
     "score": 70,
@@ -63,15 +65,14 @@ class TestLLMGeminiContract(unittest.TestCase):
 
         2 件のままだったら 2 回目で諦めて LLMError。
         """
-        # 強調記法は新 contract test を通過させるため意味分けで入れる
-        bad = {**_VALID_PAYLOAD, "summary_points": ["**短い1**", "**短い2**"]}  # 2 件
+        bad = {**_VALID_PAYLOAD, "summary_points": ["短い1", "短い2"]}  # 2 件
         good = {
             **_VALID_PAYLOAD,
             "summary_points": [
-                "**要点A** __公開__",
-                "**要点B** ==99%== 達成",
-                "**要点C** 詳細",
-                "**要点D** 詳細",
+                "要点A 詳細",
+                "要点B 詳細",
+                "要点C 詳細",
+                "要点D 詳細",
             ],
         }
         responses = [bad, good]
@@ -85,62 +86,13 @@ class TestLLMGeminiContract(unittest.TestCase):
         self.assertEqual(responses, [])  # 2 回ぴったり使い切る
 
         # 2 回連続 schema 違反は LLMError
-        bad2 = [{**_VALID_PAYLOAD, "summary_points": ["**短い1**", "**短い2**"]}] * 3
+        bad2 = [{**_VALID_PAYLOAD, "summary_points": ["短い1", "短い2"]}] * 3
 
         def fake_bad(article_text, meta, *, extra_instruction=""):
             return bad2.pop(0)
 
         with patch.object(llm_gemini, "_call_once", side_effect=fake_bad):
             with self.assertRaises(llm_gemini.LLMError):
-                llm_gemini.generate_event_extras("本文" * 200, _META)
-
-    def test_emphasis_only_bold_retries_once(self):
-        """強調記法が **太字** だけ（==マーカー== も __下線__ も無い）→ 1 回再投げ → 修正版で OK。
-
-        プロンプトの「絶対条件 1: 太字だけは禁止」を Python ゲートで実装。Gemini が指示を
-        無視した時に自動 retry することで品質を保つ（class of bug を境界 1 箇所に集約）。
-        2 回連続違反は LLMError で event をドロップする（無限再試行させない）。
-        """
-        bold_only = {
-            **_VALID_PAYLOAD,
-            "summary": "**Claude Opus** は **Anthropic** が **公開** した **最新モデル**",
-            "summary_points": ["**ポイント1**", "**ポイント2**", "**ポイント3**"],
-        }
-        good = _VALID_PAYLOAD
-        responses = [bold_only, good]
-
-        def fake_call(article_text, meta, *, extra_instruction=""):
-            return responses.pop(0)
-
-        with patch.object(llm_gemini, "_call_once", side_effect=fake_call):
-            result = llm_gemini.generate_event_extras("本文" * 200, _META)
-        self.assertIn("==", result["summary"], "再投げ後の summary に ==マーカー== が必須")
-        self.assertEqual(responses, [])  # 2 回ぴったり使い切る
-
-        # 2 回連続 emphasis 違反は LLMError（無限再試行禁止）
-        bad_pool = [bold_only] * 3
-
-        def fake_bad(article_text, meta, *, extra_instruction=""):
-            return bad_pool.pop(0)
-
-        with patch.object(llm_gemini, "_call_once", side_effect=fake_bad):
-            with self.assertRaises(llm_gemini.EmphasisShortageError):
-                llm_gemini.generate_event_extras("本文" * 200, _META)
-
-    def test_emphasis_no_marks_at_all_fails(self):
-        """強調記法を 1 つも使わない summary は即時 EmphasisShortageError（プロンプト絶対条件 2）。"""
-        no_emph = {
-            **_VALID_PAYLOAD,
-            "summary": "強調記法を一つも使っていない平坦なサンプル要約です。" + "あ" * 30,
-            "summary_points": ["要点A 詳細", "要点B 詳細", "要点C 詳細"],
-        }
-        responses = [no_emph, no_emph, no_emph]
-
-        def fake_call(article_text, meta, *, extra_instruction=""):
-            return responses.pop(0)
-
-        with patch.object(llm_gemini, "_call_once", side_effect=fake_call):
-            with self.assertRaises(llm_gemini.EmphasisShortageError):
                 llm_gemini.generate_event_extras("本文" * 200, _META)
 
     def test_rate_limit_blocks_until_token(self):

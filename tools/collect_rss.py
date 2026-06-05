@@ -1,12 +1,15 @@
-"""日次速報ジョブ: Google News RSS -> publisher 本文 -> Gemini 要約 -> L2 events -> store.ingest_events
+"""日次速報ジョブ: Google News RSS -> publisher 本文 -> ハイブリッド LLM 要約 -> L2 events -> store.ingest_events
 
-依存: 標準ライブラリに加えて google-genai / trafilatura / googlenewsdecoder / python-dotenv。
+依存: 標準ライブラリに加えて google-genai / trafilatura / googlenewsdecoder / python-dotenv / urllib (Ollama)。
 Gemini API キーは AI-Pulse/.env の GEMINI_API_KEY を読む（.env は .gitignore 済み）。
+Ollama サーバは localhost:11434 で起動済の前提（HYBRID_MODE=local_first がデフォルト）。
 Task Scheduler から run_daily.py 経由で毎日 7:00 に実行。
 
-旧版 (2026-06-03 以前) は RSS description をそのまま summary として保存し summary_points / rationale を
-空にしていた。本版は Gemini Free Tier (15 RPM / 1500 RPD) で要約・判断根拠を生成する。
-event_id は `-gem<NN>` 接尾辞で旧 `-rss<NN>` と区別する。
+2026-06-05 (追補11) 本配線:
+  抽出 LLM をハイブリッド構成 (Qwen3.6-35B-A3B → Gemini フォールバック) に切替。同時に
+  - rewrite_emphasis: LLM 出力から強調記法 (==/__/**) を決定論で振り直し
+  - verify_quant   : summary の数値表現が本文に実在するか照合（捏造数値ゲート）
+  を境界に配線。event_id 接尾辞は `-gem<NN>` のまま（互換のため）。
 """
 from __future__ import annotations
 
@@ -25,9 +28,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import config  # noqa: E402
 import fetch_article  # noqa: E402
-import llm_gemini  # noqa: E402
+import llm_hybrid  # noqa: E402  # 抽出 LLM のファサード（local / Gemini を可逆切替）
+import rewrite_emphasis  # noqa: E402  # 強調記法をコード付与（LLM プロンプトからは強調指示を除去済）
 import schema  # noqa: E402
 import store  # noqa: E402
+import verify_quant  # noqa: E402  # 数値捏造ゲート（summary の数値 vs 本文照合）
 
 DATA = ROOT / "data"
 
@@ -52,6 +57,12 @@ _T2_DOMAINS = frozenset({
     "thenextweb.com", "zdnet.com", "cnet.com", "tomsguide.com",
     "9to5google.com", "9to5mac.com", "engadget.com", "gizmodo.com",
 })
+
+# verify_quant の本文照合に使う数値表現パターン。rewrite_emphasis._NUM_RE を再利用して
+# 「強調候補の数値 = 検証対象の数値」を 1 ソースに固定する（[[feedback_check_design_principles]] §2）。
+_NUM_RE = rewrite_emphasis._NUM_RE
+# 半数超が本文に見つからなければ捏造疑いで skip（厳しすぎず緩すぎず・誤検出を抑える）。
+_QUANT_MISSING_RATIO_LIMIT = 0.5
 
 
 def _source_tier(url: str) -> str:
@@ -129,10 +140,10 @@ def build_query(entity: dict) -> str:
 
 
 def _make_event(entity: dict, item: dict, article: dict, extras: dict, idx: int) -> dict:
-    """RSS item + 取得本文 + Gemini 出力 から L2 dict を組み立てる。
+    """RSS item + 取得本文 + LLM 出力 から L2 dict を組み立てる。
 
     article: fetch_article.extract() 返り値（publisher_url / publisher_name / og_image / text）
-    extras : llm_gemini.generate_event_extras() 返り値（summary/summary_points/rationale/score/importance/event_type）
+    extras : llm_hybrid.generate_event_extras() 返り値（summary/summary_points/rationale/score/importance/event_type）
     """
     entity_id = entity["entity_id"]
     category = entity["category"]
@@ -174,11 +185,37 @@ def _build_meta(entity: dict, item: dict) -> dict:
     }
 
 
+def _verify_event_quant(extras: dict, article_text: str) -> tuple[bool, list[str]]:
+    """summary / summary_points 内の数値表現が article 本文に存在するか機械照合。
+
+    数値主張がなければ True（検証スキップ）。数値が複数ある場合は「半数超が本文に
+    見当たらない」場合のみ False を返す（誤検出抑制のための緩めの閾値）。
+
+    Returns:
+        (verified, missing_needles): 採用可否と本文照合できなかった数値リスト
+    """
+    text_all = (extras.get("summary") or "") + "\n" + "\n".join(extras.get("summary_points") or [])
+    numbers = _NUM_RE.findall(text_all)
+    if not numbers:
+        return True, []
+    fetcher = lambda _url: article_text  # noqa: E731 (verify_quant の fetcher 注入用)
+    missing: list[str] = []
+    for n in numbers:
+        result = verify_quant.verify(n, "<article-inline>", fetcher=fetcher)
+        if not result["verified"]:
+            missing.append(n)
+    if missing and len(missing) > len(numbers) * _QUANT_MISSING_RATIO_LIMIT:
+        return False, missing
+    return True, missing
+
+
 def collect_entities(entity_subset: list[str] | None = None) -> dict:
     """全エンティティ（またはサブセット）の RSS を収集して ingest する。
 
-    返り値: store.ingest_events と同形式 {'added': [...], 'skipped_dup': int,
-    'skipped_score': int, 'skipped_extract': int, 'skipped_llm': int}
+    返り値: store.ingest_events と同形式に、本配線で追加した skip カウンタを追記:
+      {'added': [...], 'skipped_dup': int, 'skipped_score': int,
+       'skipped_extract': int, 'skipped_llm': int, 'skipped_quant': int,
+       'skipped_validate': int}
     """
     entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
     targets = {e["entity_id"]: e for e in entities}
@@ -188,6 +225,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     candidates: list[dict] = []
     skipped_extract = 0
     skipped_llm = 0
+    skipped_quant = 0
     skipped_validate = 0
     known_ids = set(targets) | {e["entity_id"] for e in entities}
     for entity_id, entity in targets.items():
@@ -201,11 +239,27 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 skipped_extract += 1
                 print(f"    skip-extract ({entity_id}/{i}): {exc}", file=sys.stderr)
                 continue
+            # 本文を MAX_BODY_CHARS で頭から打切り（追補10: 5000 字までは抽出品質安定）
+            article_body = (article["text"] or "")[: config.MAX_BODY_CHARS]
             try:
-                extras = llm_gemini.generate_event_extras(article["text"], _build_meta(entity, item))
-            except llm_gemini.LLMError as exc:
+                extras = llm_hybrid.generate_event_extras(article_body, _build_meta(entity, item))
+            except llm_hybrid.LLMError as exc:
                 skipped_llm += 1
                 print(f"    skip-llm ({entity_id}/{i}): {exc}", file=sys.stderr)
+                continue
+            # 強調記法のコード付与（プロンプトからは強調指示を除去済なので、ここで一括振り分け）
+            ev_pre = {"summary": extras["summary"], "summary_points": extras["summary_points"]}
+            ev_rewritten, _ = rewrite_emphasis.rewrite_event(ev_pre)
+            extras["summary"] = ev_rewritten["summary"]
+            extras["summary_points"] = ev_rewritten["summary_points"]
+            # 数値捏造ゲート（本文と機械照合）
+            verified, missing = _verify_event_quant(extras, article_body)
+            if not verified:
+                skipped_quant += 1
+                print(
+                    f"    skip-quant ({entity_id}/{i}): 数値 {missing!r} が本文照合不可",
+                    file=sys.stderr,
+                )
                 continue
             try:
                 ev = _make_event(entity, item, article, extras, i)
@@ -224,11 +278,13 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     )
     result["skipped_extract"] = skipped_extract
     result["skipped_llm"] = skipped_llm
+    result["skipped_quant"] = skipped_quant
     result["skipped_validate"] = skipped_validate
     print(
-        f"RSS+Gemini 収集完了: 採用 {len(result['added'])} 件 / "
+        f"RSS+ハイブリッド LLM 収集完了: 採用 {len(result['added'])} 件 / "
         f"重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "
-        f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / schema違反 {skipped_validate}"
+        f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / 数値NG {skipped_quant} / "
+        f"schema違反 {skipped_validate}"
     )
     return result
 

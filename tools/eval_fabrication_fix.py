@@ -47,7 +47,9 @@ JUDGE_BODY_CHARS = 8000       # ジャッジは本文全量を見て factual を
 FETCH_MAX = 8000              # 8000 字版を取得（BASE は [:3000] にスライス）
 
 OLLAMA_35B = "hf.co/unsloth/Qwen3.6-35B-A3B-GGUF:UD-IQ3_XXS"
-BASE_PROMPT = ROOT / "prompts" / "gemini_summarize.md"
+# 旧本線プロンプト。2026-06-05 追補11 で本線 PROMPT_PATH を extract_grounded.md に切替したため、
+# ここでは過去 eval 再走のために .archive/ 経由で参照する（本線回帰には使わない）。
+BASE_PROMPT = ROOT / "prompts" / ".archive" / "gemini_summarize.md"
 GROUNDED_PROMPT = ROOT / "prompts" / "extract_grounded.md"
 
 # (表示名, backend, モデル, 本文文字数, temp, プロンプト)

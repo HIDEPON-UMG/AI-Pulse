@@ -6,6 +6,11 @@
     2. RPM トークンバケットを 1 箇所で acquire（突発 429 防止）
     3. 失敗時挙動（429/5xx の指数バックオフ・schema 違反の 1 回再投げ・最終ドロップ）を 1 箇所に集約
   collect_rss はここの generate_event_extras を 1 関数呼び出すだけで、リトライ/レート制御を意識しない。
+
+  2026-06-05 (追補11) で本線プロンプトを extract_grounded.md に切替し、強調記法の責務を
+  tools/rewrite_emphasis.py へ移譲した（EmphasisShortageError 系統は廃止）。理由は eval 追補10:
+  プロンプトでの強調指示は事実忠実性の注意予算を奪う・コード付与（rewrite_emphasis）なら全モデル
+  共通で意味分けが locked-in できる。旧プロンプトは prompts/.archive/gemini_summarize.md。
 """
 from __future__ import annotations
 
@@ -25,7 +30,7 @@ import config  # noqa: E402
 import schema  # noqa: E402
 from rate_limiter import TokenBucket  # noqa: E402
 
-PROMPT_PATH = ROOT / "prompts" / "gemini_summarize.md"
+PROMPT_PATH = ROOT / "prompts" / "extract_grounded.md"
 
 
 class LLMError(Exception):
@@ -74,13 +79,13 @@ def _get_client() -> genai.Client:
 
 
 def _load_prompt() -> tuple[str, str]:
-    """prompts/gemini_summarize.md から system_instruction と user テンプレを取り出す。"""
+    """PROMPT_PATH (既定: prompts/extract_grounded.md) から system_instruction と user テンプレを取り出す。"""
     text = PROMPT_PATH.read_text(encoding="utf-8")
     # `## system_instruction` 〜 `## user` 〜 EOF
     sys_m = re.search(r"##\s*system_instruction\s*\n(.+?)\n##\s*user\s*\n", text, re.DOTALL)
     usr_m = re.search(r"##\s*user\s*\n(.+)$", text, re.DOTALL)
     if not sys_m or not usr_m:
-        raise LLMError(f"prompts/gemini_summarize.md の構造が崩れています")
+        raise LLMError(f"プロンプトファイル {PROMPT_PATH.name} の構造が崩れています")
     return sys_m.group(1).strip(), usr_m.group(1).strip()
 
 
@@ -106,7 +111,8 @@ def _call_once(article_text: str, meta: dict, *, extra_instruction: str = "") ->
         system_instruction=sys_text,
         response_mime_type="application/json",
         response_json_schema=schema.gemini_response_schema(),
-        temperature=0.4,
+        # 2026-06-05: 事実忠実性を優先するため 0.4 → 0.1（追補10 eval B でラベル退化が解消した値）。
+        temperature=0.1,
     )
     _get_bucket().acquire()
     client = _get_client()
@@ -124,28 +130,12 @@ def _call_once(article_text: str, meta: dict, *, extra_instruction: str = "") ->
         raise LLMError(f"JSON パース失敗: {exc}: {raw[:200]!r}") from exc
 
 
-# 強調記法の検出（_check_shape の emphasis チェック用 / contract test の単一ソース）
-# 太字 `**X**` / マーカー `==X==` / 下線 `__X__` の各記法を検出する。
-_RE_MARK = re.compile(r"==[^=\n]+==")
-_RE_UND = re.compile(r"__[^_\n]+__")
-_RE_BOLD = re.compile(r"\*\*[^*\n]+\*\*")
-
-
-class EmphasisShortageError(LLMError):
-    """summary / summary_points が太字だけで `==マーカー==` も `__下線__` も含まない違反。
-
-    Gemini プロンプトの「太字だけは禁止」契約に該当。retry instruction で 1 回だけ再要求する。
-    """
-
-
 def _check_shape(payload: dict) -> None:
     """Python 側でも schema 違反を弾く（Gemini が JSON mode を破る稀ケース対策）。
 
-    強調記法 3 種（**太字** / ==マーカー== / __下線__）の使用契約も合わせて検証する:
-    - summary + summary_points 全体で `==マーカー==` か `__下線__` のいずれかが 1 つ以上必須。
-      太字だけは禁止（プロンプトの「絶対条件 1」に対応）。
-    - 強調記法を 1 つも使わない summary も禁止（プロンプトの「絶対条件 2」に対応）。
-    違反は EmphasisShortageError → generate_event_extras 側で 1 回だけ retry。
+    2026-06-05 (追補11): 強調記法の検証は rewrite_emphasis に責務移管したため、ここでは
+    キー必須・件数・型・range のみを検証する。EmphasisShortageError は廃止（プロンプトが
+    強調記法を要求しないため発生しない）。
     """
     required = ("summary", "summary_points", "rationale", "score", "importance", "event_type")
     missing = [k for k in required if k not in payload]
@@ -165,23 +155,6 @@ def _check_shape(payload: dict) -> None:
     if not isinstance(score, int) or not (0 <= score <= 100):
         raise LLMError(f"score 不正: {score!r}")
 
-    # 強調記法の契約検証（プロンプトの「絶対条件 1/2」に対応）
-    text_all = (payload.get("summary") or "") + "\n" + "\n".join(pts)
-    has_mark = bool(_RE_MARK.search(text_all))
-    has_und = bool(_RE_UND.search(text_all))
-    has_bold = bool(_RE_BOLD.search(text_all))
-    if not has_bold and not has_mark and not has_und:
-        raise EmphasisShortageError(
-            "強調記法が 1 つも使われていません。**太字** / ==マーカー== / __下線__ "
-            "のいずれかを summary か summary_points に最低 2 箇所入れてください。"
-        )
-    if not has_mark and not has_und:
-        raise EmphasisShortageError(
-            "太字 `**X**` だけで `==マーカー==` も `__下線__` も使われていません。"
-            "記事に数値・結論・規模があれば `==マーカー==` を、"
-            "発表・公開・採用・買収など動作があれば `__下線__` を最低 1 つ入れてください。"
-        )
-
 
 def generate_event_extras(article_text: str, meta: dict) -> dict:
     """記事本文と meta から L2 拡張フィールドを生成。失敗で LLMError。
@@ -190,11 +163,12 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
       - 429 / 5xx / ネットワーク例外: 指数バックオフ（5s, 15s, 45s）で計 GEMINI_MAX_RETRIES + 1 回試行
       - schema 違反（応答形が崩れた）: 「差分を厳密 JSON で出し直して」と 1 回だけ追記して再投げ
       - いずれも尽きたら LLMError を上に投げ、collect_rss 側で当該記事をドロップ
+
+    2026-06-05 (追補11): 強調記法の検証/retry は廃止（rewrite_emphasis に責務移管）。
     """
     backoffs = [5.0, 15.0, 45.0][: config.GEMINI_MAX_RETRIES + 1]
     last_err: Exception | None = None
     schema_retry_used = False
-    emphasis_retry_used = False
     extra = ""
     attempt_count = 0
     for wait in backoffs:
@@ -204,21 +178,6 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
             try:
                 _check_shape(payload)
                 return payload
-            except EmphasisShortageError as emph_err:
-                # 強調記法違反は 1 回だけ retry（schema 自体は壊れていないので shape retry とは別カウント）
-                if not emphasis_retry_used:
-                    emphasis_retry_used = True
-                    extra = (
-                        f"前回の応答は強調記法違反でした（{emph_err}）。"
-                        "summary / summary_points は **太字** だけで埋めず、必ず "
-                        "`==マーカー==`（決定打となる数値・結論）か `__下線__`（動作・公開・採用などの動詞句）"
-                        "のいずれかを 1 つ以上含めて、3 種記法を意味分けして使い分けてください。"
-                        "それ以外（rationale / score / importance / event_type）は前回通りで構いません。"
-                    )
-                    last_err = emph_err
-                    continue
-                last_err = emph_err
-                break  # emphasis 違反 2 回目は諦め
             except LLMError as shape_err:
                 if not schema_retry_used:
                     schema_retry_used = True
@@ -243,10 +202,7 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
                 time.sleep(wait)
                 continue
             break
-    # 連続違反の最終 raise は last_err の型（特に EmphasisShortageError）を保つ。
-    # これで「emphasis 連続違反は EmphasisShortageError でドロップ」契約をテスト側から型で識別できる。
-    final_cls = EmphasisShortageError if isinstance(last_err, EmphasisShortageError) else LLMError
-    raise final_cls(
+    raise LLMError(
         f"Gemini 呼び出しが尽きました（{attempt_count} 回試行）: "
         f"{type(last_err).__name__ if last_err else 'None'}: {last_err}"
     )
