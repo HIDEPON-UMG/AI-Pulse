@@ -58,7 +58,3 @@ HYBRID_GPU_THRESHOLD_FB_MB = 6000
 # llm_local 側で「接続/空応答/JSON パース失敗」のバックオフ回数は OLLAMA_MAX_RETRIES に集約済。
 # hybrid 層では追加リトライせず、LLMError を 1 度でも受けたら即 Gemini にフォールバックする。
 HYBRID_LOCAL_RETRY_BEFORE_FALLBACK = OLLAMA_MAX_RETRIES
-# Gemini フォールバック率の WARN 閾値（0.20 = 20% 超で collect_rss 完了時に警告を表示）。
-# 「ローカル Ollama 起動忘れ / GPU 占有が続いて全件 Gemini で動いていた」を検知する境界。
-# silent fallback を表に出すための観測機構 ([[feedback_check_design_principles]] §2)。
-HYBRID_GEMINI_FALLBACK_WARN_RATIO = 0.20

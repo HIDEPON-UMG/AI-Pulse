@@ -258,11 +258,6 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     if entity_subset:
         targets = {eid: e for eid, e in targets.items() if eid in entity_subset}
 
-    # このバッチでの provider 内訳を測るため、走行直前に hybrid counter をリセットする。
-    # 完了時に「local N / Gemini M (X%)」を表示し、X が config.HYBRID_GEMINI_FALLBACK_WARN_RATIO を
-    # 超えたら警告する (silent fallback の可視化)。
-    llm_hybrid.reset_stats()
-
     candidates: list[dict] = []
     skipped_extract = 0
     skipped_llm = 0
@@ -350,26 +345,6 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
         f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / 数値NG {skipped_quant} / "
         f"schema違反 {skipped_validate}"
     )
-    # silent fallback の稼働率を可視化 ([[feedback_check_design_principles]] §2 境界 1 箇所集約)。
-    # ローカル Ollama が落ちている / GPU 占有が続いていると Gemini に黙って流れて無料クォータが
-    # 静かに減るため、しきい値 (config.HYBRID_GEMINI_FALLBACK_WARN_RATIO) 超は WARN として出す。
-    hybrid_stats = llm_hybrid.get_stats()
-    hybrid_total = hybrid_stats["local"] + hybrid_stats["gemini"]
-    if hybrid_total > 0:
-        gemini_ratio = hybrid_stats["gemini"] / hybrid_total
-        print(
-            f"ハイブリッド LLM 実績: local {hybrid_stats['local']} / "
-            f"Gemini {hybrid_stats['gemini']} ({gemini_ratio:.1%}) — "
-            f"内訳 GPU占有→Gemini {hybrid_stats['gpu_busy_to_gemini']} / "
-            f"local失敗→Gemini {hybrid_stats['local_fail_to_gemini']}"
-        )
-        if gemini_ratio > config.HYBRID_GEMINI_FALLBACK_WARN_RATIO:
-            print(
-                f"⚠ Gemini フォールバック率 {gemini_ratio:.1%} > "
-                f"{config.HYBRID_GEMINI_FALLBACK_WARN_RATIO:.0%} — "
-                f"local Ollama 起動 / GPU 占有 / モデルロードを確認してください",
-                file=sys.stderr,
-            )
     return result
 
 
