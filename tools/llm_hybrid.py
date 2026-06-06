@@ -39,6 +39,49 @@ from _proc.run import quiet_run  # noqa: E402  # subprocess 直呼び ban の境
 LLMError = llm_gemini.LLMError
 
 
+# silent fallback の稼働率を可視化するための provider counter。
+# なぜ必要か（意図）:
+#   local_first は「ローカル Ollama 失敗 → 即 Gemini」を黙って実行する設計のため、
+#   外から「今日 Gemini が何回呼ばれたか」が見えない。Ollama サーバ落ち / GPU 占有が
+#   続いていると「全件 Gemini で動いているのに成功扱い」になり、無料クォータ消費と
+#   Google 学習データ提供が静かに進行する。本 counter で collect_rss 完了時に
+#   「local N / Gemini M (X%)」を表示し、X が config.HYBRID_GEMINI_FALLBACK_WARN_RATIO
+#   を超えたら警告する ([[feedback_check_design_principles]] §2 境界 1 箇所集約)。
+#
+# 設計:
+#   - local / gemini は最終使用 provider (= 排他)。両者の和が「成功呼出回数」。
+#   - gpu_busy_to_gemini / local_fail_to_gemini は gemini の内訳 (= gemini ≧ それらの和)。
+#   - 両経路失敗で LLMError を投げた場合は counter を増分しない (= 失敗は別軸で集計)。
+_STATS: dict[str, int] = {
+    "local": 0,
+    "gemini": 0,
+    "gpu_busy_to_gemini": 0,
+    "local_fail_to_gemini": 0,
+}
+
+
+def reset_stats() -> None:
+    """カウンタを全てゼロに戻す。バッチ開始時に collect_rss が呼ぶ。"""
+    for k in _STATS:
+        _STATS[k] = 0
+
+
+def get_stats() -> dict[str, int]:
+    """カウンタのスナップショットを返す (呼出側からの破壊的変更を避けるため copy)。"""
+    return dict(_STATS)
+
+
+def _record(provider: str, *, reason: str | None = None) -> None:
+    """成功した呼出を 1 件記録する。
+
+    provider: "local" or "gemini"
+    reason  : "gpu_busy" or "local_fail" (gemini 経路の内訳。local 時は None)
+    """
+    _STATS[provider] += 1
+    if reason:
+        _STATS[f"{reason}_to_gemini"] += 1
+
+
 def _query_gpu_memory_mb() -> int | None:
     """nvidia-smi で 1 ショット問い合わせて GPU メモリ使用量 (MB) を返す。
 
@@ -114,26 +157,40 @@ def generate_event_extras(
     mode = config.HYBRID_MODE
 
     if mode == "gemini_only":
-        return llm_gemini.generate_event_extras(article_text, meta)
+        result = llm_gemini.generate_event_extras(article_text, meta)
+        _record("gemini")
+        return result
 
     if mode == "local_only":
-        return llm_local.generate_event_extras(article_text, meta)
+        result = llm_local.generate_event_extras(article_text, meta)
+        _record("local")
+        return result
 
     if mode == "gemini_first":
         # クォータ温存より「Gemini で品質保証」を優先したい比較・A/B 用。
         try:
-            return llm_gemini.generate_event_extras(article_text, meta)
+            result = llm_gemini.generate_event_extras(article_text, meta)
+            _record("gemini")
+            return result
         except LLMError:
-            return llm_local.generate_event_extras(article_text, meta)
+            result = llm_local.generate_event_extras(article_text, meta)
+            _record("local")
+            return result
 
     if mode == "local_first":
         # 既定。GPU 占有時は local を試さず即 Gemini に流し、待ち時間 / VRAM 競合を避ける。
         if _gpu_busy(probe=gpu_probe):
-            return llm_gemini.generate_event_extras(article_text, meta)
+            result = llm_gemini.generate_event_extras(article_text, meta)
+            _record("gemini", reason="gpu_busy")
+            return result
         try:
-            return llm_local.generate_event_extras(article_text, meta)
+            result = llm_local.generate_event_extras(article_text, meta)
+            _record("local")
+            return result
         except LLMError:
-            return llm_gemini.generate_event_extras(article_text, meta)
+            result = llm_gemini.generate_event_extras(article_text, meta)
+            _record("gemini", reason="local_fail")
+            return result
 
     raise LLMError(f"未知の HYBRID_MODE: {mode!r}（local_first / gemini_first / gemini_only / local_only のいずれか）")
 
@@ -158,24 +215,38 @@ def regenerate_rationale(
     kw = {"entity_context": entity_context}
 
     if mode == "gemini_only":
-        return llm_gemini.regenerate_rationale(*args, **kw)
+        result = llm_gemini.regenerate_rationale(*args, **kw)
+        _record("gemini")
+        return result
 
     if mode == "local_only":
-        return llm_local.regenerate_rationale(*args, **kw)
+        result = llm_local.regenerate_rationale(*args, **kw)
+        _record("local")
+        return result
 
     if mode == "gemini_first":
         try:
-            return llm_gemini.regenerate_rationale(*args, **kw)
+            result = llm_gemini.regenerate_rationale(*args, **kw)
+            _record("gemini")
+            return result
         except LLMError:
-            return llm_local.regenerate_rationale(*args, **kw)
+            result = llm_local.regenerate_rationale(*args, **kw)
+            _record("local")
+            return result
 
     if mode == "local_first":
         if _gpu_busy(probe=gpu_probe):
-            return llm_gemini.regenerate_rationale(*args, **kw)
+            result = llm_gemini.regenerate_rationale(*args, **kw)
+            _record("gemini", reason="gpu_busy")
+            return result
         try:
-            return llm_local.regenerate_rationale(*args, **kw)
+            result = llm_local.regenerate_rationale(*args, **kw)
+            _record("local")
+            return result
         except LLMError:
-            return llm_gemini.regenerate_rationale(*args, **kw)
+            result = llm_gemini.regenerate_rationale(*args, **kw)
+            _record("gemini", reason="local_fail")
+            return result
 
     raise LLMError(f"未知の HYBRID_MODE: {mode!r}")
 
@@ -195,33 +266,47 @@ def translate_headline_ja(
     mode = config.HYBRID_MODE
 
     if mode == "gemini_only":
-        return llm_gemini.translate_headline_ja(headline, entity_context=entity_context)
+        result = llm_gemini.translate_headline_ja(headline, entity_context=entity_context)
+        _record("gemini")
+        return result
 
     if mode == "local_only":
-        return llm_local.translate_headline_ja(headline, entity_context=entity_context)
+        result = llm_local.translate_headline_ja(headline, entity_context=entity_context)
+        _record("local")
+        return result
 
     if mode == "gemini_first":
         try:
-            return llm_gemini.translate_headline_ja(
+            result = llm_gemini.translate_headline_ja(
                 headline, entity_context=entity_context
             )
+            _record("gemini")
+            return result
         except LLMError:
-            return llm_local.translate_headline_ja(
+            result = llm_local.translate_headline_ja(
                 headline, entity_context=entity_context
             )
+            _record("local")
+            return result
 
     if mode == "local_first":
         if _gpu_busy(probe=gpu_probe):
-            return llm_gemini.translate_headline_ja(
+            result = llm_gemini.translate_headline_ja(
                 headline, entity_context=entity_context
             )
+            _record("gemini", reason="gpu_busy")
+            return result
         try:
-            return llm_local.translate_headline_ja(
+            result = llm_local.translate_headline_ja(
                 headline, entity_context=entity_context
             )
+            _record("local")
+            return result
         except LLMError:
-            return llm_gemini.translate_headline_ja(
+            result = llm_gemini.translate_headline_ja(
                 headline, entity_context=entity_context
             )
+            _record("gemini", reason="local_fail")
+            return result
 
     raise LLMError(f"未知の HYBRID_MODE: {mode!r}")

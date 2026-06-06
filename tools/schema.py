@@ -192,6 +192,14 @@ def validate_entity(d: dict) -> dict:
     _validate_future(d, ctx)
     if "overview" in d and not (isinstance(d["overview"], str) and d["overview"]):
         raise SchemaError(f"{ctx}: overview は非空文字列")
+    # search_query は collect_rss.build_query が最優先で参照する RSS 検索クエリの override。
+    # 一般英単語・著名異義語企業を持つ entity (例: Runway / Composer / Cosmos / Codex / Llama /
+    # Figure / Devin) で「name + vendor」自動派生が AI 文脈ゼロの記事を引いてしまう class of
+    # bugs を、entity 側に明示クエリを書けるようにすることで構造的に封じる
+    # ([[feedback_check_design_principles]] §1: illegal state / §2: 境界 1 箇所集約)。
+    # 任意フィールド: 未存在は OK (自動派生に fallback)、存在するなら非空文字列必須。
+    if "search_query" in d and not (isinstance(d["search_query"], str) and d["search_query"].strip()):
+        raise SchemaError(f"{ctx}: search_query は非空文字列（実値 {d['search_query']!r}）")
     return d
 
 
