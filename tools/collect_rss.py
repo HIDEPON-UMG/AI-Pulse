@@ -298,8 +298,13 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 # 切れる事故を防ぐ。翻訳失敗は warn のみ・headline_ja 無しで通す。
                 if _needs_headline_ja(ev["headline"]):
                     try:
+                        # entity_context=None 固定。entity dict を渡すと LLM プロンプトに
+                        # 「固有名詞ヒント: <name>, <vendor>」が注入され、headline に登場しない
+                        # entity 名まで翻訳に強制注入される事故が出る (Part 6 flux 捏造事例)。
+                        # apply_headline_ja / regenerate_rationale と契約を統一する
+                        # ([[feedback_check_design_principles]] §2 境界 1 箇所集約)。
                         ev["headline_ja"] = llm_hybrid.translate_headline_ja(
-                            ev["headline"], entity_context=entity
+                            ev["headline"], entity_context=None
                         )
                     except llm_hybrid.LLMError as exc:
                         print(
