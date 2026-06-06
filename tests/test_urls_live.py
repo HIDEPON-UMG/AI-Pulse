@@ -48,6 +48,7 @@ needs_network = pytest.mark.skipif(
 )
 
 
+@pytest.mark.network
 @needs_network
 def test_recent_store_urls_are_alive():
     """直近 14 日の entity.history[].url / entity.modules.future[].url / event.source_url が
