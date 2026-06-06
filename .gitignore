@@ -10,3 +10,4 @@ site/
 scripts/
 .env
 data/*.bak-*
+_logs/
