@@ -311,19 +311,19 @@ def translate_headline_ja(
     *,
     entity_context: dict | None = None,
 ) -> str:
-    """英語 headline を日本語に翻訳（固有名詞は英語のまま）。失敗で LLMError。
+    """英語 headline を短い日本語要約見出しにする（固有名詞は英語のまま）。失敗で LLMError。
 
     意図:
       collect_rss.py で新規 entry の headline が ASCII 比率 0.95+ の場合だけ呼び、
       生成した文字列を ev["headline_ja"] に格納する。TODAY'S THEME (h1) や各カードの
-      .headline-ja DOM 表示で UI が拾う。30-50 字目安で CSS line-clamp 3 に収める前提。
+      .headline-ja DOM 表示で UI が拾う。長い直訳ではなく 28〜42 字目安の要約にする。
 
     Args:
         headline: 元の英語 headline
         entity_context: {"entity_name": str, "vendor": str, ...}（固有名詞ヒント・任意）
 
     Returns:
-        日本語見出し（30-50 字目安・装飾記号なし・1 行）
+        日本語要約見出し（28〜42 字目安・装飾記号なし・1 行）
     """
     ctx_hints = ""
     if entity_context:
@@ -334,10 +334,11 @@ def translate_headline_ja(
         if names:
             ctx_hints = f"\n固有名詞ヒント（英語のまま残す）: {', '.join(names)}"
     user = (
-        "次の英語見出しを 30〜50 字程度の自然な日本語に翻訳してください。"
+        "次の英語見出しを、直訳ではなく 28〜42 字程度の自然な日本語要約見出しにしてください。"
         "会社名・製品名・人名などの固有名詞はそのまま英語表記で残し、それ以外（動詞・名詞・"
-        "形容詞・前置詞など）はすべて日本語にしてください。装飾記号（マーカー・太字）は付けない。"
-        "純粋な日本語見出しだけを 1 行で返してください（前置き・引用符・code fence は不可）。"
+        "形容詞・前置詞など）は日本語にしてください。長い修飾句は要約し、末尾に「…」を付けない。"
+        "装飾記号（マーカー・太字）は付けない。純粋な日本語見出しだけを 1 行で返してください"
+        "（前置き・引用符・code fence は不可）。"
         f"\n\n英語見出し: {headline}"
         f"{ctx_hints}"
     )

@@ -18,11 +18,7 @@
   font-weight: var(--w-bold); font-size: clamp(32px, 4.8vw, 54px); letter-spacing: -0.02em;
   margin: var(--s-4) 0 var(--s-8); text-wrap: balance;
   /* (2026-06-05) 最大 3 行で物理保証。LLM 生成 headline_ja が短ければ 1-2 行で収まり、
-     長い英語 headline が clamp 効いた時のための安全網（要約は LLM 側で 30-50 字以内に縛る）。 */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+     長い headline_ja は使わず、summary_points 由来の display_headline を digest に使う。 */
 }
 /* News-Grasp 流の「行下半分マーカー」: 主語とカテゴリ名にだけ accent 色の太い下線を敷く。
    theme.css の全面塗り mark を override（specificity: 0,0,2,1 > 0,0,0,1）。
@@ -302,7 +298,7 @@
       </li>
       {% endif %}
       {% for s in feed %}
-      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}" data-entname="{{ s.ent_name }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a,details'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a,details'))location.href='{{ s.karte }}'"{% endif %}>
+      <li class="story{% if s.feature %} feature{% endif %}" data-filter-item data-cat="{{ s.cat }}" data-score="{{ s.score }}" data-catname="{{ s.cat_label }}" data-entname="{{ s.ent_name }}" data-digest-title="{{ s.display_headline }}"{% if s.source_url %} data-href="{{ s.source_url }}" onclick="if(!event.target.closest('a,details'))window.open('{{ s.source_url }}','_blank','noopener')"{% elif s.karte %} data-href="{{ s.karte }}" onclick="if(!event.target.closest('a,details'))location.href='{{ s.karte }}'"{% endif %}>
         <div class="score">
           <div class="num">{{ s.score }}</div>
           <div class="lbl">SCORE</div>
@@ -325,7 +321,7 @@
             <span class="cat-badge"><span class="gly">{{ s.glyph }}</span> {{ s.cat_label }}</span>
             <div class="metrics"><span class="metric" data-level="{{ s.importance }}"{% if s.rationale.importance %} data-tip="{{ s.rationale.importance }}" tabindex="0"{% endif %}><b>重要</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.impact }}"{% if s.rationale.impact %} data-tip="{{ s.rationale.impact }}" tabindex="0"{% endif %}><b>影響</b><span class="bars"><i></i><i></i><i></i></span></span><span class="metric" data-level="{{ s.buzz }}"{% if s.rationale.buzz %} data-tip="{{ s.rationale.buzz }}" tabindex="0"{% endif %}><b>話題</b><span class="bars"><i></i><i></i><i></i></span></span></div>
           </div>
-          <h2>{{ s.headline }}</h2>
+          <h2 title="{{ s.headline }}">{{ s.display_headline }}</h2>
           {% if s.headline_ja %}<div class="headline-ja">{{ s.headline_ja }}</div>{% endif %}
           <div class="sect-rule"><span class="ln"></span><span class="lbl">Summary</span></div>
           {% if s.summary_points %}<ul class="summary-points">{% for p in s.summary_points %}<li>{{ p | emph }}</li>{% endfor %}</ul>{% else %}<p class="summary">{{ s.summary | emph }}</p>{% endif %}

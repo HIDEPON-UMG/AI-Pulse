@@ -72,6 +72,27 @@ class TestGenerate(unittest.TestCase):
         self.assertEqual(ctx["feed_count"], 1)
         self.assertEqual(ctx["feed"][0]["date_rel"], "1日前")
 
+    def test_feed_title_uses_summary_point_instead_of_long_translated_headline(self):
+        """トップ/カード見出しは長い直訳ではなく、summary_points の要約タイトルを使う。"""
+        ent = {
+            "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "physical",
+            "snapshot_date": "2026-06-08", "positioning": "p",
+        }
+        long_headline = "ジェンソン・ファンがエロン・マスクについて語ったことは、テスラがスペースXより価値がある理由を示す — 本日はフィジカルAIが主役"
+        ev = {
+            "event_id": "e1", "entity_id": "x", "date": "2026-06-08", "category": "physical",
+            "event_type": "release", "headline": "Very long source headline",
+            "headline_ja": long_headline, "summary": "Nvidia CEOはOptimusの市場性を高く評価した。",
+            "summary_points": ["Optimusの市場性をNvidia CEOが高評価", "Teslaは2027年販売を目指す", "物理AI市場の拡大が焦点"],
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ctx = gp.build_context([ent], [ev], build_date=dt.date(2026, 6, 8))
+        self.assertEqual(ctx["feed"][0]["display_headline"], "Optimusの市場性をNvidia CEOが高評価")
+        html = gp.make_env().get_template("index.html.j2").render(**ctx, page="feed")
+        self.assertIn("<h2 title=\"Very long source headline\">Optimusの市場性をNvidia CEOが高評価</h2>", html)
+        self.assertIn('data-digest-title="Optimusの市場性をNvidia CEOが高評価"', html)
+
     def test_karte_index_page_is_built_with_category_groups(self):
         """カルテ一覧ページ（karte-index.html）が出力され、全カルテ名がカテゴリ別カードで載る。"""
         with tempfile.TemporaryDirectory() as d:

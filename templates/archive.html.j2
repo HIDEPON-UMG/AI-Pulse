@@ -154,7 +154,7 @@ a.entry:hover h3 { color: var(--accent); }
           <a class="entry" data-filter-item data-cat="{{ e.cat }}" href="{{ e.karte }}">
             <div class="entry-main">
               <div class="top"><span class="cat-badge"><span class="gly">{{ e.glyph }}</span> {{ e.cat_label }}</span></div>
-              <h3>{{ e.headline }}</h3>
+              <h3 title="{{ e.headline }}">{{ e.display_headline }}</h3>
               {% if e.headline_ja %}<div class="headline-ja">{{ e.headline_ja }}</div>{% endif %}
               {% if e.summary_short %}<p class="summary-short">{{ e.summary_short }}</p>{% endif %}
               <div class="src">{{ e.source }} · <span class="tier">{{ e.tier_label }}</span></div>
@@ -173,7 +173,7 @@ a.entry:hover h3 { color: var(--accent); }
           <div class="entry" data-filter-item data-cat="{{ e.cat }}">
             <div class="entry-main">
               <div class="top"><span class="cat-badge"><span class="gly">{{ e.glyph }}</span> {{ e.cat_label }}</span></div>
-              <h3>{{ e.headline }}</h3>
+              <h3 title="{{ e.headline }}">{{ e.display_headline }}</h3>
               {% if e.headline_ja %}<div class="headline-ja">{{ e.headline_ja }}</div>{% endif %}
               {% if e.summary_short %}<p class="summary-short">{{ e.summary_short }}</p>{% endif %}
               <div class="src">{{ e.source }} · <span class="tier">{{ e.tier_label }}</span></div>

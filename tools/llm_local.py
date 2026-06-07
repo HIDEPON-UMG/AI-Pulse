@@ -251,7 +251,7 @@ def translate_headline_ja(
     *,
     entity_context: dict | None = None,
 ) -> str:
-    """英語 headline を日本語に翻訳。llm_gemini.translate_headline_ja と同契約。
+    """英語 headline を短い日本語要約見出しにする。llm_gemini.translate_headline_ja と同契約。
 
     Ollama /api/chat に 1 ショットで投げる（リトライなし。失敗即 LLMError → hybrid 層で Gemini fallback）。
     structured outputs は使わず純テキスト応答（短文・装飾不要のため）。
@@ -265,10 +265,11 @@ def translate_headline_ja(
         if names:
             ctx_hints = f"\n固有名詞ヒント（英語のまま残す）: {', '.join(names)}"
     user = (
-        "次の英語見出しを 30〜50 字程度の自然な日本語に翻訳してください。"
+        "次の英語見出しを、直訳ではなく 28〜42 字程度の自然な日本語要約見出しにしてください。"
         "会社名・製品名・人名などの固有名詞はそのまま英語表記で残し、それ以外（動詞・名詞・"
-        "形容詞・前置詞など）はすべて日本語にしてください。装飾記号（マーカー・太字）は付けない。"
-        "純粋な日本語見出しだけを 1 行で返してください（前置き・引用符・code fence は不可）。"
+        "形容詞・前置詞など）は日本語にしてください。長い修飾句は要約し、末尾に「…」を付けない。"
+        "装飾記号（マーカー・太字）は付けない。純粋な日本語見出しだけを 1 行で返してください"
+        "（前置き・引用符・code fence は不可）。"
         f"\n\n英語見出し: {headline}"
         f"{ctx_hints}"
     )

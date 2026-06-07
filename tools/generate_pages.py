@@ -216,6 +216,33 @@ def _summary_short(ev: dict) -> str:
     return s
 
 
+def _plain_summary_text(text: str) -> str:
+    """表示見出し候補に使う文章を plain text に寄せる。"""
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text or "")
+    text = re.sub(r"==([^=]+)==", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+    return re.sub(r"\s+", " ", text).strip().strip("。")
+
+
+def _display_headline(ev: dict) -> str:
+    """省略しない表示用タイトル。
+
+    元見出しや直訳 headline_ja が長い場合でも、カード用の 1 行目は要約済みの
+    summary_points[0] / summary から採る。末尾の「…」は付けず、切り詰め表示に見せない。
+    """
+    for point in ev.get("summary_points") or []:
+        s = _plain_summary_text(point)
+        if s:
+            return s
+    summary = _clean_summary(ev.get("summary", ""), ev["headline"])
+    if summary:
+        # summary は 1 文目をタイトル扱いにする。句点が無い場合は全文を使う。
+        first = re.split(r"[。！？]", _plain_summary_text(summary), maxsplit=1)[0].strip()
+        if first:
+            return first
+    return (ev.get("headline_ja") or ev["headline"]).strip()
+
+
 def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
     cat = ev["category"]
     d = _d(ev["date"])
@@ -232,6 +259,7 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
         "score": ev["score"],
         "headline": ev["headline"],
         "headline_ja": ev.get("headline_ja") or "",
+        "display_headline": _display_headline(ev),
         "ent_name": ent["name"] if ent else "",
         "summary": summary,
         "source": ev["source"],
@@ -350,6 +378,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
             "cat": ev["category"], "cat_label": CAT_META[ev["category"]]["label"],
             "glyph": CAT_META[ev["category"]]["glyph"], "headline": ev["headline"],
             "headline_ja": ev.get("headline_ja") or "",
+            "display_headline": _display_headline(ev),
             "source": ev["source"], "tier": ev["source_tier"],
             "tier_label": TIER_LABEL.get(ev["source_tier"], ev["source_tier"]),
             "score": ev["score"],  # スコアは各記事タイル右端に表示（日付レールと混同しないため）
