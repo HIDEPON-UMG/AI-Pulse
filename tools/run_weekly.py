@@ -1,6 +1,6 @@
 """週次バッチ: 全エンティティのカルテ deep 更新（L1）+ サイト再生成
 
-Task Scheduler から scripts/run_weekly.bat 経由で月曜 7:00 に実行。
+Task Scheduler から scripts/run_weekly.ps1 経由で月曜 7:00 に実行。
 claude -p / SDK 不使用。NotebookLM CLI（deep モード）を直接呼び出す。
 deep は非同期（kick_deep）→ ポーリング（collect）の 2 段で処理する。
 """
@@ -57,16 +57,20 @@ def _deep_update(entity: dict) -> None:
 def run_weekly() -> None:
     print("=== AI-Pulse 週次バッチ 開始 ===")
     entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+    update_failures: list[str] = []
 
     for entity in entities:
         try:
             _deep_update(entity)
         except Exception as exc:
             print(f"  失敗 ({entity['entity_id']}): {exc}", file=sys.stderr)
+            update_failures.append(entity["entity_id"])
         time.sleep(5)
 
     print("\n--- サイト再生成 ---")
     generate_pages.main()
+    if update_failures:
+        raise RuntimeError(f"週次カルテ更新失敗: {len(update_failures)} 件 ({', '.join(update_failures)})")
     print("=== 週次バッチ 完了 ===")
 
 

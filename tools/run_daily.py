@@ -1,6 +1,6 @@
 """日次バッチ: L2 RSS 収集 + 当日追加エンティティのカルテ fast 更新 + サイト再生成
 
-Task Scheduler から scripts/run_daily.bat 経由で毎日 7:00 に実行。
+Task Scheduler から scripts/run_daily.ps1 経由で毎日 7:00 に実行。
 claude -p / SDK 不使用。NotebookLM CLI（fast モード）を直接呼び出す。
 """
 from __future__ import annotations
@@ -44,6 +44,7 @@ def _fast_update(entity: dict) -> None:
 
 def run_daily() -> None:
     print("=== AI-Pulse 日次バッチ 開始 ===")
+    update_failures: list[str] = []
 
     # Step 1: RSS 収集（L2 events）
     print("\n--- Step 1: RSS 収集 ---")
@@ -66,6 +67,7 @@ def run_daily() -> None:
                 _fast_update(entity)
             except Exception as exc:
                 print(f"    カルテ更新失敗 ({eid}): {exc}", file=sys.stderr)
+                update_failures.append(eid)
             time.sleep(3)
 
     # Step 3: サムネイル補完
@@ -75,6 +77,8 @@ def run_daily() -> None:
     # Step 4: サイト再生成
     print("\n--- Step 4: サイト再生成 ---")
     generate_pages.main()
+    if update_failures:
+        raise RuntimeError(f"カルテ更新失敗: {len(update_failures)} 件 ({', '.join(update_failures)})")
     print("=== 日次バッチ 完了 ===")
 
 
