@@ -44,22 +44,21 @@ OLLAMA_TEMPERATURE = 0.1            # 事実忠実性を優先（眼の前の本
 OLLAMA_TIMEOUT_SEC = 180           # 初回はモデルロードで時間がかかる。warm 後は ~30s/件
 OLLAMA_MAX_RETRIES = 2             # 接続/空応答/パース失敗の短バックオフ回数（実回数: 2 = 計 3 試行）
 
-# --- ハイブリッド LLM 構成（2026-06-05 追加・追補11 で配線） ---
-# 通常パス = ローカル (Ollama Qwen3.6-35B-A3B)、失敗 / GPU 占有時に Gemini フォールバック。
+# --- ハイブリッド LLM 構成（2026-06-05 追加・追補11 で配線 / 2026-06-07 GPU 占有判定撤廃） ---
+# 通常パス = ローカル (Ollama Qwen3.6-35B-A3B)、失敗時のみ Gemini フォールバック。
 # 境界 1 箇所 (tools/llm_hybrid.generate_event_extras) で切替を locked-in（契約テスト test_llm_hybrid.py）。
-# - local_first  : 既定。GPU 非占有なら local 試行 → LLMError で Gemini にフォールバック
+# - local_first  : 既定。常に local 試行 → LLMError で Gemini にフォールバック
 # - gemini_first : Gemini 試行 → 失敗で local（クォータが温存される A/B 比較用）
 # - gemini_only  : 常時 Gemini（Ollama 全停止時の暫定回避 / ベースライン比較用）
 # - local_only   : 常時 local（テスト用・Gemini を絶対呼ばせたくない時の locked-in）
+#
+# 2026-06-07: GPU メモリ占有閾値 (旧 HYBRID_GPU_THRESHOLD_FB_MB) と _gpu_busy() プローブを撤廃。
+# 旧実装は「GPU 全体 VRAM が閾値超なら local skip → 即 Gemini」だったが、(1) Ollama 自身のモデル
+# 常駐 (~10-12GB) や (2) 瞬間的な他タスク占有を「占有」と誤検出し、GPU が空いていてもフォール
+# バック率 96.7% (2026-06-07 実測) に張り付いた (6/3-6/6=91.2% → 閾値 6000→12000 の対症療法も
+# 逆効果)。常に local を 1 度試し、Ollama が VRAM 不足で OOM/evict した時のみ LLMError → Gemini
+# に落とす事実ベースへ変更 ([[feedback_check_design_principles]] §1 illegal state unrepresentable)。
 HYBRID_MODE = "local_first"
-# GPU メモリ占有閾値（MB）。ComfyUI 等の他 GPU タスクが「Qwen3.6-35B-A3B を載せる余地が無い」
-# レベルで VRAM を埋めている時に限り local をスキップして Gemini に流す。
-# 2026-06-06 改定: 6000 → 12000。理由: 旧値 6000 では ComfyUI が軽く立っているだけで
-# `_gpu_busy()=True` に倒れ、6/3-6/6 で Gemini フォールバック率 91.2% (= 想定 20% の 4.5 倍) を
-# 実測した (Cloud Monitoring と Ollama server.log の照合で確定)。RTX5080 16GB のうち 35B-A3B
-# UD-IQ3_XXS は ~10-12GB 消費するため、残 4-6GB を切るまでは local 試行を許す。Ollama が VRAM
-# 不足で OOM したら llm_hybrid 層が LLMError → Gemini で救うので可逆。
-HYBRID_GPU_THRESHOLD_FB_MB = 12000
 # llm_local 側で「接続/空応答/JSON パース失敗」のバックオフ回数は OLLAMA_MAX_RETRIES に集約済。
 # hybrid 層では追加リトライせず、LLMError を 1 度でも受けたら即 Gemini にフォールバックする。
 HYBRID_LOCAL_RETRY_BEFORE_FALLBACK = OLLAMA_MAX_RETRIES

@@ -71,10 +71,9 @@ class TestTranslateHeadlineJaHybridRouting(unittest.TestCase):
         config.HYBRID_MODE = self._orig_mode
 
     def test_local_success_does_not_call_gemini(self):
-        """local が成功した時は Gemini を呼ばない（クォータ温存）。"""
+        """local が成功した時は Gemini を呼ばない（クォータ温存・local を必ず 1 度試す）。"""
         with patch.object(llm_local, "translate_headline_ja", return_value="ローカル翻訳") as ml, \
-             patch.object(llm_gemini, "translate_headline_ja") as mg, \
-             patch.object(llm_hybrid, "_gpu_busy", return_value=False):
+             patch.object(llm_gemini, "translate_headline_ja") as mg:
             result = llm_hybrid.translate_headline_ja("Some English Headline")
         self.assertEqual(result, "ローカル翻訳")
         self.assertEqual(ml.call_count, 1)
@@ -86,25 +85,14 @@ class TestTranslateHeadlineJaHybridRouting(unittest.TestCase):
             llm_local, "translate_headline_ja",
             side_effect=llm_gemini.LLMError("Ollama 接続失敗"),
         ) as ml, \
-             patch.object(llm_gemini, "translate_headline_ja", return_value="Gemini 翻訳") as mg, \
-             patch.object(llm_hybrid, "_gpu_busy", return_value=False):
+             patch.object(llm_gemini, "translate_headline_ja", return_value="Gemini 翻訳") as mg:
             result = llm_hybrid.translate_headline_ja("Some English Headline")
         self.assertEqual(result, "Gemini 翻訳")
         self.assertEqual(ml.call_count, 1)
         self.assertEqual(mg.call_count, 1)
 
-    def test_gpu_busy_skips_local(self):
-        """GPU 占有時は local を呼ばず即 Gemini（generate_event_extras と同じ分岐）。"""
-        with patch.object(llm_local, "translate_headline_ja") as ml, \
-             patch.object(llm_gemini, "translate_headline_ja", return_value="Gemini 翻訳") as mg, \
-             patch.object(llm_hybrid, "_gpu_busy", return_value=True):
-            result = llm_hybrid.translate_headline_ja("Some English Headline")
-        self.assertEqual(result, "Gemini 翻訳")
-        self.assertEqual(ml.call_count, 0)
-        self.assertEqual(mg.call_count, 1)
-
     def test_gemini_only_mode_always_uses_gemini(self):
-        """HYBRID_MODE=gemini_only は GPU/ローカル状態に関わらず常時 Gemini。"""
+        """HYBRID_MODE=gemini_only はローカル状態に関わらず常時 Gemini。"""
         config.HYBRID_MODE = "gemini_only"
         with patch.object(llm_local, "translate_headline_ja") as ml, \
              patch.object(llm_gemini, "translate_headline_ja", return_value="Gemini 翻訳") as mg:
@@ -147,8 +135,7 @@ class TestTranslateHeadlineJaEntityContext(unittest.TestCase):
             return "ダミー翻訳"
 
         ent = {"entity_name": "Qwen", "vendor": "Alibaba Cloud"}
-        with patch.object(llm_local, "translate_headline_ja", side_effect=fake_local), \
-             patch.object(llm_hybrid, "_gpu_busy", return_value=False):
+        with patch.object(llm_local, "translate_headline_ja", side_effect=fake_local):
             llm_hybrid.translate_headline_ja("Qwen 3.7 Released", entity_context=ent)
         self.assertEqual(captured["headline"], "Qwen 3.7 Released")
         self.assertEqual(captured["entity_context"], ent)

@@ -251,7 +251,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     返り値: store.ingest_events と同形式に、本配線で追加した skip カウンタを追記:
       {'added': [...], 'skipped_dup': int, 'skipped_score': int,
        'skipped_extract': int, 'skipped_llm': int, 'skipped_quant': int,
-       'skipped_validate': int}
+       'skipped_validate': int, 'skipped_irrelevant': int}
     """
     entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
     targets = {e["entity_id"]: e for e in entities}
@@ -263,6 +263,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     skipped_llm = 0
     skipped_quant = 0
     skipped_validate = 0
+    skipped_irrelevant = 0
     known_ids = set(targets) | {e["entity_id"] for e in entities}
     for entity_id, entity in targets.items():
         query = build_query(entity)
@@ -282,6 +283,15 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
             except llm_hybrid.LLMError as exc:
                 skipped_llm += 1
                 print(f"    skip-llm ({entity_id}/{i}): {exc}", file=sys.stderr)
+                continue
+            # 関連性ゲート（2026-06-07）: 同名異義 (Runway=空港の滑走路/ファッション 等) や entity が
+            # 主題でない記事を event 化前に弾く。2026-06-06 の search_query 絞り込み (入力側) で取りこぼす
+            # Google News の緩いマッチを、抽出スキーマの is_relevant で出力側からも封じる二段構え。
+            # is_relevant=false が明示された時だけ skip し、欠落時は従来通り採用（後方互換・安全側）。
+            if not extras.get("is_relevant", True):
+                skipped_irrelevant += 1
+                reason = extras.get("relevance_reason") or "(理由なし)"
+                print(f"    skip-irrelevant ({entity_id}/{i}): {reason}", file=sys.stderr)
                 continue
             # 強調記法のコード付与（プロンプトからは強調指示を除去済なので、ここで一括付与）。
             # 新 prompt はプレーンテキスト出力 → add_emphasis_event で数値/動詞/固有名を検出し
@@ -339,11 +349,12 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     result["skipped_llm"] = skipped_llm
     result["skipped_quant"] = skipped_quant
     result["skipped_validate"] = skipped_validate
+    result["skipped_irrelevant"] = skipped_irrelevant
     print(
         f"RSS+ハイブリッド LLM 収集完了: 採用 {len(result['added'])} 件 / "
         f"重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "
         f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / 数値NG {skipped_quant} / "
-        f"schema違反 {skipped_validate}"
+        f"無関係 {skipped_irrelevant} / schema違反 {skipped_validate}"
     )
     return result
 

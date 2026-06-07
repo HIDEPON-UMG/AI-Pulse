@@ -281,8 +281,15 @@ def gemini_response_schema() -> dict:
     """
     return {
         "type": "object",
-        "required": ["summary", "summary_points", "rationale", "score", "importance", "event_type"],
+        "required": ["is_relevant", "summary", "summary_points", "rationale", "score", "importance", "event_type"],
         "properties": {
+            # 関連性ゲート (2026-06-07): 同名異義 (Runway=空港の滑走路/ファッションの Rent the Runway 等) や
+            # entity が主題でない記事を抽出段階で is_relevant=false にし、collect_rss が event 化前に skip する。
+            # 2026-06-06 の search_query 絞り込み (入力側) では Google News の緩いマッチを抑えきれなかったため、
+            # 出力側ゲートを追加して二段で封じる ([[feedback_check_design_principles]] §1 illegal state +
+            # §2 境界 1 箇所集約: 抽出スキーマが local/Gemini 共通の単一ソース)。
+            "is_relevant": {"type": "boolean"},
+            "relevance_reason": {"type": "string"},
             "summary": {"type": "string", "minLength": 20, "maxLength": 280},
             "summary_points": {
                 "type": "array",
