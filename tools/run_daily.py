@@ -26,8 +26,7 @@ def _fast_update(entity: dict) -> None:
     eid = entity["entity_id"]
     query = collect_rss.build_query(entity)
     print(f"  カルテ更新 [{eid}] query={query!r}")
-    # Cookie を温める
-    nb._nb(["auth", "refresh"], timeout=30)
+    nb.ensure_auth()
     # ノートブック作成（fast: 通常 1〜3 分）
     cp = nb._nb(["create", f"AI-Pulse daily {eid}"])
     nb_id = nb._parse_notebook_id(cp.stdout)

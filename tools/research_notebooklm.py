@@ -36,6 +36,16 @@ def _nb(args, *, runner=quiet_run, timeout=120):
     return runner([str(NB_CLI), *args], timeout=timeout)
 
 
+def ensure_auth(*, runner=quiet_run) -> None:
+    """NotebookLM 認証を温め、失効時は login で保存状態を更新して再 refresh する。"""
+    try:
+        _nb(["auth", "refresh"], runner=runner, timeout=30)
+    except Exception as exc:
+        print(f"  NotebookLM auth refresh 失敗。login で再認証します: {exc}", file=sys.stderr)
+        _nb(["login"], runner=runner, timeout=180)
+        _nb(["auth", "refresh"], runner=runner, timeout=30)
+
+
 def kick_deep(entity_id, theme, *, notebook_id=None,
               runner=quiet_run, spawner=spawn_detached) -> str:
     """段A: deep research を非同期キックし job-state を保存。notebook_id を返す。

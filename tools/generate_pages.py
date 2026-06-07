@@ -320,18 +320,19 @@ def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> 
     }
 
 
-def build_context(entities: list[dict], events: list[dict]) -> dict:
+def build_context(entities: list[dict], events: list[dict], *, build_date: dt.date | None = None) -> dict:
     """検証済み L1/L2 から全テンプレ用の文脈を組む（決定論変換の集約点）。
 
-    フィードは「events 全体の最大 date と一致するデルタ」だけを表示する（=最新収集日）。
-    過去分はアーカイブに譲ることで、フィードの情報密度を上げる。ユーザー要件 2026-06-04。
+    フィードは「events 全体の最大 date と一致するデルタ」だけを表示する（=最新記事日）。
+    サイトの更新表示は生成実行日に合わせる。ユーザー要件 2026-06-08。
     """
     ent_by_id = {e["entity_id"]: e for e in entities}
-    ref = max((_d(e["date"]) for e in events), default=dt.date.today())
-    ref_iso = ref.isoformat()
+    ref = build_date or dt.date.today()
+    latest_event_date = max((_d(e["date"]) for e in events), default=ref)
+    latest_event_iso = latest_event_date.isoformat()
     all_events = sorted(events, key=lambda e: (e["date"], e["event_id"]), reverse=True)
     feed_events = [e for e in all_events if e["score"] >= config.SCORE_MIN]
-    feed_today_events = [e for e in feed_events if e["date"] == ref_iso]
+    feed_today_events = [e for e in feed_events if e["date"] == latest_event_iso]
     feed = [_story(ev, ent_by_id, ref, feature=(i == 0))
             for i, ev in enumerate(feed_today_events)]
 

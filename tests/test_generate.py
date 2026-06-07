@@ -7,6 +7,7 @@
 - 値は autoescape され、HTML へ生のタグが注入されない（XSS 防止）。
 """
 import html as _html
+import datetime as dt
 import json
 import re
 import sys
@@ -53,6 +54,23 @@ class TestGenerate(unittest.TestCase):
             past_published = [e for e in published if e["date"] != ref_iso]
             for e in past_published[:5]:  # 抽出して確認
                 self.assertNotIn(e["headline"], idx)
+
+    def test_build_date_uses_generation_day_not_latest_event_day(self):
+        ent = {
+            "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-07", "positioning": "p",
+        }
+        ev = {
+            "event_id": "e1", "entity_id": "x", "date": "2026-06-07", "category": "model",
+            "event_type": "release", "headline": "昨日記事", "summary": "s",
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ctx = gp.build_context([ent], [ev], build_date=dt.date(2026, 6, 8))
+        self.assertEqual(ctx["build"], "2026-06-08")
+        self.assertIn("2026-06-08", ctx["ref_date_label"])
+        self.assertEqual(ctx["feed_count"], 1)
+        self.assertEqual(ctx["feed"][0]["date_rel"], "1日前")
 
     def test_karte_index_page_is_built_with_category_groups(self):
         """カルテ一覧ページ（karte-index.html）が出力され、全カルテ名がカテゴリ別カードで載る。"""

@@ -30,7 +30,7 @@ def _deep_update(entity: dict) -> None:
     query = collect_rss.build_query(entity)
     print(f"  [{eid}] query={query!r}")
 
-    nb._nb(["auth", "refresh"], timeout=30)
+    nb.ensure_auth()
     cp = nb._nb(["create", f"AI-Pulse weekly {eid}"])
     nb_id = nb._parse_notebook_id(cp.stdout)
 

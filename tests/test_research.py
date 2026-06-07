@@ -98,6 +98,28 @@ class TestNotebookLMDriver(unittest.TestCase):
         self.assertEqual(job["notebook_id"], "nbk-abc12345")
         self.assertEqual(job["status"], "researching")
 
+    def test_ensure_auth_logs_in_when_refresh_is_expired(self):
+        calls = []
+
+        def fake_runner(args, timeout=120):
+            calls.append(args[1:])
+            if args[1:] == ["auth", "refresh"] and len(calls) == 1:
+                raise RuntimeError("Authentication expired")
+            return _CP(stdout="ok")
+
+        rnb.ensure_auth(runner=fake_runner)
+        self.assertEqual(calls, [["auth", "refresh"], ["login"], ["auth", "refresh"]])
+
+    def test_ensure_auth_does_not_login_when_refresh_succeeds(self):
+        calls = []
+
+        def fake_runner(args, timeout=120):
+            calls.append(args[1:])
+            return _CP(stdout="ok")
+
+        rnb.ensure_auth(runner=fake_runner)
+        self.assertEqual(calls, [["auth", "refresh"]])
+
     def test_kick_deep_explicit_id_skips_parsing(self):
         """notebook_id を明示指定すれば create 出力のパースに依存しない安全経路。"""
         calls = {"args": []}
