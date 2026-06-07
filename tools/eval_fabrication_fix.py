@@ -3,15 +3,15 @@
 使い方:
     python tools/eval_fabrication_fix.py            # 既定 N=12
 
-35B-A3B の factual 忠実度（固有名詞・数値の捏造）を、以下の対策で改善できるか測る:
+27B IQ3_XXS の factual 忠実度（固有名詞・数値の捏造）を、以下の対策で改善できるか測る:
   (1) 本文打切りの緩和（MAX_BODY_CHARS 3000→8000）
   (2) temperature を下げる（0.4→0.1）
   (3) grounding 強化プロンプト（prompts/extract_grounded.md・強調規則を削除し事実忠実性を絶対規則化）
 
 3 アームを同条件（強調無効・maxLength 400）で生成し、本文照合に強い factual 重視の盲検ジャッジで採点:
   - flash-lite-現状 : 本文3000 / temp0.4 / 現行プロンプト（factual 基準線）
-  - 35B-現状(BASE)  : 本文3000 / temp0.4 / 現行プロンプト
-  - 35B-対策(TREAT) : 本文8000 / temp0.1 / grounding プロンプト
+  - 27B-現状(BASE)  : 本文3000 / temp0.4 / 現行プロンプト
+  - 27B-対策(TREAT) : 本文8000 / temp0.1 / grounding プロンプト
 
 出力: docs/eval/2026-06-04_fabrication_fix.md / _raw.json。本番 events.jsonl は触らない。
 """
@@ -46,7 +46,7 @@ JUDGE_MODEL = "gemini-2.5-flash"
 JUDGE_BODY_CHARS = 8000       # ジャッジは本文全量を見て factual を照合する
 FETCH_MAX = 8000              # 8000 字版を取得（BASE は [:3000] にスライス）
 
-OLLAMA_35B = "hf.co/unsloth/Qwen3.6-35B-A3B-GGUF:UD-IQ3_XXS"
+OLLAMA_27B = "hf.co/unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
 # 旧本線プロンプト。2026-06-05 追補11 で本線 PROMPT_PATH を extract_grounded.md に切替したため、
 # ここでは過去 eval 再走のために .archive/ 経由で参照する（本線回帰には使わない）。
 BASE_PROMPT = ROOT / "prompts" / ".archive" / "gemini_summarize.md"
@@ -55,8 +55,8 @@ GROUNDED_PROMPT = ROOT / "prompts" / "extract_grounded.md"
 # (表示名, backend, モデル, 本文文字数, temp, プロンプト)
 ARMS = [
     ("flash-lite-現状", "gemini", "gemini-2.5-flash-lite", 3000, 0.4, "base"),
-    ("35B-現状",        "local",  OLLAMA_35B,              3000, 0.4, "base"),
-    ("35B-対策",        "local",  OLLAMA_35B,              8000, 0.1, "grounded"),
+    ("27B-現状",        "local",  OLLAMA_27B,              3000, 0.4, "base"),
+    ("27B-対策",        "local",  OLLAMA_27B,              8000, 0.1, "grounded"),
 ]
 NAMES = [a[0] for a in ARMS]
 
@@ -208,8 +208,8 @@ def main() -> int:
     print("\n=== 集計 ===")
     for nm in NAMES:
         print(f"  {nm:16s} factual {dim_avg[nm]['factual']:.2f}  総合 {overall[nm]:.2f}  完走 {completion[nm]}/{len(samples)}")
-    d_fac = dim_avg["35B-対策"]["factual"] - dim_avg["35B-現状"]["factual"]
-    d_vs_fl = dim_avg["35B-対策"]["factual"] - dim_avg["flash-lite-現状"]["factual"]
+    d_fac = dim_avg["27B-対策"]["factual"] - dim_avg["27B-現状"]["factual"]
+    d_vs_fl = dim_avg["27B-対策"]["factual"] - dim_avg["flash-lite-現状"]["factual"]
     print(f"  factual 改善（対策−現状）: {d_fac:+.2f}")
     print(f"  factual 対 flash-lite     : {d_vs_fl:+.2f}")
 
@@ -217,12 +217,12 @@ def main() -> int:
     lines = [
         f"# 捏造対策（実験 B）factual 改善計測（{date.today().isoformat()}）\n",
         "## 目的\n",
-        "35B-A3B の factual 忠実度を 3 対策（本文8000字 / temp0.1 / grounding 強化プロンプト）で改善できるか、"
+        "27B IQ3_XXS の factual 忠実度を 3 対策（本文8000字 / temp0.1 / grounding 強化プロンプト）で改善できるか、"
         "盲検ジャッジで head-to-head に実測する。\n",
         "## 条件\n",
         f"- N={len(samples)} / 採点 {judged} 件（3 アーム全成功サンプル）",
         "- 共通: 強調無効 + maxLength 400。ジャッジ `gemini-2.5-flash` が本文全量を見て factual を厳密照合（捏造大減点・省略は減点せず）。",
-        "- アーム: flash-lite-現状（本文3000/temp0.4/現行）/ 35B-現状（本文3000/temp0.4/現行）/ 35B-対策（本文8000/temp0.1/grounding）\n",
+        "- アーム: flash-lite-現状（本文3000/temp0.4/現行）/ 27B-現状（本文3000/temp0.4/現行）/ 27B-対策（本文8000/temp0.1/grounding）\n",
         "## 結果（各軸 1-5）\n",
         "| アーム | factual | summary | points | rationale | 総合 | 完走 |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -234,8 +234,8 @@ def main() -> int:
             f"{m['rationale_quality']:.2f} | {overall[nm]:.2f} | {completion[nm]}/{len(samples)} |"
         )
     lines.append("")
-    lines.append(f"- **factual 改善（35B 対策 − 35B 現状）: {d_fac:+.2f}**")
-    lines.append(f"- **factual 35B対策 − flash-lite現状: {d_vs_fl:+.2f}**（0 以上なら捏造面で Gemini に並んだ）\n")
+    lines.append(f"- **factual 改善（27B 対策 − 27B 現状）: {d_fac:+.2f}**")
+    lines.append(f"- **factual 27B対策 − flash-lite現状: {d_vs_fl:+.2f}**（0 以上なら捏造面で Gemini に並んだ）\n")
     lines.append("## スループット\n")
     for nm in NAMES:
         if lat[nm]:

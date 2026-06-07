@@ -2,7 +2,7 @@
 
 なぜ重要か（意図）:
   Gemini Free Tier クォータ天井（RPD/RPM）と「データ学習利用」を回避するため、抽出はローカル LLM
-  (Qwen3.6-35B-A3B) を優先し、Ollama 接続失敗 / 空応答 / schema 違反尽き（LLMError）の時のみ
+  (Qwen3.6-27B IQ3_XXS) を優先し、Ollama 接続失敗 / 空応答 / schema 違反尽き（LLMError）の時のみ
   Gemini にフォールバックする。境界 1 箇所 (llm_hybrid) で切替を locked-in するため、以下の
   class of bug を構造的に封じる:
     1. local 経由が正常成功した時は Gemini を呼ばない（クォータ温存）

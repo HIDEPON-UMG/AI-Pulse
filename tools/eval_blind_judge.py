@@ -1,4 +1,4 @@
-"""flash-lite(Gemini) vs qwen3:14b vs 35B-A3B 抽出品質の盲検ジャッジ採点（N 拡大版）。
+"""flash-lite(Gemini) vs qwen3:14b vs 27B IQ3_XXS 抽出品質の盲検ジャッジ採点（N 拡大版）。
 
 使い方:
     python tools/eval_blind_judge.py            # 既定 N=12
@@ -9,7 +9,7 @@
 評価条件（= 計画アーキテクチャを反映して公平化。本番コードは触らず本スクリプト内 monkeypatch で適用）:
 - **強調契約を無効化**: 「強調記法はコード付与へ移す」決定済みのため、LLM には強調を課さない条件で実質品質を測る。
 - **maxLength を 400 に緩和**: 語中切れ(maxLength:280 のハード切断)confound を全モデルから除去。
-- **3 contestant 同条件**: flash-lite / qwen3:14b / 35B-A3B に同じプロンプト・同じ(緩和)スキーマ・temp 0.4。
+- **3 contestant 同条件**: flash-lite / qwen3:14b / 27B IQ3_XXS に同じプロンプト・同じ(緩和)スキーマ・temp 0.4。
 
 盲検ジャッジ:
 - 各サンプルで 3 出力を候補 A/B/C に index ローテーションで shuffle（モデル名隠蔽 + 位置バイアス回避）。
@@ -56,7 +56,7 @@ JUDGE_BODY_CHARS = 2000
 CONTESTANTS = [
     ("flash-lite", "gemini", "gemini-2.5-flash-lite"),
     ("qwen3:14b", "local", "qwen3:14b"),
-    ("35B-A3B", "local", "hf.co/unsloth/Qwen3.6-35B-A3B-GGUF:UD-IQ3_XXS"),
+    ("27B-IQ3_XXS", "local", "hf.co/unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"),
 ]
 DIMS = ["factual", "summary_quality", "points_quality", "rationale_quality"]
 
@@ -282,7 +282,7 @@ def main() -> int:
 
     # --- レポート ---
     lines = [
-        f"# 盲検ジャッジ採点: flash-lite vs qwen3:14b vs 35B-A3B（{date.today().isoformat()}）\n",
+        f"# 盲検ジャッジ採点: flash-lite vs qwen3:14b vs 27B IQ3_XXS（{date.today().isoformat()}）\n",
         "## 方法\n",
         f"- N={len(samples)}（本文取得成功サンプル。-gem イベントから category×event_type 多様性優先で選定）",
         f"- 採点対象 {judged} 件（3 モデルすべて成功したサンプルのみ）",

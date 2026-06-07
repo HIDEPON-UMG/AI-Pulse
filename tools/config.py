@@ -29,23 +29,24 @@ GEMINI_TIMEOUT_SEC = 30             # 1 リクエストの上限
 GEMINI_MAX_RETRIES = 2              # 429/5xx の指数バックオフ回数（実回数: 2 リトライ = 計 3 試行）
 ARTICLE_FETCH_TIMEOUT = 12          # trafilatura / urllib の本文取得タイムアウト（秒）
 # 本文文字数: 2026-06-04 eval 追補10 で 3000→5000 に拡大（8000 一律は隣接数値の混同誘発で却下）。
-# Qwen3.6-35B-A3B は長文に強く、5000 字までは要点抽出が安定する（grounded プロンプト併用）。
+# 2026-06-08 再評価で Qwen3.6-27B IQ3_XXS は 35B A3B より本文忠実性が安定した。
 MAX_BODY_CHARS = 5000
 MIN_BODY_CHARS = 200                # これ未満はドロップ（paywall / 404 / カード型本文の事故防止）
 
 # --- ローカル LLM (Ollama) バックエンド（2026-06-04 eval 確定・2026-06-05 本配線） ---
-# Ollama 0.30.3 / RTX5080 16GB。Qwen3.6-35B-A3B は盲検ジャッジ総合 3.80/5 > flash-lite 3.38 で品質一位。
+# Ollama / RTX5080 16GB。Qwen3.6-27B IQ3_XXS は 2026-06-08 再評価で
+# AI-Pulse JSON 要約・News-Grasp 長文骨子の本文忠実性が 35B A3B より安定したため採用。
 # 狙いは API クォータ非依存・オフライン自走 + データが Google 学習に使われない安全側（コスト動機なし）。
 # 本番切替は llm_hybrid 経由で 1 行入替で済むよう境界 1 箇所集約（feedback_check_design_principles §2）。
 OLLAMA_HOST = "http://localhost:11434"
 # hf.co GGUF は `/api/generate` だと chat template 欠落で `/api/chat`(messages) 必須（追補10 注意）。
-OLLAMA_MODEL = "hf.co/unsloth/Qwen3.6-35B-A3B-GGUF:UD-IQ3_XXS"
+OLLAMA_MODEL = "hf.co/unsloth/Qwen3.6-27B-GGUF:UD-IQ3_XXS"
 OLLAMA_TEMPERATURE = 0.1            # 事実忠実性を優先（眼の前の本文だけを根拠に出させる）
 OLLAMA_TIMEOUT_SEC = 180           # 初回はモデルロードで時間がかかる。warm 後は ~30s/件
 OLLAMA_MAX_RETRIES = 2             # 接続/空応答/パース失敗の短バックオフ回数（実回数: 2 = 計 3 試行）
 
 # --- ハイブリッド LLM 構成（2026-06-05 追加・追補11 で配線 / 2026-06-07 GPU 占有判定撤廃） ---
-# 通常パス = ローカル (Ollama Qwen3.6-35B-A3B)、失敗時のみ Gemini フォールバック。
+# 通常パス = ローカル (Ollama Qwen3.6-27B IQ3_XXS)、失敗時のみ Gemini フォールバック。
 # 境界 1 箇所 (tools/llm_hybrid.generate_event_extras) で切替を locked-in（契約テスト test_llm_hybrid.py）。
 # - local_first  : 既定。常に local 試行 → LLMError で Gemini にフォールバック
 # - gemini_first : Gemini 試行 → 失敗で local（クォータが温存される A/B 比較用）

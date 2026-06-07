@@ -7,7 +7,7 @@ Ollama サーバは localhost:11434 で起動済の前提（HYBRID_MODE=local_fi
 Task Scheduler から run_daily.py 経由で毎日 7:00 に実行。
 
 2026-06-05 (追補11) 本配線:
-  抽出 LLM をハイブリッド構成 (Qwen3.6-35B-A3B → Gemini フォールバック) に切替。同時に
+  抽出 LLM をハイブリッド構成 (Qwen3.6-27B IQ3_XXS → Gemini フォールバック) に切替。同時に
   - rewrite_emphasis: LLM 出力から強調記法 (==/__/**) を決定論で振り直し
   - verify_quant   : summary の数値表現が本文に実在するか照合（捏造数値ゲート）
   を境界に配線。event_id 接尾辞は `-gem<NN>` のまま（互換のため）。

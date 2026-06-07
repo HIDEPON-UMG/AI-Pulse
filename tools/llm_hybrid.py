@@ -1,4 +1,4 @@
-"""ハイブリッド LLM ファサード: ローカル (Ollama Qwen3.6-35B-A3B) を通常パスに、失敗時のみ Gemini フォールバック。
+"""ハイブリッド LLM ファサード: ローカル (Ollama Qwen3.6-27B IQ3_XXS) を通常パスに、失敗時のみ Gemini フォールバック。
 
 なぜ重要か（意図）:
   Gemini API Free Tier は (a) RPD/RPM クォータ天井と (b) Google 学習データへの利用 という
