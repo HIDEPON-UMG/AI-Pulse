@@ -88,6 +88,14 @@ def _needs_headline_ja(headline: str) -> bool:
     return _ascii_ratio(headline) >= _HEADLINE_JA_ASCII_THRESHOLD
 
 
+def _title_key(entity_id: str, headline: str) -> tuple[str, str] | None:
+    """既存 headline と RSS title の重複判定キーを返す。空タイトルは判定しない。"""
+    title = re.sub(r"\s+", " ", (headline or "").strip()).casefold()
+    if not title:
+        return None
+    return (entity_id, title)
+
+
 def _source_tier(url: str) -> str:
     domain = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
     if domain in _T1_DOMAINS:
@@ -250,15 +258,21 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
 
     返り値: store.ingest_events と同形式に、本配線で追加した skip カウンタを追記:
       {'added': [...], 'skipped_dup': int, 'skipped_score': int,
-       'skipped_extract': int, 'skipped_llm': int, 'skipped_quant': int,
-       'skipped_validate': int, 'skipped_irrelevant': int}
+       'skipped_pre_dup': int, 'skipped_extract': int, 'skipped_llm': int,
+       'skipped_quant': int, 'skipped_validate': int, 'skipped_irrelevant': int}
     """
-    entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+    entities, existing_events = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
     targets = {e["entity_id"]: e for e in entities}
     if entity_subset:
         targets = {eid: e for eid, e in targets.items() if eid in entity_subset}
 
     candidates: list[dict] = []
+    existing_title_keys = {
+        key
+        for ev in existing_events
+        if (key := _title_key(ev["entity_id"], ev.get("headline", ""))) is not None
+    }
+    skipped_pre_dup = 0
     skipped_extract = 0
     skipped_llm = 0
     skipped_quant = 0
@@ -270,6 +284,10 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
         print(f"  [{entity_id}] {query!r}")
         items = _fetch_rss(query, num=config.BREAKING_PER_CATEGORY)
         for i, item in enumerate(items, 1):
+            if _title_key(entity_id, item.get("title", "")) in existing_title_keys:
+                skipped_pre_dup += 1
+                print(f"    skip-predup ({entity_id}/{i}): 既存 headline と同一 title", file=sys.stderr)
+                continue
             try:
                 article = fetch_article.extract(item["link"])
             except fetch_article.ArticleFetchError as exc:
@@ -346,13 +364,14 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
         candidates,
     )
     result["skipped_extract"] = skipped_extract
+    result["skipped_pre_dup"] = skipped_pre_dup
     result["skipped_llm"] = skipped_llm
     result["skipped_quant"] = skipped_quant
     result["skipped_validate"] = skipped_validate
     result["skipped_irrelevant"] = skipped_irrelevant
     print(
         f"RSS+ハイブリッド LLM 収集完了: 採用 {len(result['added'])} 件 / "
-        f"重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "
+        f"pre重複 {skipped_pre_dup} / 重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "
         f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / 数値NG {skipped_quant} / "
         f"無関係 {skipped_irrelevant} / schema違反 {skipped_validate}"
     )
