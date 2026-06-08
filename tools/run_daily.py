@@ -22,12 +22,13 @@ import schema  # noqa: E402
 DATA = ROOT / "data"
 
 
-def _fast_update(entity: dict) -> None:
+def _fast_update(entity: dict, *, auth_checked: bool = False) -> None:
     """1 エンティティを fast モードで NotebookLM 収集 → carte_fields → apply_deepdive。"""
     eid = entity["entity_id"]
     query = collect_rss.build_query(entity)
     print(f"  カルテ更新 [{eid}] query={query!r}")
-    nb.ensure_auth()
+    if not auth_checked:
+        nb.ensure_auth()
     # ノートブック作成（fast: 通常 1〜3 分）
     cp = nb._nb(["create", f"AI-Pulse daily {eid}"])
     nb_id = nb._parse_notebook_id(cp.stdout)
@@ -71,18 +72,27 @@ def run_daily() -> None:
     else:
         updated_eids = list({ev["entity_id"] for ev in added_events})
         print(f"\n--- Step 3: カルテ fast 更新 ({len(updated_eids)} 件) ---")
-        entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
-        by_id = {e["entity_id"]: e for e in entities}
-        for eid in updated_eids:
-            entity = by_id.get(eid)
-            if entity is None:
-                continue
-            try:
-                _fast_update(entity)
-            except Exception as exc:
-                print(f"    カルテ更新失敗 ({eid}): {exc}", file=sys.stderr)
-                update_failures.append(eid)
-            time.sleep(3)
+        try:
+            nb.ensure_auth(allow_login=False)
+        except Exception as exc:
+            print(
+                f"  NotebookLM 認証 preflight 失敗。カルテ fast 更新をスキップします: {exc}",
+                file=sys.stderr,
+            )
+            update_failures.extend(updated_eids)
+        else:
+            entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+            by_id = {e["entity_id"]: e for e in entities}
+            for eid in updated_eids:
+                entity = by_id.get(eid)
+                if entity is None:
+                    continue
+                try:
+                    _fast_update(entity, auth_checked=True)
+                except Exception as exc:
+                    print(f"    カルテ更新失敗 ({eid}): {exc}", file=sys.stderr)
+                    update_failures.append(eid)
+                time.sleep(3)
 
     # Step 4: サムネイル補完
     print("\n--- Step 4: サムネイル補完 ---")
@@ -92,7 +102,11 @@ def run_daily() -> None:
     print("\n--- Step 5: サイト再生成 ---")
     generate_pages.main()
     if update_failures:
-        raise RuntimeError(f"カルテ更新失敗: {len(update_failures)} 件 ({', '.join(update_failures)})")
+        print(
+            f"カルテ更新失敗: {len(update_failures)} 件 ({', '.join(update_failures)})。"
+            "日次本線は完了（RSS収集・品質監査・サイト再生成済み）。",
+            file=sys.stderr,
+        )
     print("=== 日次バッチ 完了 ===")
 
 

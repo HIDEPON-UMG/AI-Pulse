@@ -110,6 +110,17 @@ class TestNotebookLMDriver(unittest.TestCase):
         rnb.ensure_auth(runner=fake_runner)
         self.assertEqual(calls, [["auth", "refresh"], ["login"], ["auth", "refresh"]])
 
+    def test_ensure_auth_can_skip_login_for_noninteractive_runs(self):
+        calls = []
+
+        def fake_runner(args, timeout=120):
+            calls.append(args[1:])
+            raise RuntimeError("Authentication expired")
+
+        with self.assertRaisesRegex(RuntimeError, "非対話実行"):
+            rnb.ensure_auth(runner=fake_runner, allow_login=False)
+        self.assertEqual(calls, [["auth", "refresh"]])
+
     def test_ensure_auth_does_not_login_when_refresh_succeeds(self):
         calls = []
 

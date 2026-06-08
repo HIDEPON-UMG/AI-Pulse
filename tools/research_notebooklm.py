@@ -36,11 +36,20 @@ def _nb(args, *, runner=quiet_run, timeout=120):
     return runner([str(NB_CLI), *args], timeout=timeout)
 
 
-def ensure_auth(*, runner=quiet_run) -> None:
-    """NotebookLM 認証を温め、失効時は login で保存状態を更新して再 refresh する。"""
+def ensure_auth(*, runner=quiet_run, allow_login: bool = True) -> None:
+    """NotebookLM 認証を温める。
+
+    Task Scheduler などの非対話実行では login を完了できないため、日次バッチは
+    allow_login=False で refresh の成否だけを見る。対話実行や週次の手動復旧では
+    従来通り login で保存状態の更新を試せる。
+    """
     try:
         _nb(["auth", "refresh"], runner=runner, timeout=30)
     except Exception as exc:
+        if not allow_login:
+            raise RuntimeError(
+                f"NotebookLM auth refresh 失敗（非対話実行のため login は試行しません）: {exc}"
+            ) from exc
         print(f"  NotebookLM auth refresh 失敗。login で再認証します: {exc}", file=sys.stderr)
         _nb(["login"], runner=runner, timeout=180)
         _nb(["auth", "refresh"], runner=runner, timeout=30)
