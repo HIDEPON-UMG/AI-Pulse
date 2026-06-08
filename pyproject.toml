@@ -10,6 +10,7 @@ dependencies = [
     "trafilatura>=2.0",           # 本文抽出
     "googlenewsdecoder>=0.1",     # GNews redirect → publisher URL（urllib では解決不可と実機確認）
     "python-dotenv>=1.0",         # .env から GEMINI_API_KEY を読む
+    "Pillow>=10",                 # entity logo の PNG 正規化・破損検証
 ]
 
 [project.optional-dependencies]

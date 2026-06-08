@@ -25,6 +25,7 @@ import schema  # noqa: E402
 
 TEMPLATES_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
+ASSETS_DIR = ROOT / "assets"
 DATA_DIR = ROOT / "data"
 OUT_DIR = ROOT / "site"
 
@@ -331,6 +332,7 @@ def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> 
         "id": ent["entity_id"], "name": ent["name"], "cat": cat,
         "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"],
         "positioning": ent["positioning"], "vendor": ent["vendor"],
+        "logo": ent.get("logo") or None,
         "kind_ja": KIND_JA.get(ent["kind"], ent["kind"]),
         "domain_ja": DOMAIN_JA.get(ent["domain"], ent["domain"]),
         "offering_ja": OFFERING_JA.get(ent["offering"], ent["offering"]),
@@ -420,6 +422,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
                     "id": e["entity_id"], "name": e["name"], "cat": cat,
                     "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"],
                     "positioning": e["positioning"], "vendor": e["vendor"],
+                    "logo": e.get("logo") or None,
                     "href": f"karte-{e['entity_id']}.html",
                     "feed_updated_rel": (_human_rel(ref, latest_by_entity[e["entity_id"]])
                                          if e["entity_id"] in latest_by_entity else None),
@@ -460,7 +463,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
 
 
 def _copy_assets(out_dir: Path) -> int:
-    """static/ 配下のホワイトリスト拡張子をすべて `out_dir` に流す。
+    """static/ と assets/ 配下の公開アセットを `out_dir` に流す。
 
     本番 (OUT_DIR) でも tmp ディレクトリでも同じ経路を辿るよう out_dir を引数化した
     （2026-06-05 改修: テストが OGP png 等のアセット貫通を検証できるようにするため）。
@@ -470,6 +473,14 @@ def _copy_assets(out_dir: Path) -> int:
         if f.is_file() and f.suffix in ASSET_SUFFIXES:
             shutil.copy2(f, out_dir / f.name)
             n += 1
+    if ASSETS_DIR.exists():
+        for f in sorted(ASSETS_DIR.rglob("*")):
+            if f.is_file() and f.suffix in ASSET_SUFFIXES:
+                rel = Path("assets") / f.relative_to(ASSETS_DIR)
+                dest = out_dir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dest)
+                n += 1
     return n
 
 

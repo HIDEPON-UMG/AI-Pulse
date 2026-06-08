@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -29,6 +30,7 @@ EVENT_TYPES = {"release", "funding", "pricing", "ma", "shutdown", "incident", "b
 # regulation=規制の施行・ガイドライン公表など(policy レンズ)。
 SOURCE_TIERS = {"T1", "T2", "T3"}  # T1 公式/一次, T2 一次報道, T3 二次/個人
 IMPORTANCE = {"high", "mid", "low"}
+LOGO_STATUSES = {"verified", "candidate", "missing"}
 
 # rationale 各値の最低文字数。prompt は 40〜80 字を要求しているが、安全側で 20 字以上を
 # 「文章として最低限の情報量」のハードゲートにする。これ以下は "high"/"mid"/"low" や
@@ -46,6 +48,8 @@ ENTITY_REQUIRED = (
 # comparison = 競合比較マトリクス。比較軸はレンズ(category)共通（LENS_AXES が単一ソース）。
 #          entity は cols(name/cells) だけ持つ。各 col は所属レンズ全 axis キーのセルを揃える。
 HISTORY_ITEM_REQUIRED = ("when", "title")
+LOGO_PATH_PREFIX = "assets/service-icons/"
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # レンズ(7カテゴリ)ごとの比較軸。「同レンズ=同軸」を強制する単一ソース（方針B）。
 # entity.comparison.cols の cells はここで定義した key を全て埋める。
@@ -180,6 +184,49 @@ def _validate_future(d: dict, ctx: str) -> None:
                 f"{ctx}.modules.future[{i}]: url は http(s) 文字列（実値 {f['url']!r}）")
 
 
+def _is_http_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
+def _validate_logo(d: dict, ctx: str) -> None:
+    """entity.logo があるなら、PPT と SSG が読める形に固定する。"""
+    if "logo" not in d:
+        return
+    logo = d["logo"]
+    lctx = f"{ctx}.logo"
+    if not isinstance(logo, dict):
+        raise SchemaError(f"{lctx}: logo は object")
+    status = logo.get("status")
+    if status not in LOGO_STATUSES:
+        raise SchemaError(f"{lctx}.status は {sorted(LOGO_STATUSES)} のいずれか")
+    path = logo.get("path")
+    if status == "missing":
+        if path:
+            raise SchemaError(f"{lctx}.path: missing では path を持たない")
+    elif not (
+        isinstance(path, str)
+        and path.startswith(LOGO_PATH_PREFIX)
+        and path.endswith(".png")
+    ):
+        raise SchemaError(
+            f"{lctx}.path は {LOGO_PATH_PREFIX}<entity_id>.png 形式（実値 {path!r}）")
+    if isinstance(path, str) and (
+        "\\" in path or ".." in Path(path).parts or Path(path).is_absolute()
+    ):
+        raise SchemaError(f"{lctx}.path は repo 相対の安全な POSIX path（実値 {path!r}）")
+    for key in ("source_url", "source_page"):
+        url = logo.get(key)
+        if url is not None and not (isinstance(url, str) and _is_http_url(url)):
+            raise SchemaError(f"{lctx}.{key} は http(s) 文字列（実値 {url!r}）")
+    fetched_at = logo.get("fetched_at")
+    if fetched_at is not None and not (isinstance(fetched_at, str) and _DATE_RE.match(fetched_at)):
+        raise SchemaError(f"{lctx}.fetched_at は YYYY-MM-DD 文字列（実値 {fetched_at!r}）")
+    note = logo.get("license_note")
+    if note is not None and not (isinstance(note, str) and note.strip()):
+        raise SchemaError(f"{lctx}.license_note は非空文字列")
+
+
 def validate_entity(d: dict) -> dict:
     """L1 カルテ 1 件を検証して返す。不正なら SchemaError。"""
     ctx = f"entity[{d.get('entity_id')}]"
@@ -190,6 +237,7 @@ def validate_entity(d: dict) -> dict:
     _validate_history(d, ctx)
     _validate_comparison(d, ctx)
     _validate_future(d, ctx)
+    _validate_logo(d, ctx)
     if "overview" in d and not (isinstance(d["overview"], str) and d["overview"]):
         raise SchemaError(f"{ctx}: overview は非空文字列")
     # search_query は collect_rss.build_query が最優先で参照する RSS 検索クエリの override。

@@ -17,6 +17,12 @@
   font-weight: var(--w-black); font-size: var(--t-display); letter-spacing: -0.02em;
   margin: var(--s-16) 0 var(--s-8); display: flex; align-items: center; gap: 14px;
 }
+.karte-head h1 .service-logo {
+  width: 54px; height: 54px; object-fit: contain; flex: 0 0 auto;
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 7px; box-shadow: 0 0 18px color-mix(in oklab, var(--cat) 18%, transparent);
+}
 .karte-head h1 .mark {
   width: 12px; height: 28px; background: var(--cat); border-radius: 1px;
   box-shadow: 0 0 14px color-mix(in oklab, var(--cat) 50%, transparent);
@@ -101,6 +107,7 @@
 /* 狭幅では横スクロール（overflow-x:auto）だと最新マイルストーンが画面外に隠れるため縦積みにする。
    縦積み時はドット中心を通す縦の一本線で各マイルストーンを繋ぎ、左側で連続して見えるようにする */
 @media (max-width: 560px) {
+  .karte-head h1 .service-logo { width: 44px; height: 44px; padding: 6px; }
   .evo-track { flex-wrap: wrap; overflow-x: visible; gap: var(--s-16) 0; }
   .evo-step { flex: 1 1 100%; padding: 0 0 0 var(--s-24); }
   /* ::before を横線→縦線へ。ドット(left:0/中心6.5px)を貫き、次ステップのドットまで(gap分)伸ばす */
@@ -333,7 +340,7 @@
           <div class="eyebrow">
             <span class="label">サービスカルテ / ENTITY KARTE</span>
           </div>
-          <h1><span class="mark"></span>{{ k.name }}</h1>
+          <h1>{% if k.logo and k.logo.path and k.logo.status != 'missing' %}<img class="service-logo" src="{{ k.logo.path }}" alt="{{ k.name }} logo" loading="eager" decoding="async" />{% endif %}<span class="mark"></span>{{ k.name }}</h1>
           <p class="position">「<b>{{ k.positioning }}</b>」</p>
           {% if k.overview %}
           <p class="overview">{{ k.overview | emph }}</p>

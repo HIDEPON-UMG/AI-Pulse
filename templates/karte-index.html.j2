@@ -55,6 +55,15 @@
   margin: var(--s-4) 0 var(--s-4); color: var(--fg);
   letter-spacing: -0.02em; line-height: 1.25;
 }
+.ki-card .title-row {
+  display: grid; grid-template-columns: auto 1fr; gap: var(--s-12); align-items: center;
+}
+.ki-card .service-logo {
+  width: 42px; height: 42px; object-fit: contain;
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 6px; flex: 0 0 auto;
+}
 .ki-card:hover h3 { color: var(--cat); }
 
 /* (2026-06-04) カードの「直近アップデート」を 2 種並列で。位置はカード下方 (meta 直上)。
@@ -156,7 +165,10 @@
       <div class="ki-cards">
         {% for it in g.cards %}
         <a class="ki-card" href="{{ it.href }}" data-cat="{{ it.cat }}">
-          <h3>{{ it.name }}</h3>
+          <div class="title-row">
+            {% if it.logo and it.logo.path and it.logo.status != 'missing' %}<img class="service-logo" src="{{ it.logo.path }}" alt="{{ it.name }} logo" loading="lazy" decoding="async" />{% endif %}
+            <h3>{{ it.name }}</h3>
+          </div>
           <p class="pos">{{ it.positioning }}</p>
           <div class="upd-row">
             {% if it.feed_updated_rel %}
