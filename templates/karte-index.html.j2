@@ -37,10 +37,13 @@
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 .ki-card {
+  position: relative;
   display: flex; flex-direction: column; gap: 8px;
+  min-height: 170px;
   padding: var(--s-16); background: var(--bg-elev);
   border: 1px solid var(--border); border-left: 2px solid var(--cat);
   border-radius: var(--r-sm); text-decoration: none; color: inherit;
+  overflow: hidden;
   transition: background .15s, border-color .15s, transform .15s;
 }
 .ki-card:hover {
@@ -56,14 +59,17 @@
   letter-spacing: -0.02em; line-height: 1.25;
 }
 .ki-card .title-row {
-  display: grid; grid-template-columns: auto 1fr; gap: var(--s-12); align-items: center;
+  display: block;
 }
-.ki-card .service-logo {
-  width: 42px; height: 42px; object-fit: contain;
+.ki-card .card-logo {
+  position: absolute; right: var(--s-16); bottom: var(--s-16);
+  width: 64px; height: 64px; object-fit: contain;
   background: color-mix(in oklab, var(--fg) 6%, transparent);
   border: 1px solid var(--border); border-radius: var(--r-sm);
-  padding: 6px; flex: 0 0 auto;
+  padding: 8px; opacity: .88; pointer-events: none;
+  z-index: 0;
 }
+.ki-card > *:not(.card-logo) { position: relative; z-index: 1; }
 .ki-card:hover h3 { color: var(--cat); }
 
 /* (2026-06-04) カードの「直近アップデート」を 2 種並列で。位置はカード下方 (meta 直上)。
@@ -128,7 +134,8 @@
 }
 .ki-card .meta {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin-top: 4px; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute);
+  margin-top: 4px; padding-right: 80px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute);
 }
 .ki-card .meta .vendor { color: var(--fg-sub); }
 .ki-card .meta .cat-mini {
@@ -166,7 +173,6 @@
         {% for it in g.cards %}
         <a class="ki-card" href="{{ it.href }}" data-cat="{{ it.cat }}">
           <div class="title-row">
-            {% if it.logo and it.logo.path and it.logo.status != 'missing' %}<img class="service-logo" src="{{ it.logo.path }}" alt="{{ it.name }} logo" loading="lazy" decoding="async" />{% endif %}
             <h3>{{ it.name }}</h3>
           </div>
           <p class="pos">{{ it.positioning }}</p>
@@ -188,6 +194,7 @@
             <span class="cat-mini">{{ it.glyph }} {{ it.cat_label }}</span>
             <span class="vendor">{{ it.vendor }}</span>
           </div>
+          {% if it.logo and it.logo.path and it.logo.status != 'missing' %}<img class="service-logo card-logo" src="{{ it.logo.path }}" alt="{{ it.name }} logo" loading="lazy" decoding="async" />{% endif %}
         </a>
         {% endfor %}
       </div>

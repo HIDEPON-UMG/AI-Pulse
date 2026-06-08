@@ -92,6 +92,7 @@ class TestEntityLogoGenerate(unittest.TestCase):
             **ctx, page="karte_index"
         )
         self.assertIn('src="assets/service-icons/x.png"', idx)
+        self.assertIn('class="service-logo card-logo"', idx)
 
     def test_service_icon_assets_are_copied_under_assets_directory(self):
         with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as out:
