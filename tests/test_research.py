@@ -121,6 +121,39 @@ class TestNotebookLMDriver(unittest.TestCase):
             rnb.ensure_auth(runner=fake_runner, allow_login=False)
         self.assertEqual(calls, [["auth", "refresh"]])
 
+    def test_ensure_auth_retries_refresh_before_noninteractive_failure(self):
+        calls = []
+
+        def fake_runner(args, timeout=120):
+            calls.append(args[1:])
+            raise RuntimeError("temporary auth failure")
+
+        with self.assertRaisesRegex(RuntimeError, "非対話実行"):
+            rnb.ensure_auth(
+                runner=fake_runner,
+                allow_login=False,
+                refresh_attempts=3,
+                retry_seconds=0,
+            )
+        self.assertEqual(calls, [["auth", "refresh"], ["auth", "refresh"], ["auth", "refresh"]])
+
+    def test_ensure_auth_refresh_retry_can_recover(self):
+        calls = []
+
+        def fake_runner(args, timeout=120):
+            calls.append(args[1:])
+            if len(calls) < 2:
+                raise RuntimeError("temporary auth failure")
+            return _CP(stdout="ok")
+
+        rnb.ensure_auth(
+            runner=fake_runner,
+            allow_login=False,
+            refresh_attempts=3,
+            retry_seconds=0,
+        )
+        self.assertEqual(calls, [["auth", "refresh"], ["auth", "refresh"]])
+
     def test_ensure_auth_does_not_login_when_refresh_succeeds(self):
         calls = []
 

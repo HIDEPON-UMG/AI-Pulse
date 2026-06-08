@@ -36,23 +36,40 @@ def _nb(args, *, runner=quiet_run, timeout=120):
     return runner([str(NB_CLI), *args], timeout=timeout)
 
 
-def ensure_auth(*, runner=quiet_run, allow_login: bool = True) -> None:
+def ensure_auth(
+    *,
+    runner=quiet_run,
+    allow_login: bool = True,
+    refresh_attempts: int = 1,
+    retry_seconds: float = 5.0,
+) -> None:
     """NotebookLM 認証を温める。
 
     Task Scheduler などの非対話実行では login を完了できないため、日次バッチは
     allow_login=False で refresh の成否だけを見る。対話実行や週次の手動復旧では
     従来通り login で保存状態の更新を試せる。
     """
-    try:
-        _nb(["auth", "refresh"], runner=runner, timeout=30)
-    except Exception as exc:
-        if not allow_login:
-            raise RuntimeError(
-                f"NotebookLM auth refresh 失敗（非対話実行のため login は試行しません）: {exc}"
-            ) from exc
-        print(f"  NotebookLM auth refresh 失敗。login で再認証します: {exc}", file=sys.stderr)
-        _nb(["login"], runner=runner, timeout=180)
-        _nb(["auth", "refresh"], runner=runner, timeout=30)
+    last_exc: Exception | None = None
+    for attempt in range(max(1, refresh_attempts)):
+        try:
+            _nb(["auth", "refresh"], runner=runner, timeout=30)
+            return
+        except Exception as exc:
+            last_exc = exc
+            if attempt < refresh_attempts - 1:
+                print(
+                    f"  NotebookLM auth refresh 失敗 ({attempt + 1}/{refresh_attempts})。"
+                    f"{retry_seconds:g}秒後に再試行します: {exc}",
+                    file=sys.stderr,
+                )
+                time.sleep(retry_seconds)
+    if not allow_login:
+        raise RuntimeError(
+            f"NotebookLM auth refresh 失敗（非対話実行のため login は試行しません）: {last_exc}"
+        ) from last_exc
+    print(f"  NotebookLM auth refresh 失敗。login で再認証します: {last_exc}", file=sys.stderr)
+    _nb(["login"], runner=runner, timeout=180)
+    _nb(["auth", "refresh"], runner=runner, timeout=30)
 
 
 def kick_deep(entity_id, theme, *, notebook_id=None,

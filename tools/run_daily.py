@@ -73,7 +73,7 @@ def run_daily() -> None:
         updated_eids = list({ev["entity_id"] for ev in added_events})
         print(f"\n--- Step 3: カルテ fast 更新 ({len(updated_eids)} 件) ---")
         try:
-            nb.ensure_auth(allow_login=False)
+            nb.ensure_auth(allow_login=False, refresh_attempts=3, retry_seconds=20)
         except Exception as exc:
             print(
                 f"  NotebookLM 認証 preflight 失敗。カルテ fast 更新をスキップします: {exc}",
