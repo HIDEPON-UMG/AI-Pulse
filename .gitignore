@@ -11,3 +11,8 @@ scripts/
 .env
 data/*.bak-*
 _logs/
+.codegraph/
+~$*.pptx
+docs/AI-Pulse_karte_*_relayout*.pptx
+docs/karte-ppt-export-*.zi_
+docs/karte-ppt-export-*/

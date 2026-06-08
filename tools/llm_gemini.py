@@ -208,6 +208,103 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
     )
 
 
+def _quality_audit_schema() -> dict:
+    """Flash-Lite 監査の JSON schema。候補は自動適用せずログに残す。"""
+    return {
+        "type": "object",
+        "required": ["status", "issues", "term_candidates", "notes"],
+        "properties": {
+            "status": {"type": "string", "enum": ["ok", "warn", "fail"]},
+            "issues": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["category", "severity", "field", "evidence", "suggestion"],
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": ["translation", "overclaim", "hallucination", "style"],
+                        },
+                        "severity": {"type": "string", "enum": ["low", "mid", "high"]},
+                        "field": {"type": "string"},
+                        "evidence": {"type": "string"},
+                        "suggestion": {"type": "string"},
+                    },
+                },
+            },
+            "term_candidates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["bad", "good", "reason", "kind"],
+                    "properties": {
+                        "bad": {"type": "string"},
+                        "good": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "kind": {"type": "string", "enum": ["phrase", "regex", "soften", "warn"]},
+                    },
+                },
+            },
+            "notes": {"type": "string"},
+        },
+    }
+
+
+def audit_event_quality(article_text: str, event: dict) -> dict:
+    """採用済み event の要約品質を Flash-Lite で監査する。
+
+    本文に照らして、誤訳・誇張・本文にない主張を検出する。戻り値は観測ログ専用で、
+    event 本体や editorial_terms.json を自動更新しない。
+    """
+    points = "\n".join(f"- {p}" for p in event.get("summary_points") or [])
+    rationale = event.get("rationale") or {}
+    user = (
+        "あなたは AI-Pulse の編集監査者です。記事本文と生成済み event を比較し、"
+        "日本語の自然さ、誤訳、誇張表現、本文にない主張だけを確認してください。\n"
+        "厳しすぎる文体好みは issue にせず、読者に誤認を与えるものだけを指摘します。\n"
+        "辞書化できる修正があれば term_candidates に追加します。候補は自動適用されないため、"
+        "短く再利用しやすい形にしてください。\n\n"
+        "[判定]\n"
+        "- ok: 問題なし\n"
+        "- warn: 表現改善・軽微な誤訳候補あり\n"
+        "- fail: 本文にない主張、重大な誤訳、強い誇張がある\n\n"
+        "[記事本文]\n"
+        f"{article_text[: config.QUALITY_AUDIT_MAX_BODY_CHARS]}\n\n"
+        "[event]\n"
+        f"event_id: {event.get('event_id', '')}\n"
+        f"headline: {event.get('headline', '')}\n"
+        f"headline_ja: {event.get('headline_ja', '')}\n"
+        f"summary: {event.get('summary', '')}\n"
+        f"summary_points:\n{points}\n"
+        f"rationale.importance: {rationale.get('importance', '')}\n"
+        f"rationale.impact: {rationale.get('impact', '')}\n"
+        f"rationale.buzz: {rationale.get('buzz', '')}\n\n"
+        "純粋な JSON だけを返してください。"
+    )
+    cfg = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_json_schema=_quality_audit_schema(),
+        temperature=0.0,
+    )
+    _get_bucket().acquire()
+    try:
+        resp = _get_client().models.generate_content(
+            model=config.QUALITY_AUDIT_MODEL,
+            contents=user,
+            config=cfg,
+        )
+    except Exception as exc:
+        raise LLMError(f"Gemini audit_event_quality 失敗: {exc}") from exc
+    raw = (resp.text or "").strip()
+    if not raw:
+        raise LLMError("Gemini が空応答 (audit_event_quality)")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise LLMError(f"JSON パース失敗 (audit_event_quality): {exc}: {raw[:200]!r}") from exc
+    return payload
+
+
 def regenerate_rationale(
     headline: str,
     summary: str,

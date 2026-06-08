@@ -28,8 +28,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import config  # noqa: E402
+import editorial_lint  # noqa: E402
 import fetch_article  # noqa: E402
 import llm_hybrid  # noqa: E402  # 抽出 LLM のファサード（local / Gemini を可逆切替）
+import quality_audit  # noqa: E402
 import rewrite_emphasis  # noqa: E402  # 強調記法をコード付与（LLM プロンプトからは強調指示を除去済）
 import schema  # noqa: E402
 import store  # noqa: E402
@@ -278,6 +280,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     skipped_quant = 0
     skipped_validate = 0
     skipped_irrelevant = 0
+    audit_records_by_event_id: dict[str, dict] = {}
     known_ids = set(targets) | {e["entity_id"] for e in entities}
     for entity_id, entity in targets.items():
         query = build_query(entity)
@@ -311,6 +314,15 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 reason = extras.get("relevance_reason") or "(理由なし)"
                 print(f"    skip-irrelevant ({entity_id}/{i}): {reason}", file=sys.stderr)
                 continue
+            extras, editorial_findings = editorial_lint.apply_editorial_lint(extras)
+            for finding in editorial_findings:
+                print(
+                    f"    editorial-lint ({entity_id}/{i}): "
+                    f"{finding.get('field')} {finding.get('kind')} "
+                    f"{finding.get('bad') or finding.get('pattern')} -> "
+                    f"{finding.get('good') or finding.get('message')}",
+                    file=sys.stderr,
+                )
             # 強調記法のコード付与（プロンプトからは強調指示を除去済なので、ここで一括付与）。
             # 新 prompt はプレーンテキスト出力 → add_emphasis_event で数値/動詞/固有名を検出し
             # `==X==` / `__X__` / `**X**` を新規付与する（entity_context で固有名候補を渡す）。
@@ -356,6 +368,9 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 print(f"    skip-validate ({entity_id}/{i}): {exc}", file=sys.stderr)
                 continue
             candidates.append(ev)
+            audit_records_by_event_id[ev["event_id"]] = quality_audit.build_audit_record(
+                ev, article_body
+            )
         time.sleep(1.0)  # Google RSS rate limit 対策
 
     result = store.ingest_events(
@@ -369,6 +384,11 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     result["skipped_quant"] = skipped_quant
     result["skipped_validate"] = skipped_validate
     result["skipped_irrelevant"] = skipped_irrelevant
+    result["quality_audit_records"] = [
+        audit_records_by_event_id[ev["event_id"]]
+        for ev in result["added"]
+        if ev["event_id"] in audit_records_by_event_id
+    ]
     print(
         f"RSS+ハイブリッド LLM 収集完了: 採用 {len(result['added'])} 件 / "
         f"pre重複 {skipped_pre_dup} / 重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "

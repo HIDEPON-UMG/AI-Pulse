@@ -33,6 +33,13 @@ ARTICLE_FETCH_TIMEOUT = 12          # trafilatura / urllib の本文取得タイ
 MAX_BODY_CHARS = 5000
 MIN_BODY_CHARS = 200                # これ未満はドロップ（paywall / 404 / カード型本文の事故防止）
 
+# --- 品質監査（2026-06-08 追加） ---
+# 採用済み event だけを Gemini Flash-Lite で軽量監査し、誤訳・誇張・辞書候補を _logs に残す。
+# 掲載本線を止めない観測レイヤーなので、失敗時も日次バッチは継続する。
+QUALITY_AUDIT_ENABLED = True
+QUALITY_AUDIT_MODEL = "gemini-2.5-flash-lite"
+QUALITY_AUDIT_MAX_BODY_CHARS = MAX_BODY_CHARS
+
 # --- ローカル LLM (Ollama) バックエンド（2026-06-04 eval 確定・2026-06-05 本配線） ---
 # Ollama / RTX5080 16GB。Qwen3.6-27B IQ3_XXS は 2026-06-08 再評価で
 # AI-Pulse JSON 要約・News-Grasp 長文骨子の本文忠実性が 35B A3B より安定したため採用。

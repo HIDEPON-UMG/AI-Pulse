@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import backfill_thumb  # noqa: E402
 import collect_rss  # noqa: E402
 import generate_pages  # noqa: E402
+import quality_audit  # noqa: E402
 import research_notebooklm as nb  # noqa: E402
 import schema  # noqa: E402
 
@@ -49,13 +50,27 @@ def run_daily() -> None:
     print("\n--- Step 1: RSS 収集 ---")
     result = collect_rss.collect_entities()
     added_events = result["added"]
+    audit_records = result.get("quality_audit_records") or []
 
-    # Step 2: 当日更新エンティティのカルテ fast 更新
+    # Step 2: 採用 event の軽量品質監査（観測レイヤーなので失敗しても本線は止めない）
+    print("\n--- Step 2: 品質監査 ---")
+    try:
+        audit_stats = quality_audit.audit_records(audit_records)
+        print(
+            "品質監査完了: "
+            f"監査 {audit_stats['audited']} 件 / ok {audit_stats['ok']} / "
+            f"warn {audit_stats['warn']} / fail {audit_stats['fail']} / "
+            f"error {audit_stats['errors']} / 辞書候補 {audit_stats['term_candidates']}"
+        )
+    except Exception as exc:
+        print(f"品質監査失敗（本線継続）: {exc}", file=sys.stderr)
+
+    # Step 3: 当日更新エンティティのカルテ fast 更新
     if not added_events:
         print("新着なし。カルテ更新をスキップします。")
     else:
         updated_eids = list({ev["entity_id"] for ev in added_events})
-        print(f"\n--- Step 2: カルテ fast 更新 ({len(updated_eids)} 件) ---")
+        print(f"\n--- Step 3: カルテ fast 更新 ({len(updated_eids)} 件) ---")
         entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
         by_id = {e["entity_id"]: e for e in entities}
         for eid in updated_eids:
@@ -69,12 +84,12 @@ def run_daily() -> None:
                 update_failures.append(eid)
             time.sleep(3)
 
-    # Step 3: サムネイル補完
-    print("\n--- Step 3: サムネイル補完 ---")
+    # Step 4: サムネイル補完
+    print("\n--- Step 4: サムネイル補完 ---")
     backfill_thumb.backfill()
 
-    # Step 4: サイト再生成
-    print("\n--- Step 4: サイト再生成 ---")
+    # Step 5: サイト再生成
+    print("\n--- Step 5: サイト再生成 ---")
     generate_pages.main()
     if update_failures:
         raise RuntimeError(f"カルテ更新失敗: {len(update_failures)} 件 ({', '.join(update_failures)})")
