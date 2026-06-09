@@ -66,6 +66,48 @@ def test_run_daily_skips_carte_update_when_auth_preflight_fails(
     assert "カルテ更新失敗: 2 件" in captured.err
 
 
+def test_run_daily_retries_carte_update_after_auth_refresh(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        run_daily.collect_rss,
+        "collect_entities",
+        lambda: {"added": [{"entity_id": "claude-opus"}]},
+    )
+    monkeypatch.setattr(
+        run_daily.schema,
+        "validate_store",
+        lambda *_args: ([{"entity_id": "claude-opus"}], []),
+    )
+    auth_calls: list[dict] = []
+
+    def fake_ensure_auth(**kwargs):
+        auth_calls.append(kwargs)
+
+    attempts = {"count": 0}
+
+    def fake_fast_update(_entity, **_kwargs):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise RuntimeError("auth expired during create")
+
+    monkeypatch.setattr(run_daily.nb, "ensure_auth", fake_ensure_auth)
+    monkeypatch.setattr(run_daily, "_fast_update", fake_fast_update)
+    monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: None)
+    monkeypatch.setattr(run_daily.generate_pages, "main", lambda: None)
+
+    run_daily.run_daily()
+
+    captured = capsys.readouterr()
+    assert attempts["count"] == 2
+    assert len(auth_calls) == 2
+    assert all(call["allow_login"] is False for call in auth_calls)
+    assert "NotebookLM 認証 refresh 後に 1 回だけ再試行" in captured.err
+    assert "カルテ更新失敗:" not in captured.err
+
+
 def test_run_weekly_raises_after_notebooklm_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         run_weekly.schema,

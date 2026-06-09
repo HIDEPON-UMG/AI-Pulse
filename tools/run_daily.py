@@ -20,6 +20,8 @@ import research_notebooklm as nb  # noqa: E402
 import schema  # noqa: E402
 
 DATA = ROOT / "data"
+AUTH_REFRESH_ATTEMPTS = 3
+AUTH_RETRY_SECONDS = 20
 
 
 def _fast_update(entity: dict, *, auth_checked: bool = False) -> None:
@@ -73,7 +75,11 @@ def run_daily() -> None:
         updated_eids = list({ev["entity_id"] for ev in added_events})
         print(f"\n--- Step 3: カルテ fast 更新 ({len(updated_eids)} 件) ---")
         try:
-            nb.ensure_auth(allow_login=False, refresh_attempts=3, retry_seconds=20)
+            nb.ensure_auth(
+                allow_login=False,
+                refresh_attempts=AUTH_REFRESH_ATTEMPTS,
+                retry_seconds=AUTH_RETRY_SECONDS,
+            )
         except Exception as exc:
             print(
                 f"  NotebookLM 認証 preflight 失敗。カルテ fast 更新をスキップします: {exc}",
@@ -90,8 +96,20 @@ def run_daily() -> None:
                 try:
                     _fast_update(entity, auth_checked=True)
                 except Exception as exc:
-                    print(f"    カルテ更新失敗 ({eid}): {exc}", file=sys.stderr)
-                    update_failures.append(eid)
+                    print(
+                        f"    カルテ更新失敗 ({eid})。NotebookLM 認証 refresh 後に 1 回だけ再試行します: {exc}",
+                        file=sys.stderr,
+                    )
+                    try:
+                        nb.ensure_auth(
+                            allow_login=False,
+                            refresh_attempts=AUTH_REFRESH_ATTEMPTS,
+                            retry_seconds=AUTH_RETRY_SECONDS,
+                        )
+                        _fast_update(entity, auth_checked=True)
+                    except Exception as retry_exc:
+                        print(f"    カルテ更新失敗 ({eid}): {retry_exc}", file=sys.stderr)
+                        update_failures.append(eid)
                 time.sleep(3)
 
     # Step 4: サムネイル補完

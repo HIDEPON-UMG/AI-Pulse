@@ -7,7 +7,9 @@ tests/_tmp*/
 docs/specs/_verify_*.png
 .e2e/
 site/
-scripts/
+scripts/*
+!scripts/run_daily.ps1
+!scripts/refresh_notebooklm_auth.ps1
 .env
 data/*.bak-*
 _logs/
