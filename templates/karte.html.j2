@@ -104,6 +104,23 @@
 .evo-more[open] > summary::before { transform: rotate(90deg); }
 .evo-more[open] > summary .evo-more-label::after { content: " （閉じる）"; color: var(--fg-mute); }
 .evo-more > .evo-track { margin-top: var(--s-16); }
+.sub-history { margin-top: var(--s-24); background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--s-16); }
+.sub-history > summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: var(--s-16); font-family: var(--font-head); font-weight: var(--w-med); color: var(--fg); list-style: none; user-select: none; }
+.sub-history > summary::-webkit-details-marker { display: none; }
+.sub-history > summary::after { content: "表示"; font-family: var(--font-mono); font-size: var(--t-label); color: var(--cat); border: 1px solid color-mix(in oklab, var(--cat) 40%, transparent); border-radius: var(--r-sm); padding: 4px 8px; white-space: nowrap; }
+.sub-history[open] > summary::after { content: "閉じる"; color: var(--fg-mute); border-color: var(--border); }
+.sub-history .hint { display: block; margin-top: 4px; font-family: var(--font-body); font-size: var(--t-sm); font-weight: 400; color: var(--fg-mute); }
+.sub-history-grid { display: grid; gap: 12px; margin-top: var(--s-16); }
+.sub-history-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: var(--s-16); align-items: start; padding: 12px 0; border-top: 1px solid var(--border); }
+.sub-history-row h3 { margin: 0; font-family: var(--font-head); font-size: var(--t-h3); font-weight: var(--w-med); line-height: 1.35; color: var(--fg); }
+.sub-history-items { display: grid; gap: 8px; }
+.sub-history-item { display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: start; }
+.sub-history-item .when { font-family: var(--font-mono); font-size: var(--t-label); color: var(--cat); letter-spacing: .04em; }
+.sub-history-item .body { min-width: 0; }
+.sub-history-item .title { font-weight: var(--w-med); color: var(--fg); line-height: 1.45; }
+.sub-history-item .note { margin-top: 3px; color: var(--fg-sub); font-size: var(--t-sm); line-height: 1.6; }
+.sub-history-item .src { display: inline-flex; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--cat); text-decoration: none; border-bottom: 1px solid color-mix(in oklab, var(--cat) 40%, transparent); }
+.sub-history-item .src:hover { border-bottom-color: var(--cat); }
 /* 狭幅では横スクロール（overflow-x:auto）だと最新マイルストーンが画面外に隠れるため縦積みにする。
    縦積み時はドット中心を通す縦の一本線で各マイルストーンを繋ぎ、左側で連続して見えるようにする */
 @media (max-width: 560px) {
@@ -115,6 +132,8 @@
   .evo-step:last-child::before { display: none; }
   .evo-step .dot { top: 0; left: 0; }
   .evo-step p { margin-right: 0; }
+  .sub-history-row { grid-template-columns: 1fr; gap: 8px; }
+  .sub-history-item { grid-template-columns: 64px 1fr; }
 }
 
 /* section */
@@ -385,6 +404,32 @@
         <summary><span class="evo-more-label">さらに {{ k.history|length - 5 }} 件の履歴を表示</span></summary>
         <div class="evo-track">
           {% for h in k.history[5:] %}{{ evo_step(h) }}{% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if k.sub_history %}
+      <details class="sub-history">
+        <summary>
+          <span>サブ・ヒストリー<span class="hint">廉価/高速/派生モデルの系譜。初期表示ではフロンティア系譜だけを見せます。</span></span>
+        </summary>
+        <div class="sub-history-grid">
+          {% for group in k.sub_history %}
+          <section class="sub-history-row">
+            <h3>{{ group.model }}</h3>
+            <div class="sub-history-items">
+              {% for h in group["items"] %}
+              <div class="sub-history-item">
+                <div class="when">{{ h.when }}</div>
+                <div class="body">
+                  <div class="title">{{ h.title }}</div>
+                  {% if h.note %}<div class="note">{{ h.note }}</div>{% endif %}
+                  {% if h.url %}<a class="src" href="{{ h.url }}" target="_blank" rel="noopener noreferrer">出典: {{ h.source or 'リンク' }} ↗</a>{% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </section>
+          {% endfor %}
         </div>
       </details>
       {% endif %}

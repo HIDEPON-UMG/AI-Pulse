@@ -91,6 +91,28 @@ class TestSchemaContract(unittest.TestCase):
             {"when": "2026.05", "title": "新", "now": True}, {"when": "2024.03", "title": "旧"}]})
         self.assertTrue(ok["history"][0]["now"])
 
+    def test_sub_history_is_grouped_by_submodel(self):
+        """サブ・ヒストリーはサブモデル単位の行として固定する。
+
+        なぜ重要か: 三大モデルのカルテは frontier history を主表示にし、Sonnet/mini/Flash 等は
+        折りたたみ内でモデル別に読む。group/items の形を固定しないと、テンプレで空の行や
+        モデル名不明の履歴が出る。
+        """
+        base = {"entity_id": "e", "name": "E", "kind": "app", "domain": "x", "offering": "oss",
+                "vendor": "v", "category": "model", "snapshot_date": "2026-06-02", "positioning": "p"}
+        ok = schema.validate_entity({**base, "sub_history": [{
+            "model": "E mini",
+            "items": [{"when": "2026.05", "title": "mini 更新", "url": "https://example.com/mini"}],
+        }]})
+        self.assertEqual(ok["sub_history"][0]["model"], "E mini")
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "sub_history": [{"items": [{"when": "2026.05", "title": "mini"}]}]})
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "sub_history": [{"model": "E mini", "items": []}]})
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "sub_history": [{"model": "E mini", "items": [
+                {"when": "2026.05", "title": "mini", "url": "javascript:1"}]}]})
+
     def test_comparison_axes_are_lens_shared_and_complete(self):
         """比較軸はレンズ(category)共通が単一ソース（方針B）。entity 独自軸は不可、
 

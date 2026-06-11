@@ -110,6 +110,147 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
     )
 
 
+def generate_carte_fields(entity: dict, recent_events: list[dict]) -> dict:
+    """既存 entity と直近 event からカルテ更新差分を Ollama で生成する。
+
+    NotebookLM の外部 research 依存を外し、AI-Pulse が既に採用済みの event と
+    現在の entity 情報だけを根拠に overview と self 列の比較セルを更新する。
+    競合列や logo などの既存構造は呼び出し側で保持する。
+    """
+    axes = schema.LENS_AXES.get(entity.get("category"), [])
+    axis_keys = [axis["key"] for axis in axes]
+    if not axis_keys:
+        raise LLMError(f"カルテ軸が未定義です: category={entity.get('category')!r}")
+    event_lines = []
+    for ev in recent_events[:8]:
+        points = ev.get("summary_points") or []
+        point_text = " / ".join(str(p) for p in points[:3])
+        event_lines.append(
+            "\n".join(
+                [
+                    f"- date: {ev.get('date', '')}",
+                    f"  headline: {ev.get('headline_ja') or ev.get('headline', '')}",
+                    f"  summary: {ev.get('summary', '')}",
+                    f"  points: {point_text}",
+                    f"  source: {ev.get('source', '')}",
+                ]
+            )
+        )
+    events_text = "\n".join(event_lines) or "- 新規 event なし"
+    axis_text = "\n".join(f"- {axis['key']}: {axis['label']}" for axis in axes)
+    current_overview = entity.get("overview") or entity.get("positioning") or ""
+    user = (
+        "あなたは AI-Pulse のカルテ編集者です。NotebookLM は使わず、下の既存カルテ情報と"
+        "AI-Pulse に採用済みの直近 event だけを根拠に、カルテ更新差分を作ってください。\n\n"
+        "[対象 entity]\n"
+        f"entity_id: {entity.get('entity_id')}\n"
+        f"name: {entity.get('name')}\n"
+        f"vendor: {entity.get('vendor')}\n"
+        f"category: {entity.get('category')}\n"
+        f"positioning: {entity.get('positioning')}\n"
+        f"current_overview: {current_overview}\n\n"
+        "[直近 event]\n"
+        f"{events_text}\n\n"
+        "[比較軸]\n"
+        f"{axis_text}\n\n"
+        "[出力規約]\n"
+        "- overview は 3〜5 文の日本語。固有名詞は英語のまま残す。\n"
+        "- cells は比較軸 key をすべて含む object。各値は 1〜2 文、または短い文字列配列。\n"
+        "- 入力にない未確認事実、価格、日付、性能値を作らない。\n"
+        "- 不明な軸は N/A と書く。空文字は禁止。\n"
+        "- 純粋な JSON だけを返す。前置き・後置き・code fence は不可。"
+    )
+    carte_schema = {
+        "type": "object",
+        "required": ["overview", "cells"],
+        "properties": {
+            "overview": {"type": "string", "minLength": 20},
+            "cells": {
+                "type": "object",
+                "required": axis_keys,
+                "properties": {
+                    key: {
+                        "oneOf": [
+                            {"type": "string", "minLength": 1},
+                            {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {"type": "string", "minLength": 1},
+                            },
+                        ]
+                    }
+                    for key in axis_keys
+                },
+            },
+        },
+    }
+    attempts = config.OLLAMA_MAX_RETRIES + 1
+    last_err: Exception | None = None
+    extra = ""
+    for attempt in range(1, attempts + 1):
+        req = {
+            "model": config.OLLAMA_MODEL,
+            "messages": [{"role": "user", "content": user + (("\n\n" + extra) if extra else "")}],
+            "think": False,
+            "format": carte_schema,
+            "stream": False,
+            "options": {"temperature": 0.2},
+        }
+        data = json.dumps(req).encode("utf-8")
+        url = f"{config.OLLAMA_HOST}/api/chat"
+        try:
+            with urllib.request.urlopen(
+                urllib.request.Request(
+                    url, data=data, headers={"Content-Type": "application/json"}
+                ),
+                timeout=config.OLLAMA_TIMEOUT_SEC,
+            ) as r:
+                resp = json.load(r)
+            raw = (resp.get("message", {}).get("content") or "").strip()
+            if not raw:
+                raise LLMError("Ollama が空応答 (generate_carte_fields / think=false 確認)")
+            payload = json.loads(raw)
+            _check_carte_shape(payload, axis_keys)
+            return payload
+        except (urllib.error.URLError, json.JSONDecodeError, LLMError) as exc:
+            last_err = exc
+            extra = (
+                f"前回の応答はカルテ schema 違反または取得失敗でした: {exc}。"
+                "overview と cells を必ず埋め、cells には指定された全 key を含めてください。"
+            )
+            if attempt < attempts:
+                time.sleep(2.0)
+    raise LLMError(
+        f"Ollama カルテ生成が尽きました（{attempts} 回試行）: "
+        f"{type(last_err).__name__ if last_err else 'None'}: {last_err}"
+    )
+
+
+def _check_carte_shape(payload: dict, axis_keys: list[str]) -> None:
+    """Ollama カルテ応答の最低限 shape を検証する。"""
+    if not isinstance(payload, dict):
+        raise LLMError("カルテ応答が object ではありません")
+    if not isinstance(payload.get("overview"), str) or not payload["overview"].strip():
+        raise LLMError("カルテ overview が空です")
+    cells = payload.get("cells")
+    if not isinstance(cells, dict):
+        raise LLMError("カルテ cells が object ではありません")
+    missing = [key for key in axis_keys if key not in cells]
+    if missing:
+        raise LLMError(f"カルテ cells の軸欠落: {missing}")
+    for key in axis_keys:
+        value = cells[key]
+        if isinstance(value, str) and value.strip():
+            continue
+        if (
+            isinstance(value, list)
+            and value
+            and all(isinstance(item, str) and item.strip() for item in value)
+        ):
+            continue
+        raise LLMError(f"カルテ cells[{key!r}] が空または不正です")
+
+
 def regenerate_rationale(
     headline: str,
     summary: str,

@@ -1,9 +1,9 @@
-﻿# AI-Pulse 日次バッチ: RSS 収集 + 関連カルテ fast 更新 + サイト再生成
-# Task Scheduler 登録: 毎日 7:00
+﻿# AI-Pulse 週次バッチ: 全エンティティのカルテ deep 更新 + サイト再生成
+# Task Scheduler 登録: 月曜 7:00 (毎日 7:00 の日次と同時刻で月曜のみ追加実行)
 #   プログラム: powershell.exe
 #   引数      : -NoProfile -ExecutionPolicy Bypass -File "<このファイルのフルパス>"
 #
-# .bat 版 (run_daily.bat) との差分:
+# .bat 版 (run_weekly.bat) との差分:
 #   - PS5.1 既定の CP932 文字化けを回避（UTF-8 で stdout/log を統一）
 #   - %DATE% パース不要（Get-Date で確定）
 #   - パス解決は $PSScriptRoot 相対（マルチバイトパスでも安定）
@@ -16,14 +16,14 @@ $AiPulse   = Split-Path -Parent $PSScriptRoot
 $PythonExe = Join-Path $AiPulse '.venv\Scripts\python.exe'
 $LogsDir   = Join-Path $AiPulse '_logs'
 $DateStr   = Get-Date -Format 'yyyyMMdd'
-$LogPath   = Join-Path $LogsDir "daily_$DateStr.log"
+$LogPath   = Join-Path $LogsDir "weekly_$DateStr.log"
 
 if (-not (Test-Path -LiteralPath $LogsDir)) {
     New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
 }
 
 $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次バッチ 開始" -Encoding UTF8
+Add-Content -LiteralPath $LogPath -Value "[$Stamp] 週次バッチ 開始" -Encoding UTF8
 
 # ===== ネット到達性待ち (再起動直後のネット未確立で RSS 収集が空振りするのを防ぐ) =====
 # 2026-06-11: Windows Update 自動再起動直後 (07:00 直前) にネット未確立のまま起動する
@@ -87,18 +87,18 @@ if ($Ollama) {
     if ($Ready) {
         Add-Content -LiteralPath $LogPath -Value "[$Stamp] Ollama 到達性 OK" -Encoding UTF8
     } else {
-        Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: Ollama 未到達だが日次本線は続行する" -Encoding UTF8
+        Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: Ollama 未到達だが週次本線は続行する" -Encoding UTF8
     }
 } else {
     $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: ollama.exe が PATH に無いが日次本線は続行する" -Encoding UTF8
+    Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: ollama.exe が PATH に無いが週次本線は続行する" -Encoding UTF8
 }
 
-& $PythonExe (Join-Path $AiPulse 'tools\run_daily.py') 2>&1 |
+& $PythonExe (Join-Path $AiPulse 'tools\run_weekly.py') 2>&1 |
     Out-File -LiteralPath $LogPath -Append -Encoding UTF8
 
 $ExitCode = $LASTEXITCODE
 $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次バッチ 終了 (exit $ExitCode)" -Encoding UTF8
+Add-Content -LiteralPath $LogPath -Value "[$Stamp] 週次バッチ 終了 (exit $ExitCode)" -Encoding UTF8
 
 exit $ExitCode

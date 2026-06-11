@@ -136,6 +136,31 @@ def _validate_history(d: dict, ctx: str) -> None:
         raise SchemaError(f"{ctx}: history は新しい順で記述し最新(now=true)を先頭に置く")
 
 
+def _validate_sub_history(d: dict, ctx: str) -> None:
+    """entity.sub_history があれば、サブモデル単位の履歴行として形を固定する。"""
+    groups = d.get("sub_history")
+    if groups in (None, []):
+        return
+    if not isinstance(groups, list):
+        raise SchemaError(f"{ctx}: sub_history は配列（実値 {type(groups).__name__}）")
+    for i, group in enumerate(groups):
+        gctx = f"{ctx}.sub_history[{i}]"
+        if not isinstance(group, dict):
+            raise SchemaError(f"{gctx}: dict ではない")
+        _require(group, ("model", "items"), gctx)
+        if not isinstance(group["items"], list) or not group["items"]:
+            raise SchemaError(f"{gctx}.items は非空配列")
+        for j, item in enumerate(group["items"]):
+            ictx = f"{gctx}.items[{j}]"
+            if not isinstance(item, dict):
+                raise SchemaError(f"{ictx}: dict ではない")
+            _require(item, HISTORY_ITEM_REQUIRED, ictx)
+            if "now" in item and not isinstance(item["now"], bool):
+                raise SchemaError(f"{ictx}: now は bool（実値 {item['now']!r}）")
+            if "url" in item and not (isinstance(item["url"], str) and item["url"].startswith("http")):
+                raise SchemaError(f"{ictx}: url は http(s) 文字列（実値 {item['url']!r}）")
+
+
 def _validate_comparison(d: dict, ctx: str) -> None:
     """entity.comparison（競合比較マトリクス）があれば形を検証する（任意項目）。
 
@@ -235,6 +260,7 @@ def validate_entity(d: dict) -> dict:
     _enum(d, "kind", KINDS, ctx)
     _enum(d, "offering", OFFERINGS, ctx)
     _validate_history(d, ctx)
+    _validate_sub_history(d, ctx)
     _validate_comparison(d, ctx)
     _validate_future(d, ctx)
     _validate_logo(d, ctx)

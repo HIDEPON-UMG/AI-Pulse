@@ -1,7 +1,7 @@
-"""日次バッチ: L2 RSS 収集 + 当日追加エンティティのカルテ fast 更新 + サイト再生成
+"""日次バッチ: L2 RSS 収集 + 当日追加エンティティの Ollama カルテ更新 + サイト再生成
 
 Task Scheduler から scripts/run_daily.ps1 経由で毎日 7:00 に実行。
-claude -p / SDK 不使用。NotebookLM CLI（fast モード）を直接呼び出す。
+claude -p / SDK / NotebookLM 不使用。Ollama で採用済み event からカルテを更新する。
 """
 from __future__ import annotations
 
@@ -16,32 +16,18 @@ import backfill_thumb  # noqa: E402
 import collect_rss  # noqa: E402
 import generate_pages  # noqa: E402
 import quality_audit  # noqa: E402
-import research_notebooklm as nb  # noqa: E402
+import research_ollama as carte  # noqa: E402
 import schema  # noqa: E402
 
 DATA = ROOT / "data"
-AUTH_REFRESH_ATTEMPTS = 3
-AUTH_RETRY_SECONDS = 20
 
 
-def _fast_update(entity: dict, *, auth_checked: bool = False) -> None:
-    """1 エンティティを fast モードで NotebookLM 収集 → carte_fields → apply_deepdive。"""
+def _fast_update(entity: dict, events: list[dict]) -> None:
+    """1 エンティティを Ollama でカルテ更新する。"""
     eid = entity["entity_id"]
     query = collect_rss.build_query(entity)
-    print(f"  カルテ更新 [{eid}] query={query!r}")
-    if not auth_checked:
-        nb.ensure_auth()
-    # ノートブック作成（fast: 通常 1〜3 分）
-    cp = nb._nb(["create", f"AI-Pulse daily {eid}"])
-    nb_id = nb._parse_notebook_id(cp.stdout)
-    nb._nb([
-        "source", "add-research", query,
-        "--mode", "fast", "--import-all", "--timeout", "300",
-        "-n", nb_id,
-    ])
-    # axis ごと ask → carte_fields → 永続化
-    fields = nb.build_carte_fields(entity, nb_id)
-    nb.apply_deepdive(eid, fields)
+    print(f"  カルテ更新 [{eid}] backend=ollama query={query!r}")
+    carte.update_entity(entity, events)
     print(f"    完了: {eid}")
 
 
@@ -68,49 +54,27 @@ def run_daily() -> None:
     except Exception as exc:
         print(f"品質監査失敗（本線継続）: {exc}", file=sys.stderr)
 
-    # Step 3: 当日更新エンティティのカルテ fast 更新
+    # Step 3: 当日更新エンティティのカルテ更新（Ollama）
     if not added_events:
         print("新着なし。カルテ更新をスキップします。")
     else:
         updated_eids = list({ev["entity_id"] for ev in added_events})
-        print(f"\n--- Step 3: カルテ fast 更新 ({len(updated_eids)} 件) ---")
-        try:
-            nb.ensure_auth(
-                allow_login=False,
-                refresh_attempts=AUTH_REFRESH_ATTEMPTS,
-                retry_seconds=AUTH_RETRY_SECONDS,
-            )
-        except Exception as exc:
-            print(
-                f"  NotebookLM 認証 preflight 失敗。カルテ fast 更新をスキップします: {exc}",
-                file=sys.stderr,
-            )
-            update_failures.extend(updated_eids)
-        else:
-            entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
-            by_id = {e["entity_id"]: e for e in entities}
-            for eid in updated_eids:
-                entity = by_id.get(eid)
-                if entity is None:
-                    continue
-                try:
-                    _fast_update(entity, auth_checked=True)
-                except Exception as exc:
-                    print(
-                        f"    カルテ更新失敗 ({eid})。NotebookLM 認証 refresh 後に 1 回だけ再試行します: {exc}",
-                        file=sys.stderr,
-                    )
-                    try:
-                        nb.ensure_auth(
-                            allow_login=False,
-                            refresh_attempts=AUTH_REFRESH_ATTEMPTS,
-                            retry_seconds=AUTH_RETRY_SECONDS,
-                        )
-                        _fast_update(entity, auth_checked=True)
-                    except Exception as retry_exc:
-                        print(f"    カルテ更新失敗 ({eid}): {retry_exc}", file=sys.stderr)
-                        update_failures.append(eid)
-                time.sleep(3)
+        print(f"\n--- Step 3: カルテ Ollama 更新 ({len(updated_eids)} 件) ---")
+        entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+        by_id = {e["entity_id"]: e for e in entities}
+        by_event_eid: dict[str, list[dict]] = {}
+        for ev in added_events:
+            by_event_eid.setdefault(ev["entity_id"], []).append(ev)
+        for eid in updated_eids:
+            entity = by_id.get(eid)
+            if entity is None:
+                continue
+            try:
+                _fast_update(entity, by_event_eid.get(eid, []))
+            except Exception as exc:
+                print(f"    カルテ更新失敗 ({eid}): {exc}", file=sys.stderr)
+                update_failures.append(eid)
+            time.sleep(3)
 
     # Step 4: サムネイル補完
     print("\n--- Step 4: サムネイル補完 ---")

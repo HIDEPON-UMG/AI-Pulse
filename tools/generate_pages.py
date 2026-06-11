@@ -343,6 +343,7 @@ def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> 
         "sources": sources,
         # 裏付けデータがある時だけ描画（無ければテンプレ側 {% if %} で非表示・捏造しない）
         "history": ent.get("history") or [],
+        "sub_history": ent.get("sub_history") or [],
         "comparison": comparison,
         "future": modules.get("future") or [],
         "overview": ent.get("overview") or None,

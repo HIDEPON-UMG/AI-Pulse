@@ -270,6 +270,32 @@ class TestGenerate(unittest.TestCase):
             **ctx5, page="karte", k=ctx5["kartes"][0])
         self.assertNotIn("<details", html5)
 
+    def test_sub_history_renders_collapsed_by_default(self):
+        """サブ・ヒストリーは初期状態で畳み、サブモデル単位の行で描画する。
+
+        なぜ重要か: 三大モデルのカルテでは、主表示はフロンティアモデルの系譜に限定する。
+        廉価/高速/派生モデルまで常時表示すると履歴の焦点がぼやけるため、展開操作でだけ読める
+        `details.sub-history` として固定する。
+        """
+        ent = {
+            "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
+            "offering": "commercial", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-02", "positioning": "p",
+            "history": [{"when": "2026.05", "title": "Frontier", "now": True}],
+            "sub_history": [{
+                "model": "X mini",
+                "items": [{"when": "2026.04", "title": "mini 更新", "note": "高速版"}],
+            }],
+        }
+        ctx = gp.build_context([ent], [])
+        html = gp.make_env().get_template("karte.html.j2").render(
+            **ctx, page="karte", k=ctx["kartes"][0])
+        self.assertIn('<details class="sub-history">', html)
+        self.assertNotIn('<details class="sub-history" open>', html)
+        self.assertIn("サブ・ヒストリー", html)
+        self.assertIn("X mini", html)
+        self.assertIn("mini 更新", html)
+
     def test_feed_source_link_update_badge_and_bullets(self):
         """フィードは本体クリックで出典記事へ飛び・カルテ更新は UPDATE バッジ・要約は箇条書き・
         3指標は判断根拠をツールチップで持つ。source_url が無ければカルテへ戻り要約は1文に戻る。

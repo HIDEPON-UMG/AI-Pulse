@@ -9,6 +9,7 @@ docs/specs/_verify_*.png
 site/
 scripts/*
 !scripts/run_daily.ps1
+!scripts/run_weekly.ps1
 !scripts/refresh_notebooklm_auth.ps1
 .env
 data/*.bak-*

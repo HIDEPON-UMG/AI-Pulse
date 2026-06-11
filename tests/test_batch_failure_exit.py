@@ -1,4 +1,4 @@
-"""日次・週次バッチの NotebookLM 失敗境界の契約テスト。"""
+"""日次・週次バッチのカルテ更新失敗境界の契約テスト。"""
 from __future__ import annotations
 
 import pytest
@@ -7,7 +7,7 @@ import tools.run_daily as run_daily
 import tools.run_weekly as run_weekly
 
 
-def test_run_daily_continues_after_notebooklm_failure(
+def test_run_daily_continues_after_ollama_carte_failure(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -21,11 +21,10 @@ def test_run_daily_continues_after_notebooklm_failure(
         "validate_store",
         lambda *_args: ([{"entity_id": "claude-opus"}], []),
     )
-    monkeypatch.setattr(run_daily.nb, "ensure_auth", lambda **_kwargs: None)
     monkeypatch.setattr(
         run_daily,
         "_fast_update",
-        lambda _entity, **_kwargs: (_ for _ in ()).throw(RuntimeError("auth expired")),
+        lambda _entity, _events: (_ for _ in ()).throw(RuntimeError("ollama down")),
     )
     monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: None)
@@ -38,7 +37,7 @@ def test_run_daily_continues_after_notebooklm_failure(
     assert "日次本線は完了" in captured.err
 
 
-def test_run_daily_skips_carte_update_when_auth_preflight_fails(
+def test_run_daily_updates_added_entities_with_ollama(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -48,12 +47,16 @@ def test_run_daily_skips_carte_update_when_auth_preflight_fails(
         lambda: {"added": [{"entity_id": "claude-opus"}, {"entity_id": "gemini"}]},
     )
     monkeypatch.setattr(
-        run_daily.nb,
-        "ensure_auth",
-        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("refresh failed")),
+        run_daily.schema,
+        "validate_store",
+        lambda *_args: ([{"entity_id": "claude-opus"}, {"entity_id": "gemini"}], []),
     )
-    calls: list[str] = []
-    monkeypatch.setattr(run_daily, "_fast_update", lambda _entity, **_kwargs: calls.append("fast"))
+    calls: list[tuple[str, list[dict]]] = []
+    monkeypatch.setattr(
+        run_daily,
+        "_fast_update",
+        lambda entity, events: calls.append((entity["entity_id"], events)),
+    )
     monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: None)
     monkeypatch.setattr(run_daily.generate_pages, "main", lambda: None)
@@ -61,12 +64,13 @@ def test_run_daily_skips_carte_update_when_auth_preflight_fails(
     run_daily.run_daily()
 
     captured = capsys.readouterr()
-    assert calls == []
-    assert "NotebookLM 認証 preflight 失敗" in captured.err
-    assert "カルテ更新失敗: 2 件" in captured.err
+    assert {eid for eid, _events in calls} == {"claude-opus", "gemini"}
+    assert all(events for _eid, events in calls)
+    assert "NotebookLM" not in captured.err
+    assert "カルテ更新失敗:" not in captured.err
 
 
-def test_run_daily_retries_carte_update_after_auth_refresh(
+def test_run_daily_does_not_call_notebooklm_auth_preflight(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -80,20 +84,7 @@ def test_run_daily_retries_carte_update_after_auth_refresh(
         "validate_store",
         lambda *_args: ([{"entity_id": "claude-opus"}], []),
     )
-    auth_calls: list[dict] = []
-
-    def fake_ensure_auth(**kwargs):
-        auth_calls.append(kwargs)
-
-    attempts = {"count": 0}
-
-    def fake_fast_update(_entity, **_kwargs):
-        attempts["count"] += 1
-        if attempts["count"] == 1:
-            raise RuntimeError("auth expired during create")
-
-    monkeypatch.setattr(run_daily.nb, "ensure_auth", fake_ensure_auth)
-    monkeypatch.setattr(run_daily, "_fast_update", fake_fast_update)
+    monkeypatch.setattr(run_daily, "_fast_update", lambda _entity, _events: None)
     monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: None)
     monkeypatch.setattr(run_daily.generate_pages, "main", lambda: None)
@@ -101,20 +92,18 @@ def test_run_daily_retries_carte_update_after_auth_refresh(
     run_daily.run_daily()
 
     captured = capsys.readouterr()
-    assert attempts["count"] == 2
-    assert len(auth_calls) == 2
-    assert all(call["allow_login"] is False for call in auth_calls)
-    assert "NotebookLM 認証 refresh 後に 1 回だけ再試行" in captured.err
+    assert "NotebookLM" not in captured.out
+    assert "NotebookLM" not in captured.err
     assert "カルテ更新失敗:" not in captured.err
 
 
-def test_run_weekly_raises_after_notebooklm_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_weekly_raises_after_ollama_carte_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         run_weekly.schema,
         "validate_store",
         lambda *_args: ([{"entity_id": "claude-opus"}], []),
     )
-    monkeypatch.setattr(run_weekly, "_deep_update", lambda _entity: (_ for _ in ()).throw(RuntimeError("auth expired")))
+    monkeypatch.setattr(run_weekly, "_deep_update", lambda _entity, _events: (_ for _ in ()).throw(RuntimeError("ollama down")))
     monkeypatch.setattr(run_weekly.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(run_weekly.generate_pages, "main", lambda: None)
 
