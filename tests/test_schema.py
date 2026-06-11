@@ -146,6 +146,26 @@ class TestSchemaContract(unittest.TestCase):
         ok = schema.validate_entity({**base, "modules": {"future": [{"label": "近", "title": "t", "note": "n"}]}})
         self.assertEqual(len(ok["modules"]["future"]), 1)
 
+    def test_confidence_counts_are_well_formed_when_present(self):
+        """裏取り率の 3 カウントは、部分欠落や型崩れを弾く。
+
+        なぜ重要か: confidence はカルテの「根拠充足」をパーセンテージ表示する入力。
+        asserted/speculated/unverified の一部だけを通すと、未確認件数や裏取り率が
+        空欄・過大表示になるため、任意フィールドでも存在するなら 3 キーを固定する。
+        """
+        base = {"entity_id": "e", "name": "E", "kind": "app", "domain": "x", "offering": "oss",
+                "vendor": "v", "category": "model", "snapshot_date": "2026-06-02", "positioning": "p"}
+        ok = schema.validate_entity({**base, "confidence": {"asserted": 1, "speculated": 2, "unverified": 3}})
+        self.assertEqual(ok["confidence"]["asserted"], 1)
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "confidence": {"asserted": 1, "speculated": 2}})
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "confidence": {"asserted": 1, "speculated": 2, "unverified": -1}})
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "confidence": {"asserted": 1, "speculated": "2", "unverified": 3}})
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_entity({**base, "confidence": {"asserted": True, "speculated": 2, "unverified": 3}})
+
     def test_event_extras_are_well_formed_when_present(self):
         """L2 デルタの拡張（出典URL・カルテ更新フラグ・要点・判断根拠）は、入れるなら形を固定する。
 

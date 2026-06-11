@@ -36,6 +36,41 @@ class TestGenerate(unittest.TestCase):
                 self.assertTrue(p.exists(), f"karte 欠落: {e['entity_id']}")
                 self.assertIn(e["name"], p.read_text(encoding="utf-8"))
 
+    def test_karte_confidence_renders_as_evidence_coverage(self):
+        """confidence は「確信度」ではなく、根拠充足の裏取り率として表示する。"""
+        ent = {
+            "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-08", "positioning": "p",
+            "confidence": {"asserted": 2, "speculated": 1, "unverified": 1},
+        }
+        ev = {
+            "event_id": "e1", "entity_id": "x", "date": "2026-06-08", "category": "model",
+            "event_type": "release", "headline": "見出し", "summary": "サマリ",
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ctx = gp.build_context([ent], [ev], build_date=dt.date(2026, 6, 8))
+        html = gp.make_env().get_template("karte.html.j2").render(**ctx, k=ctx["kartes"][0])
+        self.assertIn("裏取り率 50% ・ 未確認 1件", html)
+        self.assertIn("裏取り率 <span class=\"label\">evidence</span>", html)
+        self.assertIn("裏取り済 / VERIFIED", html)
+        self.assertNotIn("確信度", html)
+
+    def test_empty_confidence_renders_as_one_unverified_item(self):
+        """既存データ未 backfill でも、空の裏取り率を 0 件表示しない。"""
+        ent = {
+            "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-08", "positioning": "p",
+        }
+        ev = {
+            "event_id": "e1", "entity_id": "x", "date": "2026-06-08", "category": "model",
+            "event_type": "release", "headline": "見出し", "summary": "サマリ",
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ctx = gp.build_context([ent], [ev], build_date=dt.date(2026, 6, 8))
+        self.assertEqual(ctx["kartes"][0]["conf_counts"], {"asserted": 0, "speculated": 0, "unverified": 1})
+
     def test_feed_is_today_only_and_archive_lists_all(self):
         """ユーザー要件 2026-06-04: フィードは最新日付（ref date）の published のみ表示。
         過去分はアーカイブに譲ることでフィードの情報密度を上げる。

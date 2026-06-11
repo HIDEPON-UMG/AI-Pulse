@@ -32,6 +32,22 @@ def test_update_entity_merges_ollama_payload_without_dropping_existing_columns(
         "snapshot_date": "2026-06-01",
         "positioning": "Anthropic の最上位 LLM",
         "overview": "古い overview",
+        "history": [
+            {"when": "2026.05", "title": "公式更新", "url": "https://example.com/history"},
+            {"when": "2026.04", "title": "URLなし更新"},
+        ],
+        "sub_history": [
+            {
+                "model": "Claude Sonnet",
+                "items": [{"when": "2026.03", "title": "Sonnet URLなし"}],
+            }
+        ],
+        "modules": {
+            "future": [
+                {"label": "近", "title": "将来予測"},
+            ]
+        },
+        "confidence": {"asserted": 99, "speculated": 99, "unverified": 99},
         "comparison": {
             "cols": [
                 {
@@ -78,13 +94,27 @@ def test_update_entity_merges_ollama_payload_without_dropping_existing_columns(
         "importance": "high",
         "source": "Anthropic",
         "source_tier": "T1",
+        "source_url": "https://example.com/source",
     }
+    t3_event = {
+        **event,
+        "event_id": "e2",
+        "source": "Blog",
+        "source_tier": "T3",
+        "source_url": "https://example.com/blog",
+    }
+    no_url_event = {
+        **event,
+        "event_id": "e3",
+        "source_tier": "T2",
+    }
+    no_url_event.pop("source_url")
     _write_jsonl(entities_path, [entity])
-    _write_jsonl(events_path, [event])
+    _write_jsonl(events_path, [event, t3_event, no_url_event])
 
     def fake_generator(target: dict, recent_events: list[dict]) -> dict:
         assert target["entity_id"] == "claude-opus"
-        assert recent_events == [event]
+        assert recent_events == [event, t3_event, no_url_event]
         return {
             "overview": "Ollama が生成した新しい overview。既存イベントだけを根拠にした説明です。",
             "cells": {
@@ -99,13 +129,14 @@ def test_update_entity_merges_ollama_payload_without_dropping_existing_columns(
 
     updated = ro.update_entity(
         entity,
-        [event],
+        [event, t3_event, no_url_event],
         entities_path=entities_path,
         events_path=events_path,
         generator=fake_generator,
     )
 
     assert updated["overview"].startswith("Ollama が生成")
+    assert updated["confidence"] == {"asserted": 2, "speculated": 1, "unverified": 10}
     assert updated["logo"]["path"] == "assets/service-icons/claude-opus.png"
     cols = updated["comparison"]["cols"]
     assert cols[0]["name"] == "Claude Opus"
@@ -114,6 +145,20 @@ def test_update_entity_merges_ollama_payload_without_dropping_existing_columns(
     assert cols[1]["cells"]["strength"] == "競合強み"
     persisted = [json.loads(line) for line in entities_path.read_text(encoding="utf-8").splitlines()]
     assert persisted[0]["overview"] == updated["overview"]
+    assert persisted[0]["confidence"] == updated["confidence"]
+
+
+def test_recalculate_confidence_never_returns_empty_total() -> None:
+    entity = {
+        "entity_id": "x",
+        "category": "model",
+        "comparison": {"cols": [{"name": "x", "self": False, "cells": {}}]},
+    }
+    assert ro.recalculate_confidence(entity, []) == {
+        "asserted": 0,
+        "speculated": 0,
+        "unverified": 1,
+    }
 
 
 def test_update_entity_rejects_unknown_entity(tmp_path: Path) -> None:

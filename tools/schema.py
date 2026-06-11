@@ -31,6 +31,7 @@ EVENT_TYPES = {"release", "funding", "pricing", "ma", "shutdown", "incident", "b
 SOURCE_TIERS = {"T1", "T2", "T3"}  # T1 公式/一次, T2 一次報道, T3 二次/個人
 IMPORTANCE = {"high", "mid", "low"}
 LOGO_STATUSES = {"verified", "candidate", "missing"}
+CONFIDENCE_REQUIRED = ("asserted", "speculated", "unverified")
 
 # rationale 各値の最低文字数。prompt は 40〜80 字を要求しているが、安全側で 20 字以上を
 # 「文章として最低限の情報量」のハードゲートにする。これ以下は "high"/"mid"/"low" や
@@ -252,6 +253,20 @@ def _validate_logo(d: dict, ctx: str) -> None:
         raise SchemaError(f"{lctx}.license_note は非空文字列")
 
 
+def _validate_confidence(d: dict, ctx: str) -> None:
+    if "confidence" not in d:
+        return
+    conf = d["confidence"]
+    cctx = f"{ctx}.confidence"
+    if not isinstance(conf, dict):
+        raise SchemaError(f"{cctx} は object")
+    _require(conf, CONFIDENCE_REQUIRED, cctx)
+    for key in CONFIDENCE_REQUIRED:
+        value = conf[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise SchemaError(f"{cctx}.{key} は 0 以上の int（実値 {value!r}）")
+
+
 def validate_entity(d: dict) -> dict:
     """L1 カルテ 1 件を検証して返す。不正なら SchemaError。"""
     ctx = f"entity[{d.get('entity_id')}]"
@@ -264,6 +279,7 @@ def validate_entity(d: dict) -> dict:
     _validate_comparison(d, ctx)
     _validate_future(d, ctx)
     _validate_logo(d, ctx)
+    _validate_confidence(d, ctx)
     if "overview" in d and not (isinstance(d["overview"], str) and d["overview"]):
         raise SchemaError(f"{ctx}: overview は非空文字列")
     # search_query は collect_rss.build_query が最優先で参照する RSS 検索クエリの override。

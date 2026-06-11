@@ -40,9 +40,35 @@ def update_entity(
     source_events = sorted(source_events, key=lambda ev: ev.get("date", ""), reverse=True)
     payload = generator(target, source_events)
     _merge_payload(target, payload)
+    target["confidence"] = recalculate_confidence(target, source_events)
     schema.validate_entity(target)
     store.write_entities(entities_path, entities)
     return target
+
+
+def recalculate_confidence(entity: dict, source_events: list[dict]) -> dict:
+    """採用済み event と entity 内 URL から「裏取り率」用 confidence を再計算する。"""
+    asserted = 0
+    speculated = len((entity.get("modules") or {}).get("future") or [])
+    unverified = 0
+
+    for ev in source_events:
+        has_url = bool(ev.get("source_url"))
+        if ev.get("source_tier") in {"T1", "T2"} and has_url:
+            asserted += 1
+        else:
+            unverified += 1
+
+    for item in _iter_history_items(entity):
+        if item.get("url"):
+            asserted += 1
+        else:
+            unverified += 1
+
+    unverified += _self_comparison_cell_count(entity)
+    if asserted + speculated + unverified == 0:
+        unverified = 1
+    return {"asserted": asserted, "speculated": speculated, "unverified": unverified}
 
 
 def _merge_payload(entity: dict, payload: dict) -> None:
@@ -71,3 +97,20 @@ def _find_self_col(entity: dict, cols: list[dict]) -> dict | None:
         if col.get("self") is True or col.get("name") == entity.get("name"):
             return col
     return None
+
+
+def _iter_history_items(entity: dict):
+    for item in entity.get("history") or []:
+        yield item
+    for group in entity.get("sub_history") or []:
+        for item in group.get("items") or []:
+            yield item
+
+
+def _self_comparison_cell_count(entity: dict) -> int:
+    comparison = entity.get("comparison") or {}
+    self_col = _find_self_col(entity, list(comparison.get("cols") or []))
+    if not self_col:
+        return 0
+    cells = self_col.get("cells") or {}
+    return len(cells) if isinstance(cells, dict) else 0

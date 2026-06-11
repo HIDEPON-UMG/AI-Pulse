@@ -285,8 +285,12 @@ def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
 def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> dict:
     cat = ent["category"]
     conf = ent.get("confidence") or {}
-    total = sum(v for v in conf.values() if isinstance(v, int))
-    conf_pct = round(conf.get("asserted", 0) / total * 100) if total else 0
+    conf_counts = {key: conf.get(key, 0) for key in ("asserted", "speculated", "unverified")}
+    total = sum(v for v in conf_counts.values() if isinstance(v, int))
+    if total == 0:
+        conf_counts["unverified"] = 1
+        total = 1
+    conf_pct = round(conf_counts["asserted"] / total * 100) if total else 0
     rels = []
     for r in ent.get("relations") or []:
         cls, label, arr = REL_META.get(r.get("type"), REL_FALLBACK)
@@ -337,6 +341,7 @@ def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> 
         "domain_ja": DOMAIN_JA.get(ent["domain"], ent["domain"]),
         "offering_ja": OFFERING_JA.get(ent["offering"], ent["offering"]),
         "conf_pct": conf_pct,
+        "conf_counts": conf_counts,
         "competitors": ent.get("competitors") or [],
         "relations": rels,
         "rec_rows": rec_rows,
