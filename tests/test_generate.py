@@ -51,10 +51,28 @@ class TestGenerate(unittest.TestCase):
         }
         ctx = gp.build_context([ent], [ev], build_date=dt.date(2026, 6, 8))
         html = gp.make_env().get_template("karte.html.j2").render(**ctx, k=ctx["kartes"][0])
-        self.assertIn("裏取り率 50% ・ 未確認 1件", html)
+        self.assertIn("裏取り率 67% ・ 未確認 1件 ・ 予測 1件", html)
         self.assertIn("裏取り率 <span class=\"label\">evidence</span>", html)
         self.assertIn("裏取り済 / VERIFIED", html)
         self.assertNotIn("確信度", html)
+
+    def test_karte_evidence_coverage_excludes_speculated_from_denominator(self):
+        """将来予測は裏取り不能な欄なので、裏取り率の分母から外して別件数表示する。"""
+        ent = {
+            "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
+            "offering": "oss", "vendor": "V", "category": "model",
+            "snapshot_date": "2026-06-08", "positioning": "p",
+            "confidence": {"asserted": 9, "speculated": 99, "unverified": 1},
+        }
+        ev = {
+            "event_id": "e1", "entity_id": "x", "date": "2026-06-08", "category": "model",
+            "event_type": "release", "headline": "見出し", "summary": "サマリ",
+            "score": 90, "importance": "high", "source": "src", "source_tier": "T1",
+        }
+        ctx = gp.build_context([ent], [ev], build_date=dt.date(2026, 6, 8))
+        self.assertEqual(ctx["kartes"][0]["conf_pct"], 90)
+        html = gp.make_env().get_template("karte.html.j2").render(**ctx, k=ctx["kartes"][0])
+        self.assertIn("裏取り率 90% ・ 未確認 1件 ・ 予測 99件", html)
 
     def test_empty_confidence_renders_as_one_unverified_item(self):
         """既存データ未 backfill でも、空の裏取り率を 0 件表示しない。"""

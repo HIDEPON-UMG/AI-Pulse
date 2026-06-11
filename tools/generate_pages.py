@@ -286,11 +286,11 @@ def _karte(ent: dict, all_events: list[dict], ent_by_id: dict, ref: dt.date) -> 
     cat = ent["category"]
     conf = ent.get("confidence") or {}
     conf_counts = {key: conf.get(key, 0) for key in ("asserted", "speculated", "unverified")}
-    total = sum(v for v in conf_counts.values() if isinstance(v, int))
-    if total == 0:
+    evidence_total = conf_counts["asserted"] + conf_counts["unverified"]
+    if evidence_total == 0:
         conf_counts["unverified"] = 1
-        total = 1
-    conf_pct = round(conf_counts["asserted"] / total * 100) if total else 0
+        evidence_total = 1
+    conf_pct = round(conf_counts["asserted"] / evidence_total * 100)
     rels = []
     for r in ent.get("relations") or []:
         cls, label, arr = REL_META.get(r.get("type"), REL_FALLBACK)
