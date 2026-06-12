@@ -107,6 +107,8 @@ def test_existing_title_duplicate_is_skipped_before_fetch_and_llm(tmp_path, monk
             "publisher_name": "Example",
             "og_image": "",
             "text": "Fresh AI News reports that Claude Opus improved coding accuracy.",
+            "fetch_stage": "fetcher",
+            "fetch_attempts": [("urllib", 403, "blocked"), ("fetcher", 200, "ok")],
         }
 
     def fake_generate_event_extras(_body: str, meta: dict) -> dict:
@@ -140,3 +142,6 @@ def test_existing_title_duplicate_is_skipped_before_fetch_and_llm(tmp_path, monk
     assert len(result["added"]) == 1
     assert fetched_links == ["https://example.com/fresh"]
     assert llm_titles == ["Fresh AI News"]
+    assert result["fetch_stage_counts"] == {"fetcher": 1}
+    assert result["quality_audit_records"][0]["fetch_stage"] == "fetcher"
+    assert "fetch_stage" not in result["added"][0]

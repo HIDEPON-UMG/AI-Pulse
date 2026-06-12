@@ -19,6 +19,7 @@ from googlenewsdecoder import gnewsdecoder
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import config  # noqa: E402
+import fetch_escalation  # noqa: E402
 
 
 class ArticleFetchError(Exception):
@@ -41,7 +42,8 @@ def resolve(gnews_url: str, *, interval: int = 1) -> str:
     except Exception as exc:
         raise ArticleFetchError(f"decoder 例外: {type(exc).__name__}: {exc}") from exc
     if not decoded or not decoded.get("status"):
-        raise ArticleFetchError(f"decoder 失敗: {decoded.get('message', '?') if decoded else 'None'}")
+        message = decoded.get("message", "?") if decoded else "None"
+        raise ArticleFetchError(f"decoder 失敗: {message}")
     pub_url = decoded.get("decoded_url", "")
     if not pub_url or not pub_url.startswith("http"):
         raise ArticleFetchError(f"decoded_url 不正: {pub_url!r}")
@@ -51,16 +53,28 @@ def resolve(gnews_url: str, *, interval: int = 1) -> str:
 def extract(gnews_url: str) -> dict:
     """gnews_url → publisher URL 解決 → trafilatura 本文抽出 → meta 整形。
 
-    返り値: {"text": str, "publisher_url": str, "publisher_name": str, "og_image": str | None}
-    失敗時は ArticleFetchError。本文が config.MIN_BODY_CHARS 未満も例外で落とす（paywall / 404 対策）。
+    返り値: {"text": str, "publisher_url": str, "publisher_name": str, "og_image": str | None,
+             "fetch_stage": str, "fetch_attempts": list}
+    失敗時は ArticleFetchError。本文が config.MIN_BODY_CHARS 未満も例外で落とす。
     """
     publisher_url = resolve(gnews_url)
+    fetch_stage = "trafilatura"
+    fetch_attempts: list[tuple[str, int | None, str]] = []
     try:
         html = trafilatura.fetch_url(publisher_url)
     except Exception as exc:
-        raise ArticleFetchError(f"fetch_url 例外: {type(exc).__name__}: {exc}") from exc
+        html = None
+        fetch_attempts.append(("trafilatura", None, f"fetch_url 例外: {type(exc).__name__}: {exc}"))
     if not html:
-        raise ArticleFetchError(f"fetch_url 空応答: {publisher_url}")
+        if not fetch_attempts:
+            fetch_attempts.append(("trafilatura", None, "fetch_url 空応答"))
+        res = fetch_escalation.fetch_with_escalation(publisher_url)
+        fetch_stage = res.stage
+        fetch_attempts.extend(res.attempts)
+        html = res.html
+        if not res.ok or not html:
+            detail = res.error or "fetch_url 空応答"
+            raise ArticleFetchError(f"fetch_url 空応答: {publisher_url} ({detail})")
     try:
         text = trafilatura.extract(html, include_comments=False, include_tables=False)
     except Exception as exc:
@@ -90,6 +104,8 @@ def extract(gnews_url: str) -> dict:
         "publisher_url": publisher_url,
         "publisher_name": publisher_name,
         "og_image": og_image,
+        "fetch_stage": fetch_stage,
+        "fetch_attempts": fetch_attempts,
     }
 
 

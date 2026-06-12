@@ -15,6 +15,7 @@ Task Scheduler から run_daily.py 経由で毎日 7:00 に実行。
 from __future__ import annotations
 
 import html as _html
+from collections import Counter
 import re
 import sys
 import time
@@ -261,9 +262,13 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     返り値: store.ingest_events と同形式に、本配線で追加した skip カウンタを追記:
       {'added': [...], 'skipped_dup': int, 'skipped_score': int,
        'skipped_pre_dup': int, 'skipped_extract': int, 'skipped_llm': int,
-       'skipped_quant': int, 'skipped_validate': int, 'skipped_irrelevant': int}
+       'skipped_quant': int, 'skipped_validate': int, 'skipped_irrelevant': int,
+       'fetch_stage_counts': dict[str, int]}
     """
-    entities, existing_events = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+    entities, existing_events = schema.validate_store(
+        DATA / "entities.jsonl",
+        DATA / "events.jsonl",
+    )
     targets = {e["entity_id"]: e for e in entities}
     if entity_subset:
         targets = {eid: e for eid, e in targets.items() if eid in entity_subset}
@@ -280,6 +285,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     skipped_quant = 0
     skipped_validate = 0
     skipped_irrelevant = 0
+    fetch_stage_counts: Counter[str] = Counter()
     audit_records_by_event_id: dict[str, dict] = {}
     known_ids = set(targets) | {e["entity_id"] for e in entities}
     for entity_id, entity in targets.items():
@@ -289,7 +295,10 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
         for i, item in enumerate(items, 1):
             if _title_key(entity_id, item.get("title", "")) in existing_title_keys:
                 skipped_pre_dup += 1
-                print(f"    skip-predup ({entity_id}/{i}): 既存 headline と同一 title", file=sys.stderr)
+                print(
+                    f"    skip-predup ({entity_id}/{i}): 既存 headline と同一 title",
+                    file=sys.stderr,
+                )
                 continue
             try:
                 article = fetch_article.extract(item["link"])
@@ -297,6 +306,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 skipped_extract += 1
                 print(f"    skip-extract ({entity_id}/{i}): {exc}", file=sys.stderr)
                 continue
+            fetch_stage_counts[article.get("fetch_stage") or "unknown"] += 1
             # 本文を MAX_BODY_CHARS で頭から打切り（追補10: 5000 字までは抽出品質安定）
             article_body = (article["text"] or "")[: config.MAX_BODY_CHARS]
             try:
@@ -305,10 +315,10 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 skipped_llm += 1
                 print(f"    skip-llm ({entity_id}/{i}): {exc}", file=sys.stderr)
                 continue
-            # 関連性ゲート（2026-06-07）: 同名異義 (Runway=空港の滑走路/ファッション 等) や entity が
-            # 主題でない記事を event 化前に弾く。2026-06-06 の search_query 絞り込み (入力側) で取りこぼす
-            # Google News の緩いマッチを、抽出スキーマの is_relevant で出力側からも封じる二段構え。
-            # is_relevant=false が明示された時だけ skip し、欠落時は従来通り採用（後方互換・安全側）。
+            # 関連性ゲート（2026-06-07）: 同名異義や entity が主題でない記事を
+            # event 化前に弾く。入力側の検索絞り込みで取りこぼす Google News の
+            # 緩いマッチを、抽出スキーマの is_relevant で出力側からも封じる。
+            # is_relevant=false が明示された時だけ skip し、欠落時は従来通り採用する。
             if not extras.get("is_relevant", True):
                 skipped_irrelevant += 1
                 reason = extras.get("relevance_reason") or "(理由なし)"
@@ -368,9 +378,9 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
                 print(f"    skip-validate ({entity_id}/{i}): {exc}", file=sys.stderr)
                 continue
             candidates.append(ev)
-            audit_records_by_event_id[ev["event_id"]] = quality_audit.build_audit_record(
-                ev, article_body
-            )
+            audit_record = quality_audit.build_audit_record(ev, article_body)
+            audit_record["fetch_stage"] = article.get("fetch_stage") or "unknown"
+            audit_records_by_event_id[ev["event_id"]] = audit_record
         time.sleep(1.0)  # Google RSS rate limit 対策
 
     result = store.ingest_events(
@@ -384,6 +394,7 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     result["skipped_quant"] = skipped_quant
     result["skipped_validate"] = skipped_validate
     result["skipped_irrelevant"] = skipped_irrelevant
+    result["fetch_stage_counts"] = dict(fetch_stage_counts)
     result["quality_audit_records"] = [
         audit_records_by_event_id[ev["event_id"]]
         for ev in result["added"]
@@ -391,9 +402,11 @@ def collect_entities(entity_subset: list[str] | None = None) -> dict:
     ]
     print(
         f"RSS+ハイブリッド LLM 収集完了: 採用 {len(result['added'])} 件 / "
-        f"pre重複 {skipped_pre_dup} / 重複 {result['skipped_dup']} / 閾値 {result['skipped_score']} / "
+        f"pre重複 {skipped_pre_dup} / 重複 {result['skipped_dup']} / "
+        f"閾値 {result['skipped_score']} / "
         f"本文NG {skipped_extract} / LLM失敗 {skipped_llm} / 数値NG {skipped_quant} / "
-        f"無関係 {skipped_irrelevant} / schema違反 {skipped_validate}"
+        f"無関係 {skipped_irrelevant} / schema違反 {skipped_validate} / "
+        f"取得段 {dict(fetch_stage_counts)}"
     )
     return result
 

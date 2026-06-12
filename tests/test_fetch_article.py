@@ -54,9 +54,44 @@ class TestFetchArticleContract(unittest.TestCase):
                           return_value={"status": True, "decoded_url": publisher}):
             # trafilatura.fetch_url が空応答を返すケース
             with patch.object(fetch_article.trafilatura, "fetch_url", return_value=""):
-                with self.assertRaises(fetch_article.ArticleFetchError) as ctx:
-                    fetch_article.extract(gnews_url)
+                with patch.object(fetch_article.fetch_escalation, "fetch_with_escalation",
+                                  return_value=fetch_article.fetch_escalation.FetchResult(
+                                      url=publisher, stage="fetcher", ok=False, error="empty")):
+                    with self.assertRaises(fetch_article.ArticleFetchError) as ctx:
+                        fetch_article.extract(gnews_url)
                 self.assertIn("fetch_url 空応答", str(ctx.exception))
+
+            # trafilatura.fetch_url が空応答でも昇格取得の HTML が十分なら通る
+            long_text = "本文" * (config.MIN_BODY_CHARS)
+            rescued = fetch_article.fetch_escalation.FetchResult(
+                url=publisher,
+                status=200,
+                html="<html>rescued</html>",
+                stage="fetcher",
+                ok=True,
+                attempts=[("urllib", 403, "blocked"), ("fetcher", 200, "ok")],
+            )
+            with patch.object(fetch_article.trafilatura, "fetch_url", return_value=""):
+                with patch.object(fetch_article.fetch_escalation, "fetch_with_escalation",
+                                  return_value=rescued):
+                    with patch.object(fetch_article.trafilatura, "extract", return_value=long_text):
+                        with patch.object(fetch_article.trafilatura, "extract_metadata", return_value=None):
+                            result = fetch_article.extract(gnews_url)
+            self.assertEqual(result["fetch_stage"], "fetcher")
+            self.assertEqual(result["fetch_attempts"][0][0], "trafilatura")
+            self.assertEqual(result["fetch_attempts"][1:], rescued.attempts)
+            self.assertTrue(result["text"].startswith("本文"))
+
+            # 昇格取得できても本文が短ければ採用しない
+            with patch.object(fetch_article.trafilatura, "fetch_url", return_value=""):
+                with patch.object(fetch_article.fetch_escalation, "fetch_with_escalation",
+                                  return_value=rescued):
+                    with patch.object(fetch_article.trafilatura, "extract",
+                                      return_value="x" * (config.MIN_BODY_CHARS - 1)):
+                        with patch.object(fetch_article.trafilatura, "extract_metadata", return_value=None):
+                            with self.assertRaises(fetch_article.ArticleFetchError) as ctx:
+                                fetch_article.extract(gnews_url)
+            self.assertIn("本文短文", str(ctx.exception))
 
             # trafilatura.extract が短文を返すケース（MIN_BODY_CHARS 未満）
             short_text = "x" * (config.MIN_BODY_CHARS - 1)
@@ -75,6 +110,7 @@ class TestFetchArticleContract(unittest.TestCase):
                         result = fetch_article.extract(gnews_url)
             self.assertEqual(result["publisher_url"], publisher)
             self.assertTrue(result["text"].startswith("本文"))
+            self.assertEqual(result["fetch_stage"], "trafilatura")
             # MAX_BODY_CHARS 超過は頭打ちされる
             self.assertLessEqual(len(result["text"]), config.MAX_BODY_CHARS)
 

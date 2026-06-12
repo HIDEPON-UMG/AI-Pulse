@@ -9,6 +9,7 @@ dependencies = [
     "google-genai>=1.0",          # Gemini API SDK (response_schema JSON mode)
     "trafilatura>=2.0",           # 本文抽出
     "googlenewsdecoder>=0.1",     # GNews redirect → publisher URL（urllib では解決不可と実機確認）
+    "scrapling[fetchers]==0.4.9",  # blocked 時の本文 HTML 取得昇格（Fetcher -> StealthyFetcher）
     "python-dotenv>=1.0",         # .env から GEMINI_API_KEY を読む
     "Pillow>=10",                 # entity logo の PNG 正規化・破損検証
 ]
