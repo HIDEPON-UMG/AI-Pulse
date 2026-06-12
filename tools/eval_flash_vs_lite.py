@@ -132,10 +132,10 @@ def main() -> int:
         print(f"  本文 {len(text)} 文字 取得")
         meta = build_meta_from_event(ev)
 
-        print(f"  → flash 呼び出し中...")
+        print("  → flash 呼び出し中...")
         out_flash = call_with_model(text, meta, "gemini-2.5-flash")
         time.sleep(2.0)
-        print(f"  → flash-lite 呼び出し中...")
+        print("  → flash-lite 呼び出し中...")
         out_lite = call_with_model(text, meta, "gemini-2.5-flash-lite")
         time.sleep(2.0)
 
@@ -144,29 +144,29 @@ def main() -> int:
         lines.append(f"- **category / event_type (flash)**: {ev['category']} / {ev['event_type']}")
         lines.append(f"- **本文文字数（再取得時点）**: {len(text)}\n")
 
-        lines.append(f"#### flash 出力\n")
+        lines.append("#### flash 出力\n")
         if isinstance(out_flash, str):
             lines.append(f"```\n{out_flash}\n```\n")
         else:
             lines.append(f"- **score / importance / event_type**: {out_flash.get('score')} / "
                          f"{out_flash.get('importance')} / {out_flash.get('event_type')}")
             lines.append(f"- **summary**: {out_flash.get('summary', '')}")
-            lines.append(f"- **summary_points**:")
+            lines.append("- **summary_points**:")
             lines.append(fmt(out_flash, "summary_points"))
-            lines.append(f"- **rationale**:")
+            lines.append("- **rationale**:")
             lines.append(fmt(out_flash, "rationale"))
             lines.append("")
 
-        lines.append(f"#### flash-lite 出力\n")
+        lines.append("#### flash-lite 出力\n")
         if isinstance(out_lite, str):
             lines.append(f"```\n{out_lite}\n```\n")
         else:
             lines.append(f"- **score / importance / event_type**: {out_lite.get('score')} / "
                          f"{out_lite.get('importance')} / {out_lite.get('event_type')}")
             lines.append(f"- **summary**: {out_lite.get('summary', '')}")
-            lines.append(f"- **summary_points**:")
+            lines.append("- **summary_points**:")
             lines.append(fmt(out_lite, "summary_points"))
-            lines.append(f"- **rationale**:")
+            lines.append("- **rationale**:")
             lines.append(fmt(out_lite, "rationale"))
             lines.append("")
 

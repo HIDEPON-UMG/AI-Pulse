@@ -17,7 +17,6 @@
 """
 from __future__ import annotations
 
-import copy
 import json
 import sys
 import time
@@ -32,7 +31,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import config  # noqa: E402
 import fetch_article  # noqa: E402
-import schema  # noqa: E402
 import llm_gemini  # noqa: E402
 import llm_local  # noqa: E402
 from eval_flash_vs_lite import build_meta_from_event  # noqa: E402

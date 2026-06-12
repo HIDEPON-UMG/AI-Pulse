@@ -23,11 +23,13 @@ from __future__ import annotations
 
 import os
 import socket
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+# conftest.py が ROOT を sys.path に追加済みなので tools.* を直接 import できる
+from tools._proc.run import quiet_run
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -58,15 +60,9 @@ def test_recent_store_urls_are_alive():
     モジュールを通すので、本テストが通れば push gate も通る (二重ガードのうち先発)。
     """
     cmd = [sys.executable, "-m", "tools.audit_urls", "--gate"]
-    result = subprocess.run(
-        cmd,
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=180,
-    )
+    # subprocess 直呼びは banned-api。境界モジュール quiet_run に寄せる
+    # （check=False で非 0 を CalledProcessError 化させず returncode を assert する）。
+    result = quiet_run(cmd, cwd=str(ROOT), timeout=180, check=False)
     assert result.returncode == 0, (
         "直近 14 日の entities.jsonl / events.jsonl に死リンクあり (捏造または恒久 404)。\n"
         f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}"

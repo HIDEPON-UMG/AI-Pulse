@@ -120,7 +120,8 @@ def _verify_one(ref: UrlRef, *, timeout: float) -> UrlVerdict:
 
     # 1 段目: HEAD ChromeWin
     s1, d1 = _probe(ref.url, method="HEAD", timeout=timeout, range_header=False, ua=_UAS[0])
-    statuses.append(s1); details.append(d1)
+    statuses.append(s1)
+    details.append(d1)
     if s1 is not None and 200 <= s1 < 400:
         return UrlVerdict(ref, s1, True, d1)
     if s1 in (404, 410):
@@ -132,7 +133,8 @@ def _verify_one(ref: UrlRef, *, timeout: float) -> UrlVerdict:
 
     # 2 段目: GET range ChromeWin (HEAD 拒否のみ防御している鯖を剥がす)
     s2, d2 = _probe(ref.url, method="GET", timeout=timeout, range_header=True, ua=_UAS[0])
-    statuses.append(s2); details.append(d2)
+    statuses.append(s2)
+    details.append(d2)
     if s2 is not None and 200 <= s2 < 400:
         return UrlVerdict(ref, s2, True, f"{d1} → {d2} (HEAD 拒否)")
     if s2 in (404, 410):
@@ -140,7 +142,8 @@ def _verify_one(ref: UrlRef, *, timeout: float) -> UrlVerdict:
 
     # 3 段目: GET range SafariMac (Chrome UA 拒否の Apache 系を剥がす)
     s3, d3 = _probe(ref.url, method="GET", timeout=timeout, range_header=True, ua=_UAS[1])
-    statuses.append(s3); details.append(d3)
+    statuses.append(s3)
+    details.append(d3)
     if s3 is not None and 200 <= s3 < 400:
         return UrlVerdict(ref, s3, True, f"{d1} → {d2} → {d3} (Safari UA 必須)")
     if s3 in (404, 410):

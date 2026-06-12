@@ -142,7 +142,6 @@ def _auto_rationale(ev: dict) -> dict:
     """rationale が無い RSS イベント向けにスコア・重要度・波及から簡易根拠テキストを生成する。"""
     imp = _level(ev.get("importance", "low"))
     n_ripple = len(ev.get("ripple") or [])
-    imp_label = {"高": "high", "中": "mid", "低": "low"}.get(imp, "low")
     return {
         "importance": f"スコア{ev['score']}・{imp}水準の報道（{ev.get('source','不明')}）",
         "impact": f"波及先{n_ripple}件 → {'高' if n_ripple >= 2 else '中' if n_ripple == 1 else '低'}水準",
