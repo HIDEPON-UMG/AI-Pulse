@@ -21,6 +21,7 @@ from markupsafe import Markup, escape
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # tools/ を import path に載せる
 import config  # noqa: E402
+import collect_repo_radar  # noqa: E402
 import schema  # noqa: E402
 
 TEMPLATES_DIR = ROOT / "templates"
@@ -454,6 +455,15 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
                 "glyph": CAT_META[cat]["glyph"], "cards": cards,
             })
 
+    repo_radar = collect_repo_radar.load_public_rows()
+    repo_radar_latest = repo_radar[0]["date"] if repo_radar else None
+    repo_radar_sources = sorted({
+        str(sig.get("source") or "")
+        for row in repo_radar
+        for sig in (row.get("signals") or [])
+        if sig.get("source")
+    })
+
     return {
         "feed": feed, "feed_count": len(feed),
         "feed_total_published": len(feed_events),  # 当日以外も含む全 published（参考表示）
@@ -461,6 +471,10 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         "kartes": [_karte(ent, all_events, ent_by_id, ref) for ent in entities],
         "karte_index_groups": karte_index_groups,
         "karte_total": len(entities),
+        "repo_radar": repo_radar,
+        "repo_radar_count": len(repo_radar),
+        "repo_radar_latest": repo_radar_latest,
+        "repo_radar_sources": repo_radar_sources,
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),
         "site_url": config.SITE_URL,  # OGP 絶対 URL の組立に使う（_head.html.j2）
@@ -550,6 +564,11 @@ def generate(out_dir: Path = OUT_DIR) -> dict:
         encoding="utf-8",
     )
     pages.append("karte-index.html")
+    (out_dir / "repo-radar.html").write_text(
+        env.get_template("repo-radar.html.j2").render(**ctx, page="repo_radar"),
+        encoding="utf-8",
+    )
+    pages.append("repo-radar.html")
     karte_tpl = env.get_template("karte.html.j2")
     for k in ctx["kartes"]:
         name = f"karte-{k['id']}.html"

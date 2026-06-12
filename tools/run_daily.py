@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import backfill_thumb  # noqa: E402
+import collect_repo_radar  # noqa: E402
 import collect_rss  # noqa: E402
 import generate_pages  # noqa: E402
 import quality_audit  # noqa: E402
@@ -54,12 +55,28 @@ def run_daily() -> None:
     except Exception as exc:
         print(f"品質監査失敗（本線継続）: {exc}", file=sys.stderr)
 
-    # Step 3: 当日更新エンティティのカルテ更新（Ollama）
+    # Step 3: Repo Radar（観測レイヤーなので失敗しても本線は止めない）
+    print("\n--- Step 3: Repo Radar ---")
+    try:
+        radar_stats = collect_repo_radar.collect()
+        print(
+            "Repo Radar 完了: "
+            f"candidates {radar_stats['candidates']} / "
+            f"enriched {radar_stats['enriched']} / "
+            f"evaluated {radar_stats['evaluated']} / "
+            f"skipped {radar_stats['skipped']} / "
+            f"degraded {radar_stats['degraded']} / "
+            f"ollama_errors {radar_stats['ollama_errors']}"
+        )
+    except Exception as exc:
+        print(f"Repo Radar 失敗（本線継続）: {exc}", file=sys.stderr)
+
+    # Step 4: 当日更新エンティティのカルテ更新（Ollama）
     if not added_events:
         print("新着なし。カルテ更新をスキップします。")
     else:
         updated_eids = list({ev["entity_id"] for ev in added_events})
-        print(f"\n--- Step 3: カルテ Ollama 更新 ({len(updated_eids)} 件) ---")
+        print(f"\n--- Step 4: カルテ Ollama 更新 ({len(updated_eids)} 件) ---")
         entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
         by_id = {e["entity_id"]: e for e in entities}
         by_event_eid: dict[str, list[dict]] = {}
@@ -76,12 +93,12 @@ def run_daily() -> None:
                 update_failures.append(eid)
             time.sleep(3)
 
-    # Step 4: サムネイル補完
-    print("\n--- Step 4: サムネイル補完 ---")
+    # Step 5: サムネイル補完
+    print("\n--- Step 5: サムネイル補完 ---")
     backfill_thumb.backfill()
 
-    # Step 5: サイト再生成
-    print("\n--- Step 5: サイト再生成 ---")
+    # Step 6: サイト再生成
+    print("\n--- Step 6: サイト再生成 ---")
     generate_pages.main()
     if update_failures:
         print(

@@ -158,6 +158,49 @@ class TestGenerate(unittest.TestCase):
             self.assertIn("ki-card", html)
             self.assertIn("ki-group", html)
 
+    def test_repo_radar_page_is_built_and_anonymized(self):
+        """Repo Radar ページは公開 JSONL だけを描画し、IdeaStash の具体情報を出さない。"""
+        row = {
+            "date": "2026-06-13",
+            "repo": "acme/useful-repo",
+            "repo_url": "https://github.com/acme/useful-repo",
+            "name": "useful-repo",
+            "description": "Useful repo",
+            "homepage": "",
+            "language": "Python",
+            "license": "MIT",
+            "topics": ["ai"],
+            "stars": 100,
+            "forks": 5,
+            "open_issues": 1,
+            "pushed_at": "2026-06-13T00:00:00Z",
+            "latest_release": None,
+            "signals": [{"source": "hn", "title": "Show HN", "url": "u"}],
+            "score": 88,
+            "summary": "AI 開発の補助ツールです。",
+            "developer_use_case": "実装前調査に使えます。",
+            "implementation_difficulty": "easy: Python だけで試せます。",
+            "pricing_or_license": "MIT",
+            "ai_pulse_fit": ["収集基盤"],
+            "ideastash_fit_public": ["UI/UX 改善"],
+            "risk_notes": ["保守状況を確認してください"],
+            "status": "evaluated",
+        }
+        original = gp.collect_repo_radar.load_public_rows
+        gp.collect_repo_radar.load_public_rows = lambda: [row]
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                r = gp.generate(Path(d))
+                self.assertIn("repo-radar.html", r["pages"])
+                html = (Path(d) / "repo-radar.html").read_text(encoding="utf-8")
+        finally:
+            gp.collect_repo_radar.load_public_rows = original
+        self.assertIn("acme/useful-repo", html)
+        self.assertIn("UI/UX 改善", html)
+        self.assertNotIn("SecretTask-mobile-copy-2026-06-01.md", html)
+        self.assertNotIn("スマホのコピーボタン修正", html)
+        self.assertNotIn(r"C:\Users\hidek\Obsidian", html)
+
     def test_karte_index_has_feed_and_karte_update_badges(self):
         """ユーザー要件 2026-06-04:「何が更新されたか」を一目で示すため、
         カルテ一覧の各カードは『📰 フィード』(events 最新) と『📋 カルテ』(entity.snapshot_date)

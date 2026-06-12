@@ -7,6 +7,19 @@ import tools.run_daily as run_daily
 import tools.run_weekly as run_weekly
 
 
+@pytest.fixture(autouse=True)
+def _no_repo_radar_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """既存の日次バッチテストでは Repo Radar の外部 API 呼び出しを止める。"""
+    monkeypatch.setattr(run_daily.collect_repo_radar, "collect", lambda: {
+        "candidates": 0,
+        "enriched": 0,
+        "evaluated": 0,
+        "skipped": 0,
+        "degraded": 0,
+        "ollama_errors": 0,
+    })
+
+
 def test_run_daily_continues_after_ollama_carte_failure(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -95,6 +108,43 @@ def test_run_daily_does_not_call_notebooklm_auth_preflight(
     assert "NotebookLM" not in captured.out
     assert "NotebookLM" not in captured.err
     assert "カルテ更新失敗:" not in captured.err
+
+
+def test_run_daily_continues_after_repo_radar_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        run_daily.collect_rss,
+        "collect_entities",
+        lambda: {"added": [{"entity_id": "demo"}], "quality_audit_records": []},
+    )
+    monkeypatch.setattr(run_daily.quality_audit, "audit_records", lambda _records: {
+        "audited": 0,
+        "ok": 0,
+        "warn": 0,
+        "fail": 0,
+        "errors": 0,
+        "term_candidates": 0,
+    })
+    monkeypatch.setattr(
+        run_daily.collect_repo_radar,
+        "collect",
+        lambda: (_ for _ in ()).throw(RuntimeError("repo radar down")),
+    )
+    monkeypatch.setattr(
+        run_daily.schema,
+        "validate_store",
+        lambda *_args: ([{"entity_id": "demo"}], []),
+    )
+    monkeypatch.setattr(run_daily, "_fast_update", lambda _entity, _events: calls.append("carte"))
+    monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: calls.append("thumb"))
+    monkeypatch.setattr(run_daily.generate_pages, "main", lambda: calls.append("pages"))
+
+    run_daily.run_daily()
+
+    assert calls == ["carte", "thumb", "pages"]
 
 
 def test_run_weekly_raises_after_ollama_carte_failure(monkeypatch: pytest.MonkeyPatch) -> None:

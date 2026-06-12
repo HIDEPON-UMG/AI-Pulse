@@ -30,6 +30,14 @@ def test_run_daily_calls_quality_audit_before_carte_update(monkeypatch):
         "validate_store",
         lambda _entities, _events: ([{"entity_id": "demo"}], []),
     )
+    monkeypatch.setattr(run_daily.collect_repo_radar, "collect", lambda: {
+        "candidates": 0,
+        "enriched": 0,
+        "evaluated": 0,
+        "skipped": 0,
+        "degraded": 0,
+        "ollama_errors": 0,
+    })
     monkeypatch.setattr(run_daily, "_fast_update", lambda entity, events: calls.append("carte"))
     monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: calls.append("thumb"))
