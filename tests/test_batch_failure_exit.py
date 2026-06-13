@@ -18,6 +18,7 @@ def _no_repo_radar_network(monkeypatch: pytest.MonkeyPatch) -> None:
         "degraded": 0,
         "ollama_errors": 0,
     })
+    monkeypatch.setattr(run_daily, "_export_repo_radar_obsidian", lambda: None)
 
 
 def test_run_daily_continues_after_ollama_carte_failure(

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 import time
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,7 @@ import collect_repo_radar  # noqa: E402
 import collect_rss  # noqa: E402
 import generate_pages  # noqa: E402
 import quality_audit  # noqa: E402
+import repo_radar_obsidian  # noqa: E402
 import research_ollama as carte  # noqa: E402
 import schema  # noqa: E402
 from _proc.run import quiet_run  # noqa: E402
@@ -25,6 +27,7 @@ DATA = ROOT / "data"
 PROJECT_FOLDERS = ROOT.parent
 POWERSHELL_EXE = "powershell.exe"
 TWITTER_RSS_RUNNER = PROJECT_FOLDERS / "twitter-rss" / "scripts" / "run_repo_radar_rss.ps1"
+IDEASTASH_VAULT = Path(os.environ.get("IDEASTASH_VAULT", Path.home() / "Obsidian" / "IdeaStash"))
 
 
 def _fast_update(entity: dict, events: list[dict]) -> None:
@@ -61,6 +64,51 @@ def _run_repo_radar_x_rss() -> None:
         print(f"WARN: Repo Radar X RSS 生成失敗 (exit {cp.returncode}) だが日次本線は続行する")
     else:
         print("Repo Radar X RSS 生成 完了")
+
+
+def _export_repo_radar_obsidian() -> None:
+    """Repo Radar 公開データを IdeaStash の Obsidian ノートへ同期する。"""
+    vault = IDEASTASH_VAULT
+    if not vault.exists():
+        print(f"WARN: IdeaStash vault が見つからないため Repo Radar Obsidian 同期をスキップ: {vault}")
+        return
+    stats = repo_radar_obsidian.export_notes(
+        collect_repo_radar.REPO_RADAR_PATH,
+        vault / "repo-radar",
+    )
+    print(
+        "Repo Radar Obsidian 同期: "
+        f"written {stats['written']} / skipped {stats['skipped']}"
+    )
+    if stats["written"] <= 0:
+        return
+    if not (vault / ".git").exists():
+        print("WARN: IdeaStash vault が git repo ではないため push をスキップ")
+        return
+    add = quiet_run(["git", "-C", str(vault), "add", "repo-radar"], timeout=60, check=False)
+    if add.returncode != 0:
+        print(f"WARN: IdeaStash repo-radar git add 失敗: {add.stderr}", file=sys.stderr)
+        return
+    diff = quiet_run(
+        ["git", "-C", str(vault), "diff", "--cached", "--quiet", "--", "repo-radar"],
+        timeout=60,
+        check=False,
+    )
+    if diff.returncode == 0:
+        return
+    commit = quiet_run(
+        ["git", "-C", str(vault), "commit", "-m", "sync: Repo Radar Obsidian notes [AI-Pulse]"],
+        timeout=120,
+        check=False,
+    )
+    if commit.returncode != 0:
+        print(f"WARN: IdeaStash repo-radar commit 失敗: {commit.stderr}", file=sys.stderr)
+        return
+    push = quiet_run(["git", "-C", str(vault), "push"], timeout=180, check=False)
+    if push.returncode != 0:
+        print(f"WARN: IdeaStash repo-radar push 失敗: {push.stderr}", file=sys.stderr)
+        return
+    print("Repo Radar Obsidian GitHub 同期 完了")
 
 
 def run_daily() -> None:
@@ -122,6 +170,7 @@ def run_daily() -> None:
             f"degraded {radar_stats['degraded']} / "
             f"ollama_errors {radar_stats['ollama_errors']}"
         )
+        _export_repo_radar_obsidian()
     except Exception as exc:
         print(f"Repo Radar 失敗（本線継続）: {exc}", file=sys.stderr)
 

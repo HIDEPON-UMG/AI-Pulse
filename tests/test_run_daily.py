@@ -43,6 +43,8 @@ class TestRunDailyOrder(unittest.TestCase):
                                   "candidates": 0, "enriched": 0, "evaluated": 0,
                                   "skipped": 0, "degraded": 0, "ollama_errors": 0,
                               }),
+            mock.patch.object(daily, "_export_repo_radar_obsidian",
+                              side_effect=lambda: order.append("obsidian")),
             mock.patch.object(daily.backfill_thumb, "backfill",
                               side_effect=lambda: order.append("thumb")),
             mock.patch.object(daily.generate_pages, "main",
@@ -53,6 +55,8 @@ class TestRunDailyOrder(unittest.TestCase):
 
         self.assertLess(order.index("karte"), order.index("x_rss"))
         self.assertLess(order.index("x_rss"), order.index("repo_radar"))
+        self.assertLess(order.index("repo_radar"), order.index("obsidian"))
+        self.assertLess(order.index("obsidian"), order.index("thumb"))
         self.assertEqual(order[-2:], ["thumb", "generate"])
 
 
