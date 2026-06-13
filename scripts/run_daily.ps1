@@ -94,26 +94,6 @@ if ($Ollama) {
     Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: ollama.exe が PATH に無いが日次本線は続行する" -Encoding UTF8
 }
 
-# ===== Repo Radar X RSS 生成 (Docker Desktop は必要時だけ起動し、起動した場合は終了する) =====
-$ProjectFolders = Split-Path -Parent $AiPulse
-$TwitterRssRunner = Join-Path $ProjectFolders 'twitter-rss\scripts\run_repo_radar_rss.ps1'
-if (Test-Path -LiteralPath $TwitterRssRunner) {
-    $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Add-Content -LiteralPath $LogPath -Value "[$Stamp] Repo Radar X RSS 生成 開始" -Encoding UTF8
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $TwitterRssRunner -LogPath $LogPath 2>&1 |
-        Out-File -LiteralPath $LogPath -Append -Encoding UTF8
-    $TwitterRssExit = $LASTEXITCODE
-    $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    if ($TwitterRssExit -ne 0) {
-        Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: Repo Radar X RSS 生成失敗 (exit $TwitterRssExit) だが日次本線は続行する" -Encoding UTF8
-    } else {
-        Add-Content -LiteralPath $LogPath -Value "[$Stamp] Repo Radar X RSS 生成 完了" -Encoding UTF8
-    }
-} else {
-    $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Add-Content -LiteralPath $LogPath -Value "[$Stamp] WARN: Repo Radar X RSS runner が見つからないためスキップ: $TwitterRssRunner" -Encoding UTF8
-}
-
 & $PythonExe (Join-Path $AiPulse 'tools\run_daily.py') 2>&1 |
     Out-File -LiteralPath $LogPath -Append -Encoding UTF8
 

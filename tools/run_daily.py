@@ -1,4 +1,4 @@
-"""日次バッチ: L2 RSS 収集 + 当日追加エンティティの Ollama カルテ更新 + サイト再生成
+"""日次バッチ: L2 RSS 収集 + Ollama カルテ更新 + Repo Radar + サイト再生成
 
 Task Scheduler から scripts/run_daily.ps1 経由で毎日 7:00 に実行。
 claude -p / SDK / NotebookLM 不使用。Ollama で採用済み event からカルテを更新する。
@@ -19,8 +19,12 @@ import generate_pages  # noqa: E402
 import quality_audit  # noqa: E402
 import research_ollama as carte  # noqa: E402
 import schema  # noqa: E402
+from _proc.run import quiet_run  # noqa: E402
 
 DATA = ROOT / "data"
+PROJECT_FOLDERS = ROOT.parent
+POWERSHELL_EXE = "powershell.exe"
+TWITTER_RSS_RUNNER = PROJECT_FOLDERS / "twitter-rss" / "scripts" / "run_repo_radar_rss.ps1"
 
 
 def _fast_update(entity: dict, events: list[dict]) -> None:
@@ -30,6 +34,33 @@ def _fast_update(entity: dict, events: list[dict]) -> None:
     print(f"  カルテ更新 [{eid}] backend=ollama query={query!r}")
     carte.update_entity(entity, events)
     print(f"    完了: {eid}")
+
+
+def _run_repo_radar_x_rss() -> None:
+    """Repo Radar 用の X RSS を生成する。失敗しても日次本線は止めない。"""
+    if not TWITTER_RSS_RUNNER.exists():
+        print(f"WARN: Repo Radar X RSS runner が見つからないためスキップ: {TWITTER_RSS_RUNNER}")
+        return
+    cp = quiet_run(
+        [
+            POWERSHELL_EXE,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            TWITTER_RSS_RUNNER,
+        ],
+        timeout=600,
+        check=False,
+    )
+    if cp.stdout:
+        print(cp.stdout.rstrip())
+    if cp.stderr:
+        print(cp.stderr.rstrip(), file=sys.stderr)
+    if cp.returncode != 0:
+        print(f"WARN: Repo Radar X RSS 生成失敗 (exit {cp.returncode}) だが日次本線は続行する")
+    else:
+        print("Repo Radar X RSS 生成 完了")
 
 
 def run_daily() -> None:
@@ -55,28 +86,12 @@ def run_daily() -> None:
     except Exception as exc:
         print(f"品質監査失敗（本線継続）: {exc}", file=sys.stderr)
 
-    # Step 3: Repo Radar（観測レイヤーなので失敗しても本線は止めない）
-    print("\n--- Step 3: Repo Radar ---")
-    try:
-        radar_stats = collect_repo_radar.collect()
-        print(
-            "Repo Radar 完了: "
-            f"candidates {radar_stats['candidates']} / "
-            f"enriched {radar_stats['enriched']} / "
-            f"evaluated {radar_stats['evaluated']} / "
-            f"skipped {radar_stats['skipped']} / "
-            f"degraded {radar_stats['degraded']} / "
-            f"ollama_errors {radar_stats['ollama_errors']}"
-        )
-    except Exception as exc:
-        print(f"Repo Radar 失敗（本線継続）: {exc}", file=sys.stderr)
-
-    # Step 4: 当日更新エンティティのカルテ更新（Ollama）
+    # Step 3: 当日更新エンティティのカルテ更新（Ollama）
     if not added_events:
         print("新着なし。カルテ更新をスキップします。")
     else:
         updated_eids = list({ev["entity_id"] for ev in added_events})
-        print(f"\n--- Step 4: カルテ Ollama 更新 ({len(updated_eids)} 件) ---")
+        print(f"\n--- Step 3: カルテ Ollama 更新 ({len(updated_eids)} 件) ---")
         entities, _ = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
         by_id = {e["entity_id"]: e for e in entities}
         by_event_eid: dict[str, list[dict]] = {}
@@ -92,6 +107,23 @@ def run_daily() -> None:
                 print(f"    カルテ更新失敗 ({eid}): {exc}", file=sys.stderr)
                 update_failures.append(eid)
             time.sleep(3)
+
+    # Step 4: Repo Radar（カルテ更新後の観測レイヤー。失敗しても本線は止めない）
+    print("\n--- Step 4: Repo Radar ---")
+    _run_repo_radar_x_rss()
+    try:
+        radar_stats = collect_repo_radar.collect()
+        print(
+            "Repo Radar 完了: "
+            f"candidates {radar_stats['candidates']} / "
+            f"enriched {radar_stats['enriched']} / "
+            f"evaluated {radar_stats['evaluated']} / "
+            f"skipped {radar_stats['skipped']} / "
+            f"degraded {radar_stats['degraded']} / "
+            f"ollama_errors {radar_stats['ollama_errors']}"
+        )
+    except Exception as exc:
+        print(f"Repo Radar 失敗（本線継続）: {exc}", file=sys.stderr)
 
     # Step 5: サムネイル補完
     print("\n--- Step 5: サムネイル補完 ---")
