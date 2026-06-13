@@ -218,6 +218,21 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("スマホのコピーボタン修正", html)
         self.assertNotIn(r"C:\Users\hidek\Obsidian", html)
 
+    def test_repo_radar_nav_label_is_repository_after_karte(self):
+        """Repo Radar のメニュータブは日本語名にし、カルテの右側に置く。
+
+        なぜ重要か: ユーザーが通常のサイト導線として探す対象なので、英語の内部機能名ではなく
+        「リポジトリ」としてカルテ隣に固定する。
+        """
+        with tempfile.TemporaryDirectory() as d:
+            gp.generate(Path(d))
+            html = (Path(d) / "repo-radar.html").read_text(encoding="utf-8")
+
+        self.assertIn(">カルテ</a>", html)
+        self.assertIn(">リポジトリ</a>", html)
+        self.assertLess(html.index(">カルテ</a>"), html.index(">リポジトリ</a>"))
+        self.assertNotIn(">Repo Radar</a>", html)
+
     def test_karte_index_has_feed_and_karte_update_badges(self):
         """ユーザー要件 2026-06-04:「何が更新されたか」を一目で示すため、
         カルテ一覧の各カードは『📰 フィード』(events 最新) と『📋 カルテ』(entity.snapshot_date)
