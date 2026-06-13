@@ -209,6 +209,8 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("AI駆動開発に資するGithub Repository</h1>", html)
         self.assertNotIn("<mark>Github Repository", html)
         self.assertIn('class="dateline"><span class="live-dot"></span>', html)
+        self.assertIn('<main class="app-main">', html)
+        self.assertRegex(html, r'<main class="app-main">\s*<div class="wrap">\s*<section class="rr-head">')
         self.assertIn("UI/UX 改善", html)
         self.assertIn("Show HN: Useful repo", html)
         self.assertIn("news.ycombinator.com/item?id=1", html)

@@ -254,56 +254,57 @@
 </head>
 <body data-page="repo_radar">
   {% include "_header.html.j2" %}
-  <main class="wrap">
-    <section class="rr-head">
-      <div class="kicker">
-        <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
-        <span class="label">リポジトリ一覧 / REPOSITORY LIST</span>
-        <span class="count-pill"><b data-count>{{ "%02d"|format(repo_radar_count) }}</b> repos</span>
-      </div>
-      <h1>AI駆動開発に資するGithub Repository</h1>
-      <p class="lead">Reddit / Hacker News / GitHub で話題になった GitHub リポジトリを収集し、AI-Pulse の開発・運用に取り込む価値を「発見のきっかけ → 機能 → 採用判断」の順で読むための採用候補ダッシュボードです。</p>
-      <div class="rr-meta">
-        <span>最新評価 {{ repo_radar_latest or "未実行" }}</span>
-        <span>公開面は IdeaStash の具体タスク名を匿名化</span>
-        <span>source: {{ repo_radar_sources | join(" / ") or "Reddit / HN / GitHub" }}</span>
-      </div>
-    </section>
+  <main class="app-main">
+    <div class="wrap">
+      <section class="rr-head">
+        <div class="kicker">
+          <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
+          <span class="label">リポジトリ一覧 / REPOSITORY LIST</span>
+          <span class="count-pill"><b data-count>{{ "%02d"|format(repo_radar_count) }}</b> repos</span>
+        </div>
+        <h1>AI駆動開発に資するGithub Repository</h1>
+        <p class="lead">Reddit / Hacker News / GitHub で話題になった GitHub リポジトリを収集し、AI-Pulse の開発・運用に取り込む価値を「発見のきっかけ → 機能 → 採用判断」の順で読むための採用候補ダッシュボードです。</p>
+        <div class="rr-meta">
+          <span>最新評価 {{ repo_radar_latest or "未実行" }}</span>
+          <span>公開面は IdeaStash の具体タスク名を匿名化</span>
+          <span>source: {{ repo_radar_sources | join(" / ") or "Reddit / HN / GitHub" }}</span>
+        </div>
+      </section>
 
-    <section class="rr-legend" aria-label="Adoption Lens">
-      <div><b>WHAT IT DOES</b><span>できること。repo の中核機能を一行で把握する。</span></div>
-      <div><b>WHERE IT FITS</b><span>組み込み先。AI-Pulse のどこに効くかを見る。</span></div>
-      <div><b>WHAT TO WATCH</b><span>注意点。ライセンス、依存、成熟度を先に見る。</span></div>
-      <div><b>WHY FOR US</b><span>効用。自分たちが採用候補にする理由を固定する。</span></div>
-    </section>
+      <section class="rr-legend" aria-label="Adoption Lens">
+        <div><b>WHAT IT DOES</b><span>できること。repo の中核機能を一行で把握する。</span></div>
+        <div><b>WHERE IT FITS</b><span>組み込み先。AI-Pulse のどこに効くかを見る。</span></div>
+        <div><b>WHAT TO WATCH</b><span>注意点。ライセンス、依存、成熟度を先に見る。</span></div>
+        <div><b>WHY FOR US</b><span>効用。自分たちが採用候補にする理由を固定する。</span></div>
+      </section>
 
-    <section class="rr-toolbar" aria-label="Repo Radar controls">
-      <input class="rr-search" type="search" data-search placeholder="repo / trigger / lens を検索" aria-label="リポジトリ検索" />
-      <div class="rr-sort" data-sort-bar aria-label="並び替え">
-        <button type="button" data-sort="score" aria-pressed="true">SCORE</button>
-        <button type="button" data-sort="stars" aria-pressed="false">Stars</button>
-        <button type="button" data-sort="fresh" aria-pressed="false">更新</button>
-      </div>
-      <div class="chip-row" data-filter-bar aria-label="カテゴリフィルタ">
-        <button class="chip all" type="button" aria-pressed="true">All</button>
-        {% for c in repo_radar_categories %}
-        <button class="chip" type="button" data-cat="{{ c.cat }}" aria-pressed="true">
-          <span class="gly">{{ c.glyph }}</span>{{ c.cat_label }}
-        </button>
-        {% endfor %}
-      </div>
-    </section>
+      <section class="rr-toolbar" aria-label="Repo Radar controls">
+        <input class="rr-search" type="search" data-search placeholder="repo / trigger / lens を検索" aria-label="リポジトリ検索" />
+        <div class="rr-sort" data-sort-bar aria-label="並び替え">
+          <button type="button" data-sort="score" aria-pressed="true">SCORE</button>
+          <button type="button" data-sort="stars" aria-pressed="false">Stars</button>
+          <button type="button" data-sort="fresh" aria-pressed="false">更新</button>
+        </div>
+        <div class="chip-row" data-filter-bar aria-label="カテゴリフィルタ">
+          <button class="chip all" type="button" aria-pressed="true">All</button>
+          {% for c in repo_radar_categories %}
+          <button class="chip" type="button" data-cat="{{ c.cat }}" aria-pressed="true">
+            <span class="gly">{{ c.glyph }}</span>{{ c.cat_label }}
+          </button>
+          {% endfor %}
+        </div>
+      </section>
 
-    {% if not repo_radar %}
-    <section class="rr-empty">
-      Repo Radar はまだ評価結果を持っていません。日次バッチが Reddit / HN / GitHub API から候補を収集すると、このページにリポジトリ評価が表示されます。
-    </section>
-    {% else %}
-    <div class="rr-list-head">
-      <h2>採用候補</h2>
-      <span class="count-pill"><b data-count>{{ "%02d"|format(repo_radar_count) }}</b> / {{ "%02d"|format(repo_radar_count) }} 件を表示</span>
-    </div>
-    <ol class="repo-list" data-repo-list>
+      {% if not repo_radar %}
+      <section class="rr-empty">
+        Repo Radar はまだ評価結果を持っていません。日次バッチが Reddit / HN / GitHub API から候補を収集すると、このページにリポジトリ評価が表示されます。
+      </section>
+      {% else %}
+      <div class="rr-list-head">
+        <h2>採用候補</h2>
+        <span class="count-pill"><b data-count>{{ "%02d"|format(repo_radar_count) }}</b> / {{ "%02d"|format(repo_radar_count) }} 件を表示</span>
+      </div>
+      <ol class="repo-list" data-repo-list>
       {% for r in repo_radar %}
       <li class="repo-card" data-filter-item data-cat="{{ r.cat }}" data-score="{{ r.score }}" data-stars="{{ r.stars_num }}" data-fresh="{{ r.fresh_days }}">
         <div class="repo-aside">
@@ -397,9 +398,10 @@
         </article>
       </li>
       {% endfor %}
-    </ol>
-    <p class="empty">該当するリポジトリはありません。</p>
-    {% endif %}
+      </ol>
+      <p class="empty">該当するリポジトリはありません。</p>
+      {% endif %}
+    </div>
   </main>
   {% include "_footer.html.j2" %}
   <script src="app.js"></script>
