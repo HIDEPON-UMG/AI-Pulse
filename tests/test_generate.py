@@ -157,6 +157,8 @@ class TestGenerate(unittest.TestCase):
                 self.assertIn(e["name"], html, f"カルテ名 {e['name']!r} がカルテ一覧に出ない")
             self.assertIn("ki-card", html)
             self.assertIn("ki-group", html)
+            self.assertIn('class="dateline"><span class="live-dot"></span>', html)
+            self.assertIn("カルテ一覧 / KARTE INDEX", html)
 
     def test_repo_radar_page_is_built_and_anonymized(self):
         """Repo Radar ページは公開 JSONL だけを描画し、IdeaStash の具体情報を出さない。"""
@@ -203,6 +205,10 @@ class TestGenerate(unittest.TestCase):
         finally:
             gp.collect_repo_radar.load_public_rows = original
         self.assertIn("acme/useful-repo", html)
+        self.assertIn("リポジトリ一覧 / REPOSITORY LIST", html)
+        self.assertIn("AI駆動開発に資するGithub Repository</h1>", html)
+        self.assertNotIn("<mark>Github Repository", html)
+        self.assertIn('class="dateline"><span class="live-dot"></span>', html)
         self.assertIn("UI/UX 改善", html)
         self.assertIn("Show HN: Useful repo", html)
         self.assertIn("news.ycombinator.com/item?id=1", html)
@@ -215,6 +221,12 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("WHAT TO WATCH", html)
         self.assertIn("WHY FOR US", html)
         self.assertIn("opsfit", html)
+        self.assertIn('class="body-list em-body"', html)
+        self.assertIn('class="body-list axis-list"', html)
+        self.assertIn('class="body-list reason"', html)
+        self.assertIn("<mark>AI</mark> 開発", html)
+        self.assertIn("<b>運用適合性</b>", html)
+        self.assertIn("保守状況を<u>確認</u>してください", html)
         self.assertIn('data-level="低"', html)
         self.assertIn("リポジトリを開く", html)
         self.assertIn("運用適合性", html)

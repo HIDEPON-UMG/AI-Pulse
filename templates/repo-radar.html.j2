@@ -8,12 +8,11 @@
     .rr-head .kicker, .rr-meta, .rr-list-head { display: flex; align-items: center; gap: var(--s-16); flex-wrap: wrap; }
     .rr-head h1 {
       margin: var(--s-16) 0 var(--s-8);
-      max-width: 18ch;
-      font-size: var(--t-display);
-      line-height: 1.16;
+      font-size: clamp(28px, 4.2vw, 44px);
+      line-height: 1.18;
       letter-spacing: 0;
+      text-wrap: balance;
     }
-    .rr-head h1 mark { background: var(--accent); color: var(--accent-fg); padding: 0 .08em; border-radius: var(--r-sm); }
     .rr-head .lead { margin: 0; max-width: 78ch; color: var(--fg-sub); font-size: var(--t-sm); line-height: 1.9; }
     .rr-meta { margin-top: var(--s-16); gap: var(--s-8); }
     .rr-meta span {
@@ -191,16 +190,22 @@
     .em-name { color: var(--fg); font-weight: 700; line-height: 1.35; }
     .em-name em { display: block; color: var(--fg-mute); font-style: normal; font-family: var(--font-mono); font-size: 10.5px; font-weight: 400; }
     .src-pill { margin-left: auto; color: var(--src-c); border: 1px solid color-mix(in oklab, var(--src-c) 45%, var(--border)); border-radius: 99px; padding: 2px 8px; font-family: var(--font-mono); font-size: 10px; }
-    .em-body { margin: 0; color: var(--fg-sub); font-size: 13px; line-height: 1.75; }
+    .body-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+    .body-list li { position: relative; padding-left: 16px; color: var(--fg-sub); line-height: 1.75; }
+    .body-list li::before { content: ""; position: absolute; left: 0; top: .82em; width: 5px; height: 5px; background: var(--cat); border-radius: 50%; }
+    .body-list b { color: var(--fg); font-weight: 700; }
+    .body-list u { text-decoration-color: var(--cat); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+    .body-list mark { background: color-mix(in oklab, var(--cat) 26%, transparent); color: var(--fg); }
+    .em-body { color: var(--fg-sub); font-size: 13px; }
     .em-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--fg-mute); font-family: var(--font-mono); font-size: 10.5px; }
     .lens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--border-soft); border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
     .axis { background: var(--bg); padding: 13px 14px; min-width: 0; }
     .axis.watch { background: color-mix(in oklab, var(--imp-mid) 9%, var(--bg)); }
     .ax-k { display: block; color: var(--cat); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; line-height: 1.35; }
     .ax-k em { display: block; color: var(--fg-mute); font-style: normal; letter-spacing: 0; }
-    .axis p { margin: 8px 0 0; color: var(--fg-sub); font-size: 13px; line-height: 1.75; }
+    .axis-list { font-size: 13px; }
     .opsfit { background: var(--bg); border: 1px solid var(--border); border-left: 2px solid var(--cat); border-radius: var(--r-sm); padding: 14px 16px; }
-    .opsfit .reason { margin: 0; color: var(--fg); font-size: 14px; line-height: 1.8; }
+    .opsfit .reason { color: var(--fg); font-size: 14px; }
     .opsfit .reason b { color: var(--cat); }
     .opsfit .facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-24); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
     .fact { display: inline-flex; align-items: center; gap: 9px; }
@@ -243,7 +248,7 @@
       .repo-aside, .lens { grid-template-columns: 1fr; }
       .rail-id h2 { font-size: 28px; }
       .utility .score { font-size: 34px; }
-      .em-body, .axis p { font-size: 12.5px; }
+      .em-body, .axis-list { font-size: 12.5px; }
     }
   </style>
 </head>
@@ -252,10 +257,11 @@
   <main class="wrap">
     <section class="rr-head">
       <div class="kicker">
-        <span class="label">REPO RADAR / ADOPTION SCOUTING</span>
+        <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
+        <span class="label">リポジトリ一覧 / REPOSITORY LIST</span>
         <span class="count-pill"><b data-count>{{ "%02d"|format(repo_radar_count) }}</b> repos</span>
       </div>
-      <h1>AI駆動開発に資する<mark>Github Repository List</mark></h1>
+      <h1>AI駆動開発に資するGithub Repository</h1>
       <p class="lead">Reddit / Hacker News / GitHub で話題になった GitHub リポジトリを収集し、AI-Pulse の開発・運用に取り込む価値を「発見のきっかけ → 機能 → 採用判断」の順で読むための採用候補ダッシュボードです。</p>
       <div class="rr-meta">
         <span>最新評価 {{ repo_radar_latest or "未実行" }}</span>
@@ -353,7 +359,9 @@
                 <span class="em-name">{{ r.trigger.title }}<em>{{ r.trigger.sub }}</em></span>
                 <span class="src-pill">{{ r.trigger.label }}</span>
               </div>
-              <p class="em-body">{{ r.summary }}</p>
+              <ul class="body-list em-body">
+                {% for item in r.summary_items or [r.summary] %}<li>{{ item|emph }}</li>{% endfor %}
+              </ul>
               <div class="em-foot">
                 <span>{{ r.trigger.label }} · {{ r.date }}</span>
                 <span>{{ r.trigger.stat }}</span>
@@ -364,16 +372,18 @@
           <section>
             <span class="block-label">機能概要 · Adoption Lens</span>
             <div class="lens">
-              <div class="axis"><span class="ax-k">WHAT IT DOES <em>できること</em></span><p>{{ r.outline.what }}</p></div>
-              <div class="axis"><span class="ax-k">WHERE IT FITS <em>組み込み先</em></span><p>{{ r.outline.where }}</p></div>
-              <div class="axis watch"><span class="ax-k">WHAT TO WATCH <em>注意点</em></span><p>{{ r.outline.watch }}</p></div>
-              <div class="axis"><span class="ax-k">WHY FOR US <em>効用</em></span><p>{{ r.outline.why }}</p></div>
+              <div class="axis"><span class="ax-k">WHAT IT DOES <em>できること</em></span><ul class="body-list axis-list">{% for item in r.outline.what_items or [r.outline.what] %}<li>{{ item|emph }}</li>{% endfor %}</ul></div>
+              <div class="axis"><span class="ax-k">WHERE IT FITS <em>組み込み先</em></span><ul class="body-list axis-list">{% for item in r.outline.where_items or [r.outline.where] %}<li>{{ item|emph }}</li>{% endfor %}</ul></div>
+              <div class="axis watch"><span class="ax-k">WHAT TO WATCH <em>注意点</em></span><ul class="body-list axis-list">{% for item in r.outline.watch_items or [r.outline.watch] %}<li>{{ item|emph }}</li>{% endfor %}</ul></div>
+              <div class="axis"><span class="ax-k">WHY FOR US <em>効用</em></span><ul class="body-list axis-list">{% for item in r.outline.why_items or [r.outline.why] %}<li>{{ item|emph }}</li>{% endfor %}</ul></div>
             </div>
           </section>
 
           <section class="opsfit">
             <span class="block-label">採用理由 · OPS FIT</span>
-            <p class="reason"><b>{{ r.adoption_reason or r.developer_use_case }}</b></p>
+            <ul class="body-list reason">
+              {% for item in r.adoption_items or [r.adoption_reason or r.developer_use_case] %}<li>{{ item|emph }}</li>{% endfor %}
+            </ul>
             <div class="facts">
               <span class="fact" data-level="{{ r.effort }}"><span class="fk">導入負荷</span><span class="bars"><i></i><i></i><i></i></span><span class="fv">{{ r.effort }}</span></span>
               <span class="fact"><span class="fk">ライセンス</span><span class="fv">{{ r.pricing_or_license or r.license or "n/a" }}</span></span>

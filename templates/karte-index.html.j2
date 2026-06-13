@@ -155,7 +155,10 @@
 <main class="app-main">
   <div class="wrap">
     <div class="ki-head">
-      <div class="kicker"><span class="label">カルテ一覧 / KARTE INDEX</span></div>
+      <div class="kicker">
+        <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
+        <span class="label">カルテ一覧 / KARTE INDEX</span>
+      </div>
       <h1>各サービス・モデルの分析カルテ</h1>
       <p class="lead">7 つのレンズ（カテゴリ）ごとに、注目サービス・モデル・規制を整理。気になるカードから個別カルテへ。<b style="color:var(--fg-sub);font-weight:500">全 {{ karte_total }} 件</b></p>
     </div>

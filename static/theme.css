@@ -193,6 +193,16 @@ mark {
   font-family: var(--font-mono); font-size: var(--t-label);
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-mute);
 }
+.dateline {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg);
+  white-space: nowrap;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--imp-high); display: inline-block; flex: none;
+  box-shadow: 0 0 8px var(--imp-high);
+}
 
 /* category color binding */
 [data-cat="model"]  { --cat: var(--c-model);  --cat-solid: var(--c-model-solid); }

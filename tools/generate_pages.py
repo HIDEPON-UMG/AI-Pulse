@@ -340,6 +340,44 @@ def _repo_cat(row: dict) -> str:
     return "agent"
 
 
+_REPO_MARK_TERMS = (
+    "AI-Pulse", "GitHub", "Hacker News", "Reddit", "LLM", "Python",
+    "TypeScript", "Zig", "Rust", "CLI", "API", "MCP",
+)
+_REPO_UNDERLINE_TERMS = ("確認", "依存", "注意", "必要", "リスク", "成熟途上", "可能性")
+
+
+def _repo_emphasis_text(text: str) -> str:
+    s = str(text).strip()
+    if not s:
+        return ""
+    s = re.sub(r"^([^:：]{2,18})([:：])\s*", r"**\1**\2 ", s)
+    for term in _REPO_MARK_TERMS:
+        s = re.sub(rf"(?<![=\w-]){re.escape(term)}(?![=\w-])", f"=={term}==", s)
+    s = re.sub(r"(?<![=\w-])AI(?![=\w-])", "==AI==", s)
+    for term in _REPO_UNDERLINE_TERMS:
+        s = s.replace(term, f"__{term}__")
+    return s
+
+
+def _repo_bullet_items(value: str | list | tuple | None) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        raw = [str(v).strip() for v in value if str(v).strip()]
+    else:
+        raw = []
+        for line in str(value).splitlines():
+            raw.extend(m.group(0).strip() for m in re.finditer(r"[^。.!?]+[。.!?]?", line))
+    return [_repo_emphasis_text(item) for item in raw if item]
+
+
+def _repo_text(value: str | list | tuple | None) -> str:
+    if isinstance(value, (list, tuple)):
+        return " / ".join(str(v) for v in value if str(v).strip())
+    return str(value or "")
+
+
 def _repo_outline(row: dict) -> dict:
     by_lens = {
         str(item.get("lens", "")).lower(): str(item.get("text", ""))
@@ -348,17 +386,25 @@ def _repo_outline(row: dict) -> dict:
     }
     risks = row.get("risk_notes") or ["特記事項なし"]
     fits = row.get("ai_pulse_fit") or row.get("ideastash_fit_public") or ["適用先は評価中"]
+    what = by_lens.get("capability") or row.get("summary") or row.get("description") or ""
+    where = (
+        by_lens.get("activation")
+        or by_lens.get("adoption")
+        or row.get("developer_use_case")
+        or row.get("summary")
+        or ""
+    )
+    watch = by_lens.get("trade-off") or by_lens.get("tradeoff") or risks
+    why = by_lens.get("reuse") or by_lens.get("relevance") or fits
     return {
-        "what": by_lens.get("capability") or row.get("summary") or row.get("description") or "",
-        "where": (
-            by_lens.get("activation")
-            or by_lens.get("adoption")
-            or row.get("developer_use_case")
-            or row.get("summary")
-            or ""
-        ),
-        "watch": by_lens.get("trade-off") or by_lens.get("tradeoff") or " / ".join(map(str, risks)),
-        "why": by_lens.get("reuse") or by_lens.get("relevance") or " / ".join(map(str, fits)),
+        "what": _repo_text(what),
+        "where": _repo_text(where),
+        "watch": _repo_text(watch),
+        "why": _repo_text(why),
+        "what_items": _repo_bullet_items(what),
+        "where_items": _repo_bullet_items(where),
+        "watch_items": _repo_bullet_items(watch),
+        "why_items": _repo_bullet_items(why),
     }
 
 
@@ -409,6 +455,8 @@ def _repo_display_rows(rows: list[dict], ref: dt.date) -> list[dict]:
             "stars_label": f"{stars:,}",
             "lang_color": REPO_LANG_COLOR.get(str(row.get("language") or ""), "#727479"),
             "outline": _repo_outline(row),
+            "summary_items": _repo_bullet_items(row.get("summary")),
+            "adoption_items": _repo_bullet_items(row.get("adoption_reason") or row.get("developer_use_case")),
             "trigger": _repo_signal((row.get("signals") or [None])[0], row),
             "release_label": release.get("tag") or release.get("name") or "",
         })
