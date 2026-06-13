@@ -45,11 +45,10 @@
         g.hidden = !any;
       });
       /* live count */
-      var counter = document.querySelector("[data-count]");
-      if (counter) {
-        var n = items.filter(function (el) { return !el.hidden; }).length;
+      var n = items.filter(function (el) { return !el.hidden; }).length;
+      document.querySelectorAll("[data-count]").forEach(function (counter) {
         counter.textContent = String(n).padStart(2, "0");
-      }
+      });
       var empty = document.querySelector(".empty");
       if (empty) {
         var visible = items.filter(function (el) { return !el.hidden; }).length;

@@ -57,6 +57,26 @@ DOMAIN_JA = {
     "robotics": "ロボティクス", "compute": "計算基盤", "governance": "ガバナンス",
     "agent": "エージェント",
 }
+REPO_LANG_COLOR = {
+    "Go": "#00add8",
+    "JavaScript": "#f1e05a",
+    "Python": "#3572a5",
+    "Rust": "#dea584",
+    "TypeScript": "#3178c6",
+}
+REPO_SIGNAL_META = {
+    "hn": {"avatar": "Y", "label": "Hacker News"},
+    "x": {"avatar": "X", "label": "X"},
+    "reddit": {"avatar": "r/", "label": "Reddit"},
+    "github": {"avatar": "GH", "label": "GitHub"},
+}
+REPO_CATEGORY_KEYWORDS = [
+    ("agent", ("agent", "mcp", "guardrail", "firewall", "automation", "workflow", "tool")),
+    ("infra", ("database", "vector", "rag", "gateway", "proxy", "infra", "api", "security", "compliance")),
+    ("editor", ("code", "coding", "developer", "cli", "ide")),
+    ("media", ("image", "video", "audio", "whisper", "speech")),
+    ("model", ("llm", "model", "inference", "ollama")),
+]
 # 企業間関係 type → (CSS クラス, ラベル, 矢印)。未知 type は REL_FALLBACK。
 REL_META = {
     "capital": ("rc-capital", "資本", "←"),
@@ -242,6 +262,157 @@ def _display_headline(ev: dict) -> str:
         if first:
             return first
     return (ev.get("headline_ja") or ev["headline"]).strip()
+
+
+def _date_prefix(value: str | None) -> str:
+    return str(value or "n/a")[:10]
+
+
+def _parse_iso_date(value: str | None) -> dt.date | None:
+    if not value:
+        return None
+    try:
+        return dt.datetime.fromisoformat(str(value).replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            return dt.date.fromisoformat(str(value)[:10])
+        except ValueError:
+            return None
+
+
+def _repo_age(created_at: str | None, ref: dt.date) -> str:
+    created = _parse_iso_date(created_at)
+    if not created:
+        return ""
+    days = max((ref - created).days, 0)
+    if days >= 365:
+        return f"{days / 365:.1f}y"
+    if days >= 30:
+        return f"{days // 30}mo"
+    return f"{days}d"
+
+
+def _repo_freshness(pushed_at: str | None, ref: dt.date) -> dict:
+    pushed = _parse_iso_date(pushed_at)
+    if not pushed:
+        return {"kind": "cold", "days": 9999, "label": "unknown"}
+    days = max((ref - pushed).days, 0)
+    label = "today" if days == 0 else ("1 day ago" if days == 1 else f"{days} days ago")
+    kind = "hot" if days <= 3 else ("warm" if days <= 14 else "cold")
+    return {"kind": kind, "days": days, "label": label}
+
+
+def _repo_priority(score: int | None) -> str:
+    n = int(score or 0)
+    if n >= 85:
+        return "高"
+    if n >= 65:
+        return "中"
+    return "低"
+
+
+def _repo_effort(text: str | None) -> str:
+    s = str(text or "").lower()
+    if "hard" in s or "high" in s or "難" in s:
+        return "高"
+    if "medium" in s or "mid" in s or "中" in s:
+        return "中"
+    return "低"
+
+
+def _repo_cat(row: dict) -> str:
+    haystack = " ".join(
+        str(v)
+        for v in [
+            row.get("repo"),
+            row.get("name"),
+            row.get("description"),
+            row.get("language"),
+            " ".join(row.get("topics") or []),
+            " ".join(row.get("ai_pulse_fit") or []),
+            " ".join(row.get("ideastash_fit_public") or []),
+        ]
+        if v
+    ).lower()
+    for cat, words in REPO_CATEGORY_KEYWORDS:
+        if any(w in haystack for w in words):
+            return cat
+    return "agent"
+
+
+def _repo_outline(row: dict) -> dict:
+    by_lens = {
+        str(item.get("lens", "")).lower(): str(item.get("text", ""))
+        for item in (row.get("feature_outline") or [])
+        if isinstance(item, dict)
+    }
+    risks = row.get("risk_notes") or ["特記事項なし"]
+    fits = row.get("ai_pulse_fit") or row.get("ideastash_fit_public") or ["適用先は評価中"]
+    return {
+        "what": by_lens.get("capability") or row.get("summary") or row.get("description") or "",
+        "where": (
+            by_lens.get("activation")
+            or by_lens.get("adoption")
+            or row.get("developer_use_case")
+            or row.get("summary")
+            or ""
+        ),
+        "watch": by_lens.get("trade-off") or by_lens.get("tradeoff") or " / ".join(map(str, risks)),
+        "why": by_lens.get("reuse") or by_lens.get("relevance") or " / ".join(map(str, fits)),
+    }
+
+
+def _repo_signal(sig: dict | None, row: dict) -> dict:
+    sig = sig or {}
+    src = str(sig.get("source") or "github").lower()
+    if src not in REPO_SIGNAL_META:
+        src = "github"
+    meta = REPO_SIGNAL_META[src]
+    parts = []
+    if sig.get("points") is not None:
+        parts.append(f"↑ {sig['points']}")
+    if sig.get("comments") is not None:
+        parts.append(f"{sig['comments']} comments")
+    return {
+        "src": src,
+        "avatar": meta["avatar"],
+        "label": meta["label"],
+        "url": sig.get("url") or row.get("repo_url"),
+        "title": sig.get("title") or row.get("repo"),
+        "url_text": str(sig.get("url") or row.get("repo_url") or "").replace("https://", ""),
+        "sub": row.get("repo") or "",
+        "stat": " · ".join(parts) or "signal",
+    }
+
+
+def _repo_display_rows(rows: list[dict], ref: dt.date) -> list[dict]:
+    out = []
+    for row in rows:
+        cat = _repo_cat(row)
+        fresh = _repo_freshness(row.get("pushed_at"), ref)
+        release = row.get("latest_release") or {}
+        stars = int(row.get("stars") or 0)
+        out.append({
+            **row,
+            "cat": cat,
+            "cat_label": CAT_META[cat]["label"],
+            "glyph": CAT_META[cat]["glyph"],
+            "priority": _repo_priority(row.get("score")),
+            "effort": _repo_effort(row.get("implementation_difficulty")),
+            "created_label": _date_prefix(row.get("created_at")),
+            "age_label": _repo_age(row.get("created_at"), ref),
+            "updated_label": _date_prefix(row.get("pushed_at")),
+            "fresh_label": fresh["label"],
+            "fresh_kind": fresh["kind"],
+            "fresh_days": fresh["days"],
+            "stars_num": stars,
+            "stars_label": f"{stars:,}",
+            "lang_color": REPO_LANG_COLOR.get(str(row.get("language") or ""), "#727479"),
+            "outline": _repo_outline(row),
+            "trigger": _repo_signal((row.get("signals") or [None])[0], row),
+            "release_label": release.get("tag") or release.get("name") or "",
+        })
+    return out
 
 
 def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
@@ -455,7 +626,8 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
                 "glyph": CAT_META[cat]["glyph"], "cards": cards,
             })
 
-    repo_radar = collect_repo_radar.load_public_rows()
+    repo_radar_raw = collect_repo_radar.load_public_rows()
+    repo_radar = _repo_display_rows(repo_radar_raw, ref)
     repo_radar_latest = repo_radar[0]["date"] if repo_radar else None
     repo_radar_sources = sorted({
         str(sig.get("source") or "")
@@ -463,6 +635,11 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         for sig in (row.get("signals") or [])
         if sig.get("source")
     })
+    repo_radar_categories = [
+        {"cat": cat, "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"]}
+        for cat in CAT_META
+        if any(row["cat"] == cat for row in repo_radar)
+    ]
 
     return {
         "feed": feed, "feed_count": len(feed),
@@ -474,6 +651,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         "repo_radar": repo_radar,
         "repo_radar_count": len(repo_radar),
         "repo_radar_latest": repo_radar_latest,
+        "repo_radar_categories": repo_radar_categories,
         "repo_radar_sources": repo_radar_sources,
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),
