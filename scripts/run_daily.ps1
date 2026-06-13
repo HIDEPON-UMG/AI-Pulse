@@ -129,11 +129,11 @@ $Publish = Join-Path $AiPulse 'scripts\publish_daily.ps1'
 if (Test-Path -LiteralPath $Publish) {
     $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次公開 開始" -Encoding UTF8
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Publish -LogPath $LogPath 2>&1 |
-        Out-File -LiteralPath $LogPath -Append -Encoding UTF8
+    $PublishLogPath = Join-Path $LogsDir "publish_$DateStr.log"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Publish -LogPath $PublishLogPath
     $PublishExit = $LASTEXITCODE
     $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次公開 終了 (exit $PublishExit)" -Encoding UTF8
+    Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次公開 終了 (exit $PublishExit, log $PublishLogPath)" -Encoding UTF8
     exit $PublishExit
 }
 
