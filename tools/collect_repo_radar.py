@@ -25,10 +25,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import config  # noqa: E402
-import llm_local  # noqa: E402
 
 DATA = ROOT / "data"
 LOG_DIR = ROOT / "_logs"
+
+
+def _llm_error(message: str) -> Exception:
+    import llm_local  # noqa: E402
+
+    return llm_local.LLMError(message)
 
 
 def _load_local_env() -> None:
@@ -545,19 +550,19 @@ def _public_task_category(title: str, tags: list[str], outline: list[str]) -> st
 
 def _validate_eval(payload: dict) -> dict:
     if not isinstance(payload, dict):
-        raise llm_local.LLMError("Repo Radar 評価が object ではありません")
+        raise _llm_error("Repo Radar 評価が object ではありません")
     required = REPO_RADAR_SCHEMA["required"]
     missing = [key for key in required if key not in payload]
     if missing:
-        raise llm_local.LLMError(f"Repo Radar 評価の必須キー欠落: {missing}")
+        raise _llm_error(f"Repo Radar 評価の必須キー欠落: {missing}")
     if not isinstance(payload["score"], int) or not 0 <= payload["score"] <= 100:
-        raise llm_local.LLMError("Repo Radar 評価 score が 0〜100 の int ではありません")
+        raise _llm_error("Repo Radar 評価 score が 0〜100 の int ではありません")
     for key in ("summary", "developer_use_case", "implementation_difficulty", "pricing_or_license"):
         if not isinstance(payload[key], str) or not payload[key].strip():
-            raise llm_local.LLMError(f"Repo Radar 評価 {key} が空です")
+            raise _llm_error(f"Repo Radar 評価 {key} が空です")
     for key in ("ai_pulse_fit", "ideastash_fit_public", "risk_notes"):
         if not isinstance(payload[key], list) or not all(isinstance(v, str) and v.strip() for v in payload[key]):
-            raise llm_local.LLMError(f"Repo Radar 評価 {key} が文字列配列ではありません")
+            raise _llm_error(f"Repo Radar 評価 {key} が文字列配列ではありません")
     return payload
 
 
@@ -608,7 +613,7 @@ def _ollama_chat_json(
             last_err = exc
             if attempt < config.OLLAMA_MAX_RETRIES:
                 time.sleep(2.0)
-    raise llm_local.LLMError(f"Repo Radar Ollama 評価失敗: {last_err}")
+    raise _llm_error(f"Repo Radar Ollama 評価失敗: {last_err}")
 
 
 def _call_ollama(prompt: str) -> dict:
@@ -629,14 +634,14 @@ def _call_ollama(prompt: str) -> dict:
         ) as resp:
             payload = json.load(resp)
     except urllib.error.URLError as exc:
-        raise llm_local.LLMError(f"Ollama 接続失敗（{url}）: {exc}") from exc
+        raise _llm_error(f"Ollama 接続失敗（{url}）: {exc}") from exc
     raw = (payload.get("message") or {}).get("content") or ""
     if not raw.strip():
-        raise llm_local.LLMError("Ollama が空応答です")
+        raise _llm_error("Ollama が空応答です")
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise llm_local.LLMError(f"Ollama JSON パース失敗: {exc}") from exc
+        raise _llm_error(f"Ollama JSON パース失敗: {exc}") from exc
 
 
 def _private_matches(repo: dict, evaluation: dict, tasks: list[dict]) -> list[dict]:

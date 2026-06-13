@@ -1,4 +1,5 @@
 import json
+import ast
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,20 @@ def test_extract_github_repos_normalizes_and_skips_non_repo_urls():
         "openai/codex",
         "modelcontextprotocol/servers",
     ]
+
+
+def test_module_import_does_not_require_llm_backend_dependencies():
+    """Pages 生成時の import では Gemini/Ollama 評価用依存を読まない。"""
+    source = Path("tools/collect_repo_radar.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    top_level_imports = [
+        alias.name
+        for node in tree.body
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    ]
+
+    assert "llm_local" not in top_level_imports
 
 
 def test_extract_github_repos_accepts_x_mangled_urls():
