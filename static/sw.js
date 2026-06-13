@@ -3,7 +3,7 @@
    キャッシュへフォールバック）、CSS/JS/画像などの静的アセットは cache-first にする。
    これで「更新したのに古い記事が出る」cache-first の stale 問題を避けつつオフラインも保つ。
    サイト更新でアセットを差し替えたら CACHE 版を上げると activate で旧キャッシュを破棄する。 */
-const CACHE = "aipulse-v20";
+const CACHE = "aipulse-v21";
 const CORE = [
   "./", "index.html", "archive.html", "karte-index.html", "repo-radar.html", "theme.css", "app.js",
   "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",

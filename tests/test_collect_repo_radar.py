@@ -253,9 +253,13 @@ def test_ollama_eval_validates_schema_and_retries_once(monkeypatch):
             return {"summary": "missing required fields"}
         return {
             "summary": "AI コーディング支援の小型ツールです。",
+            "feature_outline": [
+                {"lens": "Capability", "text": "小型の支援機能を提供します。"},
+            ],
             "developer_use_case": "日次調査と実装補助に使えます。",
             "implementation_difficulty": "medium: 設定が必要です。",
             "pricing_or_license": "MIT",
+            "adoption_reason": "運用適合性: 日次運用へ段階導入しやすいため。",
             "ai_pulse_fit": ["収集基盤"],
             "ideastash_fit_public": ["エージェント運用"],
             "risk_notes": ["保守状況を確認してください"],
@@ -324,6 +328,7 @@ implementation_outline:
                 "stargazers_count": 100,
                 "forks_count": 5,
                 "open_issues_count": 2,
+                "created_at": "2026-06-01T00:00:00Z",
                 "pushed_at": "2026-06-13T00:00:00Z",
             }
         if url.endswith("/readme"):
@@ -333,9 +338,14 @@ implementation_outline:
     def fake_eval(_prompt, _schema):
         return {
             "summary": "AI 開発の補助ツールです。",
+            "feature_outline": [
+                {"lens": "Capability", "text": "調査補助を自動化します。"},
+                {"lens": "Activation", "text": "Python で小さく導入できます。"},
+            ],
             "developer_use_case": "実装前調査に使えます。",
             "implementation_difficulty": "easy: Python だけで試せます。",
             "pricing_or_license": "MIT",
+            "adoption_reason": "運用適合性: 収集基盤に低コストで接続できるため。",
             "ai_pulse_fit": ["収集基盤"],
             "ideastash_fit_public": ["UI/UX 改善"],
             "risk_notes": ["スター数だけで判断しないでください"],
@@ -361,6 +371,10 @@ implementation_outline:
     assert r"C:\Users\hidek\Obsidian\IdeaStash" not in public_text
     row = json.loads(public_text)
     assert row["repo"] == "acme/useful-repo"
+    assert row["created_at"] == "2026-06-01T00:00:00Z"
+    assert row["thumbnail_url"] == "https://opengraph.githubassets.com/ai-pulse/acme/useful-repo"
+    assert row["feature_outline"][0]["lens"] == "Capability"
+    assert row["adoption_reason"].startswith("運用適合性")
     assert row["ideastash_fit_public"] == ["UI/UX 改善"]
     private_text = (tmp_path / "repo_radar_matches_20260613.jsonl").read_text(encoding="utf-8")
     assert "SecretTask-mobile-copy-2026-06-01.md" in private_text

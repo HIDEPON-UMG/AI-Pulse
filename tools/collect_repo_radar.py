@@ -66,18 +66,20 @@ EXCLUDED_REPO_NAMES = {
 }
 PUBLIC_FIELDS = {
     "date", "repo", "repo_url", "name", "description", "homepage", "language",
-    "license", "topics", "stars", "forks", "open_issues", "pushed_at",
-    "latest_release", "signals", "score", "summary", "developer_use_case",
-    "implementation_difficulty", "pricing_or_license", "ai_pulse_fit",
-    "ideastash_fit_public", "risk_notes", "status",
+    "license", "topics", "stars", "forks", "open_issues", "created_at", "pushed_at",
+    "thumbnail_url", "latest_release", "signals", "score", "summary", "feature_outline",
+    "developer_use_case", "implementation_difficulty", "pricing_or_license",
+    "adoption_reason", "ai_pulse_fit", "ideastash_fit_public", "risk_notes", "status",
 }
 REPO_RADAR_SCHEMA = {
     "type": "object",
     "required": [
         "summary",
+        "feature_outline",
         "developer_use_case",
         "implementation_difficulty",
         "pricing_or_license",
+        "adoption_reason",
         "ai_pulse_fit",
         "ideastash_fit_public",
         "risk_notes",
@@ -85,9 +87,21 @@ REPO_RADAR_SCHEMA = {
     ],
     "properties": {
         "summary": {"type": "string"},
+        "feature_outline": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["lens", "text"],
+                "properties": {
+                    "lens": {"type": "string"},
+                    "text": {"type": "string"},
+                },
+            },
+        },
         "developer_use_case": {"type": "string"},
         "implementation_difficulty": {"type": "string"},
         "pricing_or_license": {"type": "string"},
+        "adoption_reason": {"type": "string"},
         "ai_pulse_fit": {"type": "array", "items": {"type": "string"}},
         "ideastash_fit_public": {"type": "array", "items": {"type": "string"}},
         "risk_notes": {"type": "array", "items": {"type": "string"}},
@@ -205,7 +219,9 @@ def fetch_github_repo(repo: str, *, request_json=_request_json) -> dict:
         "stars": int(meta.get("stargazers_count") or 0),
         "forks": int(meta.get("forks_count") or 0),
         "open_issues": int(meta.get("open_issues_count") or 0),
+        "created_at": meta.get("created_at") or "",
         "pushed_at": meta.get("pushed_at") or "",
+        "thumbnail_url": f"https://opengraph.githubassets.com/ai-pulse/{owner_repo}",
         "latest_release": latest_release,
         "readme_excerpt": readme[:4000],
     }
@@ -557,9 +573,29 @@ def _validate_eval(payload: dict) -> dict:
         raise _llm_error(f"Repo Radar 評価の必須キー欠落: {missing}")
     if not isinstance(payload["score"], int) or not 0 <= payload["score"] <= 100:
         raise _llm_error("Repo Radar 評価 score が 0〜100 の int ではありません")
-    for key in ("summary", "developer_use_case", "implementation_difficulty", "pricing_or_license"):
+    for key in (
+        "summary",
+        "developer_use_case",
+        "implementation_difficulty",
+        "pricing_or_license",
+        "adoption_reason",
+    ):
         if not isinstance(payload[key], str) or not payload[key].strip():
             raise _llm_error(f"Repo Radar 評価 {key} が空です")
+    outline = payload["feature_outline"]
+    if (
+        not isinstance(outline, list)
+        or not outline
+        or not all(
+            isinstance(v, dict)
+            and isinstance(v.get("lens"), str)
+            and v["lens"].strip()
+            and isinstance(v.get("text"), str)
+            and v["text"].strip()
+            for v in outline
+        )
+    ):
+        raise _llm_error("Repo Radar 評価 feature_outline が lens/text object 配列ではありません")
     for key in ("ai_pulse_fit", "ideastash_fit_public", "risk_notes"):
         if not isinstance(payload[key], list) or not all(isinstance(v, str) and v.strip() for v in payload[key]):
             raise _llm_error(f"Repo Radar 評価 {key} が文字列配列ではありません")
@@ -592,9 +628,12 @@ def _ollama_chat_json(
         f"[匿名化済み IdeaStash カテゴリ]\n{json.dumps(public_tasks, ensure_ascii=False)}\n\n"
         "[出力]\n"
         "- summary: 何をする repo かを日本語 2 文以内。\n"
+        "- feature_outline: CATR フレーム（Capability/Activation/Trade-off/Reuse）に沿って、"
+        "lens と text を持つ object 配列。単なる機能列挙ではなく各観点で説明。\n"
         "- developer_use_case: AI 駆動開発でどう使えるか。\n"
         "- implementation_difficulty: easy|medium|hard と理由。\n"
         "- pricing_or_license: OSS / 商用 / 課金不明 / API key 必要など。\n"
+        "- adoption_reason: 運用適合性の観点から、採用候補にする理由を 1 文で簡潔に。\n"
         "- ai_pulse_fit: AI-Pulse のどの機能に効くかを匿名カテゴリで列挙。\n"
         "- ideastash_fit_public: 具体タスク名ではなく匿名カテゴリだけを列挙。\n"
         "- risk_notes: ライセンス、保守、セキュリティ、課金の懸念。\n"

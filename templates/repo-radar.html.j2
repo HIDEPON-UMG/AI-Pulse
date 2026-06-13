@@ -36,7 +36,7 @@
     .radar-list { list-style: none; margin: 0; padding: var(--s-24) 0 var(--s-48); display: grid; gap: var(--s-16); }
     .radar-card {
       display: grid;
-      grid-template-columns: 78px minmax(0, 1fr);
+      grid-template-columns: 148px minmax(0, 1fr);
       gap: var(--s-24);
       padding: var(--s-24);
       background: var(--bg-elev);
@@ -46,8 +46,19 @@
       box-shadow: var(--shadow-1);
     }
     .radar-card:hover { border-left-color: var(--c-agent); background: color-mix(in oklab, var(--bg-elev) 90%, var(--accent)); }
+    .radar-side { min-width: 0; }
+    .radar-thumb {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
     .radar-score .num {
       display: block;
+      margin-top: var(--s-12, 12px);
       font-family: var(--font-mono);
       font-size: 30px;
       line-height: 1;
@@ -81,6 +92,38 @@
     }
     .radar-card h2 a:hover { color: var(--accent); }
     .radar-summary { margin: 0 0 var(--s-16); color: var(--fg-sub); font-size: var(--t-sm); line-height: 1.75; }
+    .radar-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--s-8);
+      margin: var(--s-12, 12px) 0 var(--s-16);
+    }
+    .radar-metric {
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: var(--r-sm);
+      padding: var(--s-8);
+      min-width: 0;
+    }
+    .metric-label {
+      display: block;
+      color: var(--fg-mute);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .metric-value {
+      display: block;
+      margin-top: 3px;
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
     .radar-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -93,6 +136,31 @@
     }
     .radar-box .label { display: block; margin-bottom: 3px; }
     .radar-box p { margin: 0; color: var(--fg-sub); font-size: 13.5px; line-height: 1.7; }
+    .radar-box.wide { grid-column: 1 / -1; }
+    .radar-outline,
+    .radar-signals {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 7px;
+    }
+    .radar-outline li,
+    .radar-signals li {
+      color: var(--fg-sub);
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+    .radar-outline b,
+    .radar-signals b {
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .radar-signals a { color: var(--c-editor); overflow-wrap: anywhere; }
     .radar-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s-8); }
     .radar-tags span {
       display: inline-flex;
@@ -118,7 +186,10 @@
     }
     @media (max-width: 760px) {
       .radar-card { grid-template-columns: 1fr; gap: var(--s-16); }
+      .radar-thumb { max-width: 320px; }
       .radar-score { display: flex; align-items: baseline; gap: 8px; }
+      .radar-score .num { margin-top: 0; }
+      .radar-metrics { grid-template-columns: 1fr; }
       .radar-grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -148,9 +219,17 @@
     <ol class="radar-list">
       {% for r in repo_radar %}
       <li class="radar-card">
-        <div class="radar-score">
-          <span class="num">{{ r.score }}</span>
-          <span class="lbl">UTILITY</span>
+        <div class="radar-side">
+          <img
+            class="radar-thumb"
+            src="{{ r.thumbnail_url or ('https://opengraph.githubassets.com/ai-pulse/' ~ r.repo) }}"
+            alt="{{ r.repo }} repository preview"
+            loading="lazy"
+          />
+          <div class="radar-score">
+            <span class="num">{{ r.score }}</span>
+            <span class="lbl">UTILITY</span>
+          </div>
         </div>
         <article class="radar-body">
           <div class="radar-topline">
@@ -159,22 +238,59 @@
           </div>
           <h2><a href="{{ r.repo_url }}" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></h2>
           <p class="radar-summary">{{ r.summary }}</p>
+          <div class="radar-metrics" aria-label="Repository metrics">
+            <div class="radar-metric">
+              <span class="metric-label">Stars</span>
+              <span class="metric-value">{{ "{:,}".format(r.stars or 0) }}</span>
+            </div>
+            <div class="radar-metric">
+              <span class="metric-label">Created</span>
+              <span class="metric-value">{{ (r.created_at or "n/a")[:10] }}</span>
+            </div>
+            <div class="radar-metric">
+              <span class="metric-label">Updated</span>
+              <span class="metric-value">{{ (r.pushed_at or "n/a")[:10] }}</span>
+            </div>
+          </div>
           <div class="radar-grid">
-            <div class="radar-box">
-              <span class="label">Use case</span>
-              <p>{{ r.developer_use_case }}</p>
+            <div class="radar-box wide">
+              <span class="label">Feature outline / CATR</span>
+              <ul class="radar-outline">
+                {% if r.feature_outline %}
+                {% for item in r.feature_outline %}
+                <li><b>{{ item.lens }}</b> {{ item.text }}</li>
+                {% endfor %}
+                {% else %}
+                <li><b>Capability</b> {{ r.summary }}</li>
+                <li><b>Activation</b> {{ r.developer_use_case }}</li>
+                <li><b>Trade-off</b> {{ (r.risk_notes or ["特記事項なし"]) | join(" / ") }}</li>
+                <li><b>Reuse</b> {{ (r.ai_pulse_fit or []) | join(" / ") or "適用先は評価中" }}</li>
+                {% endif %}
+              </ul>
             </div>
             <div class="radar-box">
-              <span class="label">Difficulty</span>
-              <p>{{ r.implementation_difficulty }}</p>
+              <span class="label">Adoption reason / Ops fit</span>
+              <p>{{ r.adoption_reason or r.developer_use_case }}</p>
             </div>
             <div class="radar-box">
               <span class="label">License / cost</span>
               <p>{{ r.pricing_or_license }}</p>
             </div>
             <div class="radar-box">
+              <span class="label">Difficulty</span>
+              <p>{{ r.implementation_difficulty }}</p>
+            </div>
+            <div class="radar-box">
               <span class="label">Risks</span>
               <p>{{ (r.risk_notes or ["特記事項なし"]) | join(" / ") }}</p>
+            </div>
+            <div class="radar-box wide">
+              <span class="label">Adoption trigger</span>
+              <ul class="radar-signals">
+                {% for s in r.signals or [] %}
+                <li><b>{{ s.source }}</b> <a href="{{ s.url or r.repo_url }}" target="_blank" rel="noopener noreferrer">{{ s.title or r.repo }}</a></li>
+                {% endfor %}
+              </ul>
             </div>
           </div>
           <div class="radar-tags" aria-label="AI-Pulse 適用候補">
@@ -182,11 +298,9 @@
             {% for fit in r.ideastash_fit_public or [] %}<span>{{ fit }}</span>{% endfor %}
           </div>
           <div class="radar-stats">
-            <span>★ {{ r.stars }}</span>
             <span>fork {{ r.forks }}</span>
             <span>{{ r.language or "language n/a" }}</span>
             <span>{{ r.license or "license n/a" }}</span>
-            {% if r.pushed_at %}<span>pushed {{ r.pushed_at[:10] }}</span>{% endif %}
           </div>
         </article>
       </li>

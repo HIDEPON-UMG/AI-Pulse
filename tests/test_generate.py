@@ -173,14 +173,21 @@ class TestGenerate(unittest.TestCase):
             "stars": 100,
             "forks": 5,
             "open_issues": 1,
+            "created_at": "2026-06-01T00:00:00Z",
             "pushed_at": "2026-06-13T00:00:00Z",
+            "thumbnail_url": "https://opengraph.githubassets.com/ai-pulse/acme/useful-repo",
             "latest_release": None,
-            "signals": [{"source": "hn", "title": "Show HN", "url": "u"}],
+            "signals": [{"source": "hn", "title": "Show HN: Useful repo", "url": "https://news.ycombinator.com/item?id=1"}],
             "score": 88,
             "summary": "AI 開発の補助ツールです。",
+            "feature_outline": [
+                {"lens": "Capability", "text": "LLM ワークフローの調査を補助する"},
+                {"lens": "Activation", "text": "既存 Python 環境に追加しやすい"},
+            ],
             "developer_use_case": "実装前調査に使えます。",
             "implementation_difficulty": "easy: Python だけで試せます。",
             "pricing_or_license": "MIT",
+            "adoption_reason": "運用適合性: AI-Pulse の収集基盤へ小さく試せるため採用候補にする。",
             "ai_pulse_fit": ["収集基盤"],
             "ideastash_fit_public": ["UI/UX 改善"],
             "risk_notes": ["保守状況を確認してください"],
@@ -197,6 +204,16 @@ class TestGenerate(unittest.TestCase):
             gp.collect_repo_radar.load_public_rows = original
         self.assertIn("acme/useful-repo", html)
         self.assertIn("UI/UX 改善", html)
+        self.assertIn("Show HN: Useful repo", html)
+        self.assertIn("news.ycombinator.com/item?id=1", html)
+        self.assertIn("Capability", html)
+        self.assertIn("Activation", html)
+        self.assertIn("運用適合性", html)
+        self.assertIn("2026-06-01", html)
+        self.assertIn("2026-06-13", html)
+        self.assertIn("class=\"metric-value\">100</span>", html)
+        self.assertIn("radar-thumb", html)
+        self.assertIn("opengraph.githubassets.com/ai-pulse/acme/useful-repo", html)
         self.assertNotIn("SecretTask-mobile-copy-2026-06-01.md", html)
         self.assertNotIn("スマホのコピーボタン修正", html)
         self.assertNotIn(r"C:\Users\hidek\Obsidian", html)
