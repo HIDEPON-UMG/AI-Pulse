@@ -13,6 +13,14 @@ AUTO_END = "<!-- repo-radar:auto:end -->"
 MANUAL_START = "<!-- repo-radar:manual:start -->"
 MANUAL_END = "<!-- repo-radar:manual:end -->"
 DEFAULT_VAULT = Path(os.environ.get("IDEASTASH_VAULT", Path.home() / "Obsidian" / "IdeaStash"))
+OPERATIONS_DEFAULTS: dict[str, Any] = {
+    "adoption_status": "candidate",
+    "related_idea": [],
+    "trial_result": "not_tested",
+    "setup_cost": "unknown",
+    "risk": "unknown",
+    "next_action": "review",
+}
 
 
 def _yaml_scalar(value: Any) -> str:
@@ -26,9 +34,15 @@ def _yaml_scalar(value: Any) -> str:
     return text
 
 
+def _yaml_block(value: Any) -> list[str]:
+    text = str(value or "").strip() or "未設定"
+    text = re.sub(r"\s+", " ", text)
+    return [">-", f"  {text}"]
+
+
 def _yaml_list(values: list[Any]) -> list[str]:
     if not values:
-        return ["[]"]
+        return [" []"]
     return [""] + [f"  - {_yaml_scalar(v)}" for v in values]
 
 
@@ -37,7 +51,16 @@ def _safe_filename(repo: str) -> str:
     return f"{owner}__{name}.md"
 
 
-def _frontmatter(row: dict[str, Any]) -> str:
+def _normalize_list(value: Any) -> list[Any]:
+    if value in (None, "", "[]"):
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _frontmatter(row: dict[str, Any], existing: str | None = None) -> str:
+    existing_fm = _parse_frontmatter(existing) if existing else {}
     tags = sorted({
         "repo-radar",
         "cat/repository",
@@ -62,6 +85,14 @@ def _frontmatter(row: dict[str, Any]) -> str:
     lines.append("topics:" + "\n".join(_yaml_list(row.get("topics") or [])))
     lines.append("ai_pulse_fit:" + "\n".join(_yaml_list(row.get("ai_pulse_fit") or [])))
     lines.append("ideastash_fit_public:" + "\n".join(_yaml_list(row.get("ideastash_fit_public") or [])))
+    lines.append("what_it_does: " + "\n".join(_yaml_block(row.get("developer_use_case"))))
+    lines.append("ops_fit: " + "\n".join(_yaml_block(row.get("adoption_reason"))))
+    for key, default in OPERATIONS_DEFAULTS.items():
+        value = existing_fm.get(key, default)
+        if isinstance(default, list):
+            lines.append(f"{key}:" + "\n".join(_yaml_list(_normalize_list(value))))
+        else:
+            lines.append(f"{key}: {_yaml_scalar(value)}")
     lines.append("tags:" + "\n".join(_yaml_list(tags)))
     lines.append("---")
     return "\n".join(lines)
@@ -161,7 +192,7 @@ def _manual_block(existing: str | None) -> str:
 def render_note(row: dict[str, Any], existing: str | None = None) -> str:
     """1 repo の Obsidian ノート本文を生成する。"""
     return "\n\n".join([
-        _frontmatter(row),
+        _frontmatter(row, existing),
         _auto_body(row).strip(),
         _manual_block(existing),
     ]) + "\n"

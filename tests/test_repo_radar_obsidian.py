@@ -52,6 +52,13 @@ def test_export_repo_radar_notes_preserves_manual_block_and_avoids_private_leaks
     note.write_text(
         """---
 repo: acme/useful-repo
+adoption_status: testing
+related_idea:
+  - ideas/example.md
+trial_result: promising
+setup_cost: low
+risk: medium
+next_action: run smoke
 ---
 <!-- repo-radar:auto:start -->
 old generated
@@ -76,9 +83,42 @@ old generated
     assert "## 概要" in text
     assert "## Codex 実装時の使いどころ" in text
     assert "[[repo-radar/acme__useful-repo]]" not in text
+    assert "adoption_status: testing" in text
+    assert "related_idea:\n  - ideas/example.md" in text
+    assert "trial_result: promising" in text
+    assert "setup_cost: low" in text
+    assert "risk: medium" in text
+    assert "next_action: run smoke" in text
     assert "- 残したい観察" in text
     assert "PrivateTaskName" not in text
     assert "LOCAL_IDEASTASH_PATH" not in text
+
+
+def test_render_note_includes_repo_radar_operations_properties_and_valid_empty_lists():
+    row = {
+        **_repo_row(),
+        "topics": [],
+        "ideastash_fit_public": [],
+        "developer_use_case": "日次レビューで候補の用途を把握できます。",
+        "adoption_reason": "運用適合性: 低リスクで試用ログへ接続できるため。",
+    }
+
+    text = obsidian.render_note(row)
+
+    assert "what_it_does: >-" in text
+    assert "  日次レビューで候補の用途を把握できます。" in text
+    assert "ops_fit: >-" in text
+    assert "  運用適合性: 低リスクで試用ログへ接続できるため。" in text
+    assert "adoption_status: candidate" in text
+    assert "related_idea: []" in text
+    assert "trial_result: not_tested" in text
+    assert "setup_cost: unknown" in text
+    assert "risk: unknown" in text
+    assert "next_action: review" in text
+    assert "topics: []" in text
+    assert "topics:[]" not in text
+    assert "ideastash_fit_public: []" in text
+    assert "ideastash_fit_public:[]" not in text
 
 
 def test_search_related_repos_returns_fit_reason_from_generated_notes(tmp_path: Path):
