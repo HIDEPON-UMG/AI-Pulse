@@ -35,8 +35,14 @@ function Invoke-Native {
         [string[]]$Arguments
     )
     Write-Log "$Step 開始: $FilePath $($Arguments -join ' ')"
-    $Output = & $FilePath @Arguments 2>&1
-    $Code = $LASTEXITCODE
+    $PreviousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $Output = & $FilePath @Arguments 2>&1
+        $Code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+    }
     if ($Output) {
         $Output | ForEach-Object {
             Add-Content -LiteralPath $LogPath -Value $_ -Encoding UTF8
@@ -50,8 +56,14 @@ function Invoke-Native {
 
 function Invoke-GitCapture {
     param([string[]]$Arguments)
-    $Output = & git @Arguments 2>&1
-    $Code = $LASTEXITCODE
+    $PreviousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $Output = & git @Arguments 2>&1
+        $Code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+    }
     if ($Code -ne 0) {
         if ($Output) {
             $Output | ForEach-Object {

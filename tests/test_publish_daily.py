@@ -8,6 +8,15 @@ def test_publish_daily_tracks_repo_radar_data() -> None:
     assert "'data\\repo_radar.jsonl'" in script
 
 
+def test_publish_daily_does_not_treat_native_stderr_as_failure() -> None:
+    """git push の通常 stderr 出力を PowerShell 例外として誤検出しない。"""
+    script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")
+
+    assert "$PreviousErrorActionPreference = $ErrorActionPreference" in script
+    assert "$ErrorActionPreference = 'Continue'" in script
+    assert "$ErrorActionPreference = $PreviousErrorActionPreference" in script
+
+
 def test_run_daily_uses_separate_publish_log() -> None:
     """日次ログを公開プロセスへ共有せず、Add-Content のロック競合を避ける。"""
     script = Path("scripts/run_daily.ps1").read_text(encoding="utf-8-sig")
