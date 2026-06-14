@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import email.utils
+import argparse
 import json
 import os
 import re
@@ -398,6 +399,78 @@ def fetch_x_rss_candidates(
     return items[:limit], degraded
 
 
+def fetch_github_backfill_candidates(
+    *,
+    request_json=_request_json,
+    days: int = 90,
+    per_query_limit: int = 20,
+    max_items: int = 120,
+    today: str | None = None,
+) -> tuple[list[dict], bool]:
+    """GitHub Search API から過去数か月で目立った AI 開発系 repo 候補を収集する。
+
+    日次 source ではなく初回在庫補完用なので、collect(backfill_days=...) で明示された時だけ使う。
+    """
+    raw_queries = os.environ.get(
+        "REPO_RADAR_BACKFILL_QUERIES",
+        "\n".join([
+            "agentic coding",
+            "ai coding agent",
+            "mcp server",
+            "llm developer tools",
+            "ai code review",
+            "cursor claude codex",
+            "rag developer tools",
+        ]),
+    )
+    try:
+        base_date = datetime.strptime(today, "%Y-%m-%d").date() if today else datetime.now(timezone.utc).date()
+    except ValueError:
+        base_date = datetime.now(timezone.utc).date()
+    cutoff = (base_date - timedelta(days=max(1, days))).isoformat()
+    source = f"github-backfill:{days}d"
+    headers = _github_headers()
+    seen: set[str] = set()
+    items: list[dict] = []
+    degraded = False
+    for query in [q.strip() for q in raw_queries.splitlines() if q.strip()]:
+        search_query = f"{query} created:>={cutoff} stars:>=25"
+        params = (
+            f"q={urllib.parse.quote_plus(search_query, safe=':=')}"
+            f"&sort=stars&order=desc&per_page={max(1, min(100, per_query_limit))}"
+        )
+        url = f"https://api.github.com/search/repositories?{params}"
+        try:
+            payload = request_json(url, headers=headers)
+        except Exception:
+            degraded = True
+            continue
+        for repo in payload.get("items") or []:
+            full_name = str(repo.get("full_name") or "").strip()
+            if not full_name or full_name.lower() in seen:
+                continue
+            seen.add(full_name.lower())
+            topics = repo.get("topics") or []
+            text = (
+                f"{repo.get('description') or ''} "
+                f"topics={','.join(str(t) for t in topics)} "
+                f"language={repo.get('language') or ''} "
+                f"created_at={repo.get('created_at') or ''} "
+                f"pushed_at={repo.get('pushed_at') or ''}"
+            ).strip()
+            items.append({
+                "source": source,
+                "title": full_name,
+                "url": repo.get("html_url") or f"https://github.com/{full_name}",
+                "text": text,
+                "points": int(repo.get("stargazers_count") or 0),
+                "comments": int(repo.get("forks_count") or 0),
+            })
+            if len(items) >= max_items:
+                return items, degraded
+    return items, degraded
+
+
 def _split_rss_locations(raw_paths: str) -> list[str]:
     return [part.strip() for part in re.split(r"[\r\n;]+", raw_paths or "") if part.strip()]
 
@@ -745,6 +818,9 @@ def collect(
     output_path: Path = REPO_RADAR_PATH,
     log_dir: Path = LOG_DIR,
     ideas_dir: Path | None = None,
+    backfill_days: int = 0,
+    backfill_per_query_limit: int = 20,
+    backfill_max_items: int = 120,
 ) -> dict:
     """Repo Radar を 1 回実行し、公開 JSONL と非公開 match log を更新する。"""
     date_key = today or datetime.now(timezone.utc).date().isoformat()
@@ -755,9 +831,22 @@ def collect(
         "skipped": 0,
         "degraded": 0,
         "ollama_errors": 0,
+        "backfill_candidates": 0,
         "output_path": str(output_path),
     }
     hn_items = fetch_hn_candidates(request_json=request_json)
+    backfill_items: list[dict] = []
+    if backfill_days > 0:
+        backfill_items, backfill_degraded = fetch_github_backfill_candidates(
+            request_json=request_json,
+            days=backfill_days,
+            per_query_limit=backfill_per_query_limit,
+            max_items=backfill_max_items,
+            today=date_key,
+        )
+        stats["backfill_candidates"] = len(backfill_items)
+        if backfill_degraded:
+            stats["degraded"] += 1
     x_rss_items, x_rss_degraded = fetch_x_rss_candidates()
     if x_rss_degraded:
         stats["degraded"] += 1
@@ -767,8 +856,17 @@ def collect(
     reddit_items, reddit_degraded = fetch_reddit_candidates(request_json=request_json)
     if reddit_degraded:
         stats["degraded"] += 1
-    merged = merge_signals([*hn_items, *x_rss_items, *x_items, *reddit_items])
-    signals = sorted(merged.values(), key=lambda item: item["score_hint"], reverse=True)[:max_candidates]
+    existing_repos = {
+        str(row.get("repo", "")).lower()
+        for row in _load_existing(output_path)
+        if row.get("repo")
+    }
+    merged = merge_signals([*backfill_items, *hn_items, *x_rss_items, *x_items, *reddit_items])
+    signals = [
+        item
+        for item in sorted(merged.values(), key=lambda item: item["score_hint"], reverse=True)
+        if str(item.get("repo", "")).lower() not in existing_repos
+    ][:max_candidates]
     stats["candidates"] = len(signals)
     idea_tasks = _read_ideastash_tasks(ideas_dir)
     public_rows: list[dict] = []
@@ -818,12 +916,28 @@ def load_public_rows(path: Path = REPO_RADAR_PATH, *, limit: int = 80) -> list[d
 
 
 def main() -> None:
-    stats = collect()
+    parser = argparse.ArgumentParser(description="AI-Pulse Repo Radar を実行する")
+    parser.add_argument("--backfill-days", type=int, default=0, help="GitHub Search API で過去 N 日の有名化 repo を初回補完する")
+    parser.add_argument("--max-candidates", type=int, default=20)
+    parser.add_argument("--max-enrich", type=int, default=12)
+    parser.add_argument("--max-evaluate", type=int, default=8)
+    parser.add_argument("--backfill-per-query-limit", type=int, default=20)
+    parser.add_argument("--backfill-max-items", type=int, default=120)
+    args = parser.parse_args()
+    stats = collect(
+        max_candidates=args.max_candidates,
+        max_enrich=args.max_enrich,
+        max_evaluate=args.max_evaluate,
+        backfill_days=args.backfill_days,
+        backfill_per_query_limit=args.backfill_per_query_limit,
+        backfill_max_items=args.backfill_max_items,
+    )
     print(
         "[repo_radar] "
         f"candidates={stats['candidates']} enriched={stats['enriched']} "
         f"evaluated={stats['evaluated']} skipped={stats['skipped']} "
-        f"degraded={stats['degraded']} ollama_errors={stats['ollama_errors']}"
+        f"degraded={stats['degraded']} ollama_errors={stats['ollama_errors']} "
+        f"backfill_candidates={stats['backfill_candidates']}"
     )
 
 

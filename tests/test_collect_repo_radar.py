@@ -243,6 +243,58 @@ def test_x_recent_search_extracts_github_signal(monkeypatch):
     assert seen["headers"]["Authorization"] == "Bearer x-token"
 
 
+def test_github_backfill_candidates_search_recent_popular_repos(monkeypatch):
+    monkeypatch.setenv("REPO_RADAR_BACKFILL_QUERIES", "agentic coding\nmcp server")
+    seen_urls = []
+
+    def fake_request_json(url, **kwargs):
+        seen_urls.append(url)
+        assert kwargs["headers"]["User-Agent"] == "AI-Pulse-Repo-Radar/0.1"
+        return {
+            "items": [
+                {
+                    "full_name": "acme/agent-tool",
+                    "html_url": "https://github.com/acme/agent-tool",
+                    "description": "Agentic coding helper",
+                    "stargazers_count": 1234,
+                    "forks_count": 56,
+                    "topics": ["agents", "coding"],
+                    "language": "Python",
+                    "created_at": "2026-04-01T00:00:00Z",
+                    "pushed_at": "2026-06-14T00:00:00Z",
+                },
+                {
+                    "full_name": "acme/agent-tool",
+                    "html_url": "https://github.com/acme/agent-tool",
+                    "description": "duplicate",
+                    "stargazers_count": 1200,
+                    "forks_count": 50,
+                },
+            ]
+        }
+
+    items, degraded = radar.fetch_github_backfill_candidates(
+        request_json=fake_request_json,
+        days=90,
+        per_query_limit=2,
+        max_items=3,
+        today="2026-06-15",
+    )
+    assert degraded is False
+    assert len(seen_urls) == 2
+    assert "created:%3E=2026-03-17" in seen_urls[0]
+    assert items == [
+        {
+            "source": "github-backfill:90d",
+            "title": "acme/agent-tool",
+            "url": "https://github.com/acme/agent-tool",
+            "text": "Agentic coding helper topics=agents,coding language=Python created_at=2026-04-01T00:00:00Z pushed_at=2026-06-14T00:00:00Z",
+            "points": 1234,
+            "comments": 56,
+        }
+    ]
+
+
 def test_ollama_eval_validates_schema_and_retries_once(monkeypatch):
     monkeypatch.setattr(radar.config, "OLLAMA_MAX_RETRIES", 1)
     calls = []
@@ -379,3 +431,161 @@ implementation_outline:
     private_text = (tmp_path / "repo_radar_matches_20260613.jsonl").read_text(encoding="utf-8")
     assert "SecretTask-mobile-copy-2026-06-01.md" in private_text
     assert "スマホのコピーボタン修正" in private_text
+
+
+def test_collect_includes_backfill_only_when_requested(tmp_path, monkeypatch):
+    def fake_backfill(**_kwargs):
+        return ([
+            {
+                "source": "github-backfill:180d",
+                "title": "acme/backfill-repo",
+                "url": "https://github.com/acme/backfill-repo",
+                "text": "Backfill repo",
+                "points": 900,
+                "comments": 25,
+            }
+        ], False)
+
+    def fake_request_json(url, **_kwargs):
+        if url.endswith("topstories.json") or url.endswith("beststories.json"):
+            return []
+        if url.endswith("showstories.json") or url.endswith("newstories.json"):
+            return []
+        if url.endswith("/repos/acme/backfill-repo"):
+            return {
+                "html_url": "https://github.com/acme/backfill-repo",
+                "name": "backfill-repo",
+                "description": "Backfill repo",
+                "homepage": "",
+                "language": "TypeScript",
+                "license": {"spdx_id": "Apache-2.0"},
+                "topics": ["agent"],
+                "stargazers_count": 900,
+                "forks_count": 25,
+                "open_issues_count": 3,
+                "created_at": "2026-02-01T00:00:00Z",
+                "pushed_at": "2026-06-14T00:00:00Z",
+            }
+        if url.endswith("/readme"):
+            return {"encoding": "base64", "content": "UkVBRE1F"}
+        raise RuntimeError(url)
+
+    def fake_eval(_prompt, _schema):
+        return {
+            "summary": "AI 開発を支援するバックフィル候補です。",
+            "feature_outline": [{"lens": "Capability", "text": "開発作業を補助します。"}],
+            "developer_use_case": "エージェント開発の補助に使えます。",
+            "implementation_difficulty": "medium: 導入設定が必要です。",
+            "pricing_or_license": "Apache-2.0",
+            "adoption_reason": "運用適合性: 初回在庫として評価する価値が高いため。",
+            "ai_pulse_fit": ["Repo Radar"],
+            "ideastash_fit_public": ["エージェント運用"],
+            "risk_notes": ["過去急伸候補なので現在の保守状況を確認してください"],
+            "score": 84,
+        }
+
+    monkeypatch.setattr(radar, "fetch_github_backfill_candidates", fake_backfill)
+    monkeypatch.delenv("REDDIT_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("REPO_RADAR_X_RSS_PATHS", raising=False)
+
+    out = tmp_path / "repo_radar.jsonl"
+    stats = radar.collect(
+        request_json=fake_request_json,
+        eval_call_once=fake_eval,
+        output_path=out,
+        log_dir=tmp_path,
+        today="2026-06-15",
+        backfill_days=180,
+        max_candidates=5,
+        max_enrich=5,
+        max_evaluate=1,
+    )
+
+    assert stats["evaluated"] == 1
+    assert stats["backfill_candidates"] == 1
+    row = json.loads(out.read_text(encoding="utf-8"))
+    assert row["repo"] == "acme/backfill-repo"
+    assert row["signals"][0]["source"] == "github-backfill:180d"
+
+
+def test_collect_skips_repos_already_in_public_rows(tmp_path, monkeypatch):
+    def fake_backfill(**_kwargs):
+        return ([
+            {
+                "source": "github-backfill:180d",
+                "title": "acme/existing-repo",
+                "url": "https://github.com/acme/existing-repo",
+                "text": "Already known",
+                "points": 1000,
+                "comments": 10,
+            },
+            {
+                "source": "github-backfill:180d",
+                "title": "acme/new-repo",
+                "url": "https://github.com/acme/new-repo",
+                "text": "New repo",
+                "points": 900,
+                "comments": 9,
+            },
+        ], False)
+
+    def fake_request_json(url, **_kwargs):
+        if url.endswith("topstories.json") or url.endswith("beststories.json"):
+            return []
+        if url.endswith("showstories.json") or url.endswith("newstories.json"):
+            return []
+        if url.endswith("/repos/acme/new-repo"):
+            return {
+                "html_url": "https://github.com/acme/new-repo",
+                "name": "new-repo",
+                "description": "New repo",
+                "homepage": "",
+                "language": "Python",
+                "license": {"spdx_id": "MIT"},
+                "topics": ["agent"],
+                "stargazers_count": 900,
+                "forks_count": 9,
+                "open_issues_count": 1,
+                "created_at": "2026-03-01T00:00:00Z",
+                "pushed_at": "2026-06-14T00:00:00Z",
+            }
+        if url.endswith("/readme"):
+            return {"encoding": "base64", "content": "UkVBRE1F"}
+        raise RuntimeError(url)
+
+    def fake_eval(_prompt, _schema):
+        return {
+            "summary": "新規 repo だけを評価します。",
+            "feature_outline": [{"lens": "Capability", "text": "重複を避けます。"}],
+            "developer_use_case": "バックフィルの小分け実行に使えます。",
+            "implementation_difficulty": "easy: 追加設定は不要です。",
+            "pricing_or_license": "MIT",
+            "adoption_reason": "運用適合性: 既存候補の再評価を避けられるため。",
+            "ai_pulse_fit": ["Repo Radar"],
+            "ideastash_fit_public": ["エージェント運用"],
+            "risk_notes": ["重複除外後の候補数を確認してください"],
+            "score": 80,
+        }
+
+    out = tmp_path / "repo_radar.jsonl"
+    out.write_text(json.dumps({"date": "2026-06-14", "repo": "acme/existing-repo"}) + "\n", encoding="utf-8")
+    monkeypatch.setattr(radar, "fetch_github_backfill_candidates", fake_backfill)
+    monkeypatch.delenv("REDDIT_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("REPO_RADAR_X_RSS_PATHS", raising=False)
+
+    stats = radar.collect(
+        request_json=fake_request_json,
+        eval_call_once=fake_eval,
+        output_path=out,
+        log_dir=tmp_path,
+        today="2026-06-15",
+        backfill_days=180,
+        max_candidates=5,
+        max_enrich=5,
+        max_evaluate=2,
+    )
+
+    assert stats["evaluated"] == 1
+    repos = [json.loads(line)["repo"] for line in out.read_text(encoding="utf-8").splitlines()]
+    assert "acme/existing-repo" in repos
+    assert "acme/new-repo" in repos
