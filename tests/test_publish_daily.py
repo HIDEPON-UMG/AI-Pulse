@@ -24,3 +24,11 @@ def test_run_daily_uses_separate_publish_log() -> None:
 
     assert "$PublishLogPath" in publish_block
     assert "-File $Publish -LogPath $LogPath" not in publish_block
+
+
+def test_publish_daily_verifies_public_freshness_after_push() -> None:
+    """push 成功だけで完了扱いせず、公開 HTML の更新日まで確認する。"""
+    script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")
+
+    assert "tools\\check_public_freshness.py" in script
+    assert "--expected-date" in script

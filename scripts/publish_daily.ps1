@@ -141,6 +141,12 @@ try {
         throw "push 後の remote HEAD 不一致: local=$LocalHead remote=$RemoteHead"
     }
 
+    $ExpectedBuildDate = Get-Date -Format 'yyyy-MM-dd'
+    Invoke-Native "public freshness gate" $PythonExe @(
+        'tools\check_public_freshness.py',
+        '--expected-date', $ExpectedBuildDate
+    )
+
     Write-Log "日次公開 完了: $Branch $LocalHead"
     exit 0
 } catch {

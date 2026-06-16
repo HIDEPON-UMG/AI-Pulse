@@ -125,6 +125,20 @@ class TestGenerate(unittest.TestCase):
         self.assertEqual(ctx["feed_count"], 1)
         self.assertEqual(ctx["feed"][0]["date_rel"], "1日前")
 
+    def test_default_build_date_uses_jst_for_github_actions(self):
+        """GitHub Actions の UTC 夜でも、日本時間の更新日を表示する。"""
+        class FakeDateTime(dt.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return dt.datetime(2026, 6, 16, 22, 33, tzinfo=dt.timezone.utc).astimezone(tz)
+
+        original_datetime = gp.dt.datetime
+        try:
+            gp.dt.datetime = FakeDateTime
+            self.assertEqual(gp._default_build_date(), dt.date(2026, 6, 17))
+        finally:
+            gp.dt.datetime = original_datetime
+
     def test_feed_title_uses_summary_point_instead_of_long_translated_headline(self):
         """トップ/カード見出しは長い直訳ではなく、summary_points の要約タイトルを使う。"""
         ent = {

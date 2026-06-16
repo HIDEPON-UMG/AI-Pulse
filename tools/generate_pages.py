@@ -29,6 +29,7 @@ STATIC_DIR = ROOT / "static"
 ASSETS_DIR = ROOT / "assets"
 DATA_DIR = ROOT / "data"
 OUT_DIR = ROOT / "site"
+JST = dt.timezone(dt.timedelta(hours=9), "Asia/Tokyo")
 
 # 出力へコピーするアセット拡張子（HTML は描画物なのでコピーしない）
 ASSET_SUFFIXES = {".css", ".js", ".svg", ".webmanifest", ".json", ".png", ".ico"}
@@ -111,6 +112,10 @@ def _buzz_level(score: int) -> str:
 
 def _d(s: str) -> dt.date:
     return dt.date.fromisoformat(s)
+
+
+def _default_build_date() -> dt.date:
+    return dt.datetime.now(JST).date()
 
 
 def _rel_label(ref: dt.date, d: dt.date) -> str:
@@ -582,7 +587,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
     サイトの更新表示は生成実行日に合わせる。ユーザー要件 2026-06-08。
     """
     ent_by_id = {e["entity_id"]: e for e in entities}
-    ref = build_date or dt.date.today()
+    ref = build_date or _default_build_date()
     latest_event_date = max((_d(e["date"]) for e in events), default=ref)
     latest_event_iso = latest_event_date.isoformat()
     all_events = sorted(events, key=lambda e: (e["date"], e["event_id"]), reverse=True)
