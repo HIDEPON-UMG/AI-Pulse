@@ -10,6 +10,7 @@ import tools.run_weekly as run_weekly
 @pytest.fixture(autouse=True)
 def _no_repo_radar_network(monkeypatch: pytest.MonkeyPatch) -> None:
     """既存の日次バッチテストでは Repo Radar の外部 API 呼び出しを止める。"""
+    monkeypatch.setattr(run_daily, "_run_repo_radar_x_rss", lambda: None)
     monkeypatch.setattr(run_daily.collect_repo_radar, "collect", lambda: {
         "candidates": 0,
         "enriched": 0,

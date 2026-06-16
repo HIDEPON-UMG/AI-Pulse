@@ -77,6 +77,41 @@ class TestBrandingInvariants(unittest.TestCase):
         for b in ["applyPalette", "initPalette", "aipulse-palette"]:
             self.assertNotIn(b, src, f"app.js に削除済み palette 関連識別子 {b!r} が残存")
 
+    def test_mobile_header_nav_is_horizontally_scrollable(self):
+        """スマホ幅で右端のメニューが見切れても横スクロールで到達できる。
+
+        固定ヘッダ内の flex item は、親子とも min-width: 0 が無いと内容幅で
+        viewport 外へ押し出される。app-nav を overflow-x: auto にし、リンクは
+        white-space: nowrap のまま保つことで、狭幅ではナビだけを横スライド
+        できる状態を locked-in する。
+        """
+        src = (ROOT / "static" / "theme.css").read_text(encoding="utf-8")
+        self.assertRegex(
+            src,
+            r"body\s*\{[^}]*overflow-x\s*:\s*hidden",
+            "body の横スクロール抑止が無く、狭幅でページ全体が横揺れしうる",
+        )
+        self.assertRegex(
+            src,
+            r"\.app-header\s*\{[^}]*min-width\s*:\s*0",
+            ".app-header が min-width: 0 を持たず、ナビを狭幅内で縮められない",
+        )
+        self.assertRegex(
+            src,
+            r"\.app-nav\s*\{[^}]*overflow-x\s*:\s*auto",
+            ".app-nav が overflow-x: auto を持たず、横スライドできない",
+        )
+        self.assertRegex(
+            src,
+            r"\.app-nav\s*\{[^}]*-webkit-overflow-scrolling\s*:\s*touch",
+            "iOS Safari 向けの慣性スクロール指定が無い",
+        )
+        self.assertRegex(
+            src,
+            r"\.app-nav\s+a\s*\{[^}]*white-space\s*:\s*nowrap",
+            ".app-nav a が nowrap を保っておらず、タブ文字が折り返されうる",
+        )
+
     # ---- (2) OGP 絶対 URL ----
 
     def test_built_pages_emit_absolute_og_image_url(self):
