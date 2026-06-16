@@ -77,13 +77,12 @@ class TestBrandingInvariants(unittest.TestCase):
         for b in ["applyPalette", "initPalette", "aipulse-palette"]:
             self.assertNotIn(b, src, f"app.js に削除済み palette 関連識別子 {b!r} が残存")
 
-    def test_mobile_header_nav_is_horizontally_scrollable(self):
-        """スマホ幅で右端のメニューが見切れても横スクロールで到達できる。
+    def test_mobile_header_nav_wraps_below_brand_without_horizontal_scroll(self):
+        """スマホ幅ではメニューを横スライドさせず、ロゴ行の下へ折り返す。
 
-        固定ヘッダ内の flex item は、親子とも min-width: 0 が無いと内容幅で
-        viewport 外へ押し出される。app-nav を overflow-x: auto にし、リンクは
-        white-space: nowrap のまま保つことで、狭幅ではナビだけを横スライド
-        できる状態を locked-in する。
+        2026-06-16 ユーザーフィードバック:
+        狭幅でナビだけを横スクロールする UI は使いづらいため、幅が足りない時は
+        ヘッダを 2 行構成にし、ブランド行の下にメニュー全体を表示する。
         """
         src = (ROOT / "static" / "theme.css").read_text(encoding="utf-8")
         self.assertRegex(
@@ -96,20 +95,38 @@ class TestBrandingInvariants(unittest.TestCase):
             r"\.app-header\s*\{[^}]*min-width\s*:\s*0",
             ".app-header が min-width: 0 を持たず、ナビを狭幅内で縮められない",
         )
+        mobile = re.search(r"@media\s*\(\s*max-width\s*:\s*560px\s*\)\s*\{(?P<body>.*)\n\}", src, re.S)
+        self.assertIsNotNone(mobile, "スマホ幅 @media (max-width: 560px) が無い")
+        mobile_css = mobile.group("body")
         self.assertRegex(
-            src,
-            r"\.app-nav\s*\{[^}]*overflow-x\s*:\s*auto",
-            ".app-nav が overflow-x: auto を持たず、横スライドできない",
+            mobile_css,
+            r"\.app-header\s*\{[^}]*flex-wrap\s*:\s*wrap",
+            "スマホ幅 .app-header が flex-wrap: wrap を持たず、メニューがロゴ下へ回れない",
         )
         self.assertRegex(
-            src,
+            mobile_css,
+            r"\.app-nav\s*\{[^}]*order\s*:\s*2",
+            "スマホ幅 .app-nav がブランド行の下に配置される order: 2 を持たない",
+        )
+        self.assertRegex(
+            mobile_css,
+            r"\.app-nav\s*\{[^}]*flex-basis\s*:\s*100%",
+            "スマホ幅 .app-nav が全幅行にならず、ロゴ横に残りうる",
+        )
+        self.assertRegex(
+            mobile_css,
+            r"\.app-nav\s*\{[^}]*overflow-x\s*:\s*visible",
+            "スマホ幅 .app-nav が横スクロールを残している",
+        )
+        self.assertRegex(
+            mobile_css,
+            r"\.app-nav\s+a\s*\{[^}]*flex\s*:\s*1\s+1\s+0",
+            "スマホ幅 .app-nav a が均等幅で収まる指定を持たない",
+        )
+        self.assertNotRegex(
+            mobile_css,
             r"\.app-nav\s*\{[^}]*-webkit-overflow-scrolling\s*:\s*touch",
-            "iOS Safari 向けの慣性スクロール指定が無い",
-        )
-        self.assertRegex(
-            src,
-            r"\.app-nav\s+a\s*\{[^}]*white-space\s*:\s*nowrap",
-            ".app-nav a が nowrap を保っておらず、タブ文字が折り返されうる",
+            "スマホ幅 .app-nav に横スライド用の慣性スクロール指定が残っている",
         )
 
     # ---- (2) OGP 絶対 URL ----
@@ -208,10 +225,14 @@ class TestBrandingInvariants(unittest.TestCase):
             "desktop (>=769px) 除外ガードが無く、PC でも誤動作しうる",
         )
 
-    # ---- (5) View Transitions による wipe 遷移 ----
+    # ---- (5) View Transitions による fade 遷移 ----
 
     def test_theme_css_enables_cross_document_view_transitions(self):
-        """ユーザー要件 2026-06-05: ページ遷移にワイプエフェクトを当てたい。
+        """ページ遷移は旧画面を暗転させ、新画面をフェードインさせる。
+
+        2026-06-16 ユーザーフィードバック:
+        パン / スライド遷移は読み込み処理が重い時に不自然に見えるため、
+        旧画面をブラックアウトしつつ次画面が浮かび上がる fade にする。
         theme.css の @view-transition / ::view-transition-* が
         cross-document モードで設定されていることを locked-in する。
 
@@ -235,22 +256,40 @@ class TestBrandingInvariants(unittest.TestCase):
             src, r"::view-transition-new\(root\)\s*\{[^}]*animation\s*:",
             "::view-transition-new(root) の animation が無い",
         )
-        # スライド (transform translateX) 系の keyframes が定義されている
-        # (2026-06-05 ユーザーフィードバックで clip-path ワイプ → transform
-        # カルーセル スライドに変更。GPU 合成で滑らかに動く方式を locked-in)
+        # fade 系 keyframes が定義され、スライド系 transform は使わない
         self.assertRegex(
-            src, r"@keyframes\s+slide-out-to-left\b",
-            "slide-out-to-left keyframes が無い (transform translateX 方式)",
+            src, r"@keyframes\s+fade-to-black\b",
+            "fade-to-black keyframes が無い",
         )
         self.assertRegex(
-            src, r"@keyframes\s+slide-in-from-right\b",
-            "slide-in-from-right keyframes が無い (transform translateX 方式)",
+            src, r"@keyframes\s+fade-from-black\b",
+            "fade-from-black keyframes が無い",
         )
-        # transform: translateX を使う方式であることを明示的に縛る
-        # (将来 clip-path に戻すと "ワイプじゃない方式" になり UX 回帰)
-        self.assertRegex(
-            src, r"@keyframes\s+slide-[a-z-]+\s*\{[^}]*transform\s*:\s*translateX",
-            "スライド keyframes が transform: translateX を使っていない",
+        fade_to_black = re.search(
+            r"@keyframes\s+fade-to-black\b(?P<body>.*?)@keyframes\s+fade-from-black\b",
+            src,
+            re.S,
+        )
+        self.assertIsNotNone(fade_to_black, "fade-to-black keyframes の範囲を特定できない")
+        self.assertIn(
+            "filter: brightness(0)",
+            fade_to_black.group("body"),
+            "旧画面をブラックアウトする brightness(0) が fade-to-black に無い",
+        )
+        fade_from_black = re.search(
+            r"@keyframes\s+fade-from-black\b(?P<body>.*?)::view-transition-old\(root\)",
+            src,
+            re.S,
+        )
+        self.assertIsNotNone(fade_from_black, "fade-from-black keyframes の範囲を特定できない")
+        self.assertIn(
+            "opacity: 0",
+            fade_from_black.group("body"),
+            "新画面の fade-in 開始 opacity: 0 が fade-from-black に無い",
+        )
+        self.assertNotRegex(
+            src, r"@keyframes\s+slide-[a-z-]+\b|translateX\(",
+            "パン / スライド遷移の keyframes または translateX が残っている",
         )
         # アクセシビリティ: prefers-reduced-motion で短縮する分岐がある
         self.assertRegex(
