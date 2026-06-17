@@ -21,6 +21,7 @@ from markupsafe import Markup, escape
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # tools/ を import path に載せる
 import config  # noqa: E402
+import collect_buzz_posts  # noqa: E402
 import collect_repo_radar  # noqa: E402
 import schema  # noqa: E402
 
@@ -468,6 +469,23 @@ def _repo_display_rows(rows: list[dict], ref: dt.date) -> list[dict]:
     return out
 
 
+def _buzzpost_display_rows(rows: list[dict]) -> list[dict]:
+    out = []
+    for row in rows:
+        cat = row.get("category") or "model"
+        meta = CAT_META.get(cat, CAT_META["model"])
+        out.append({
+            **row,
+            "cat": cat,
+            "cat_label": row.get("category_label") or meta["label"],
+            "glyph": row.get("glyph") or meta["glyph"],
+            "score": int(row.get("buzz_score") or 0),
+            "text": str(row.get("text") or ""),
+            "url_text": str(row.get("post_url") or "").replace("https://", ""),
+        })
+    return out
+
+
 def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
     cat = ev["category"]
     d = _d(ev["date"])
@@ -693,6 +711,12 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         for cat in CAT_META
         if any(row["cat"] == cat for row in repo_radar)
     ]
+    buzz_posts = _buzzpost_display_rows(collect_buzz_posts.load_public_rows())
+    buzzpost_categories = [
+        {"cat": cat, "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"]}
+        for cat in ("model", "editor", "agent", "media")
+        if any(row["cat"] == cat for row in buzz_posts)
+    ]
 
     return {
         "feed": feed, "feed_count": len(feed),
@@ -706,6 +730,10 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         "repo_radar_latest": repo_radar_latest,
         "repo_radar_categories": repo_radar_categories,
         "repo_radar_sources": repo_radar_sources,
+        "buzz_posts": buzz_posts,
+        "buzzpost_count": len(buzz_posts),
+        "buzzpost_categories": buzzpost_categories,
+        "buzzpost_latest": buzz_posts[0]["date"] if buzz_posts else None,
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),
         "site_url": config.SITE_URL,  # OGP 絶対 URL の組立に使う（_head.html.j2）
@@ -800,6 +828,11 @@ def generate(out_dir: Path = OUT_DIR) -> dict:
         encoding="utf-8",
     )
     pages.append("repo-radar.html")
+    (out_dir / "buzz-posts.html").write_text(
+        env.get_template("buzz-posts.html.j2").render(**ctx, page="buzzpost"),
+        encoding="utf-8",
+    )
+    pages.append("buzz-posts.html")
     karte_tpl = env.get_template("karte.html.j2")
     for k in ctx["kartes"]:
         name = f"karte-{k['id']}.html"

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import backfill_thumb  # noqa: E402
+import collect_buzz_posts  # noqa: E402
 import collect_repo_radar  # noqa: E402
 import collect_rss  # noqa: E402
 import generate_pages  # noqa: E402
@@ -27,6 +28,8 @@ DATA = ROOT / "data"
 PROJECT_FOLDERS = ROOT.parent
 POWERSHELL_EXE = "powershell.exe"
 TWITTER_RSS_RUNNER = PROJECT_FOLDERS / "twitter-rss" / "scripts" / "run_repo_radar_rss.ps1"
+BUZZPOST_SEARCH_WORD_PATH = PROJECT_FOLDERS / "twitter-rss" / "data" / "buzzpost-searches.json"
+BUZZPOST_SEARCH_UPDATE_SCRIPT = PROJECT_FOLDERS / "twitter-rss" / "scripts" / "update_buzzpost_searches.py"
 IDEASTASH_VAULT = Path(os.environ.get("IDEASTASH_VAULT", Path.home() / "Obsidian" / "IdeaStash"))
 
 
@@ -64,6 +67,54 @@ def _run_repo_radar_x_rss() -> None:
         print(f"WARN: Repo Radar X RSS 生成失敗 (exit {cp.returncode}) だが日次本線は続行する")
     else:
         print("Repo Radar X RSS 生成 完了")
+
+
+def _run_buzzpost_x_rss() -> None:
+    """BuzzPost 用の X RSS を生成する。失敗しても日次本線は止めない。"""
+    if not TWITTER_RSS_RUNNER.exists():
+        print(f"WARN: BuzzPost X RSS runner が見つからないためスキップ: {TWITTER_RSS_RUNNER}")
+        return
+    if BUZZPOST_SEARCH_UPDATE_SCRIPT.exists():
+        update_cp = quiet_run(
+            [sys.executable, BUZZPOST_SEARCH_UPDATE_SCRIPT],
+            timeout=60,
+            check=False,
+        )
+        if update_cp.stdout:
+            print(update_cp.stdout.rstrip())
+        if update_cp.stderr:
+            print(update_cp.stderr.rstrip(), file=sys.stderr)
+        if update_cp.returncode != 0:
+            print(
+                f"WARN: BuzzPost 検索語更新失敗 (exit {update_cp.returncode}) "
+                "だが既存検索語で続行する"
+            )
+    if not BUZZPOST_SEARCH_WORD_PATH.exists():
+        print(f"WARN: BuzzPost 検索語が見つからないためスキップ: {BUZZPOST_SEARCH_WORD_PATH}")
+        return
+    cp = quiet_run(
+        [
+            POWERSHELL_EXE,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            TWITTER_RSS_RUNNER,
+            "-SearchWordPath",
+            BUZZPOST_SEARCH_WORD_PATH,
+            "-SkipSearchUpdate",
+        ],
+        timeout=600,
+        check=False,
+    )
+    if cp.stdout:
+        print(cp.stdout.rstrip())
+    if cp.stderr:
+        print(cp.stderr.rstrip(), file=sys.stderr)
+    if cp.returncode != 0:
+        print(f"WARN: BuzzPost X RSS 生成失敗 (exit {cp.returncode}) だが日次本線は続行する")
+    else:
+        print("BuzzPost X RSS 生成 完了")
 
 
 def _export_repo_radar_obsidian() -> None:
@@ -174,12 +225,26 @@ def run_daily() -> None:
     except Exception as exc:
         print(f"Repo Radar 失敗（本線継続）: {exc}", file=sys.stderr)
 
-    # Step 5: サムネイル補完
-    print("\n--- Step 5: サムネイル補完 ---")
+    # Step 5: BuzzPost（生成AIコミュニティ観測レイヤー。失敗しても本線は止めない）
+    print("\n--- Step 5: BuzzPost ---")
+    _run_buzzpost_x_rss()
+    try:
+        buzz_stats = collect_buzz_posts.collect()
+        print(
+            "BuzzPost 完了: "
+            f"collected {buzz_stats['collected']} / "
+            f"written {buzz_stats['written']} / "
+            f"degraded {buzz_stats['degraded']}"
+        )
+    except Exception as exc:
+        print(f"BuzzPost 失敗（本線継続）: {exc}", file=sys.stderr)
+
+    # Step 6: サムネイル補完
+    print("\n--- Step 6: サムネイル補完 ---")
     backfill_thumb.backfill()
 
-    # Step 6: サイト再生成
-    print("\n--- Step 6: サイト再生成 ---")
+    # Step 7: サイト再生成
+    print("\n--- Step 7: サイト再生成 ---")
     generate_pages.main()
     if update_failures:
         print(

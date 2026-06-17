@@ -270,6 +270,37 @@ class TestGenerate(unittest.TestCase):
         self.assertLess(html.index(">カルテ</a>"), html.index(">リポジトリ</a>"))
         self.assertNotIn(">Repo Radar</a>", html)
 
+    def test_buzzpost_page_is_built_from_public_rows(self):
+        """BuzzPost ページは公開 JSONL だけを描画し、X 投稿をカテゴリ別に読める。"""
+        row = {
+            "date": "2026-06-18",
+            "category": "model",
+            "category_label": "モデル/LLM",
+            "glyph": "◆",
+            "source": "x-rss:buzzpost-model",
+            "source_query": "(GPT-5 OR Claude OR Gemini) lang:en",
+            "post_url": "https://x.com/example/status/111",
+            "title": "Claude Code agents are everywhere",
+            "text": "Claude Code agents are everywhere today.",
+            "published_at": "2026-06-17T23:10:00+00:00",
+            "buzz_score": 156,
+        }
+        original = gp.collect_buzz_posts.load_public_rows
+        gp.collect_buzz_posts.load_public_rows = lambda: [row]
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                r = gp.generate(Path(d))
+                self.assertIn("buzz-posts.html", r["pages"])
+                html = (Path(d) / "buzz-posts.html").read_text(encoding="utf-8")
+        finally:
+            gp.collect_buzz_posts.load_public_rows = original
+        self.assertIn("BuzzPost", html)
+        self.assertIn("Claude Code agents are everywhere", html)
+        self.assertIn("https://x.com/example/status/111", html)
+        self.assertIn("モデル/LLM", html)
+        self.assertIn("BUZZ SCORE", html)
+        self.assertIn('data-page="buzzpost"', html)
+
     def test_karte_index_has_feed_and_karte_update_badges(self):
         """ユーザー要件 2026-06-04:「何が更新されたか」を一目で示すため、
         カルテ一覧の各カードは『📰 フィード』(events 最新) と『📋 カルテ』(entity.snapshot_date)

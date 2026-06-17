@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <title>BuzzPost — AI-Pulse</title>
+  {% include "_head.html.j2" %}
+  <style>
+    .buzz-head { padding: var(--s-24) 0 var(--s-16); border-bottom: 1px solid var(--border); }
+    .buzz-head h1 { margin: 18px 0 10px; font-size: clamp(30px, 4.8vw, 54px); line-height: 1.05; letter-spacing: -.02em; }
+    .buzz-head .lead { max-width: 850px; color: var(--fg-sub); font-size: 16px; line-height: 1.8; }
+    .buzz-meta { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 14px; color: var(--fg-mute); font-family: var(--font-mono); font-size: 12px; }
+    .buzz-toolbar { position: sticky; top: var(--header-h); z-index: 20; display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 12px; align-items: center; padding: 14px 0; background: color-mix(in oklch, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft); }
+    .buzz-search { min-height: 42px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg); padding: 0 14px; font-family: var(--font-body); font-size: 14px; border-radius: var(--r-sm); }
+    .buzz-search:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .buzz-list-head { display:flex; justify-content: space-between; align-items:center; gap: 12px; margin: 26px 0 14px; }
+    .buzz-list-head h2 { margin:0; font-size: 20px; }
+    .buzz-list { list-style:none; margin:0; padding:0; display:grid; gap: 14px; }
+    .buzz-card { display:grid; grid-template-columns: 108px 1fr 150px; gap: 18px; padding: 18px; background: var(--bg-elev); border: 1px solid var(--border); border-left: 4px solid var(--cat, var(--accent)); border-radius: var(--r-sm); }
+    .buzz-score { font-family: var(--font-mono); color: var(--cat, var(--accent)); }
+    .buzz-score b { display:block; font-size: 36px; line-height: .95; font-weight: 800; letter-spacing: -.04em; }
+    .buzz-score span { display:block; margin-top: 6px; font-size: 10px; letter-spacing: .1em; color: var(--fg-mute); }
+    .buzz-body h2 { margin: 0 0 8px; font-size: 20px; line-height: 1.35; }
+    .buzz-body h2 a { color: var(--fg); text-decoration: none; }
+    .buzz-body h2 a:hover { color: var(--accent); }
+    .buzz-text { margin: 0; color: var(--fg-sub); line-height: 1.75; font-size: 14px; }
+    .buzz-tags { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 12px; }
+    .buzz-tag { display:inline-flex; align-items:center; gap: 4px; padding: 5px 8px; border: 1px solid color-mix(in oklch, var(--cat, var(--accent)) 42%, var(--border)); color: var(--cat, var(--accent)); font-family: var(--font-mono); font-size: 11px; border-radius: var(--r-sm); }
+    .buzz-side { display:flex; flex-direction:column; justify-content:space-between; gap: 12px; align-items:flex-end; text-align:right; font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); }
+    .buzz-open { color: var(--accent); text-decoration:none; border: 1px solid color-mix(in oklch, var(--accent) 45%, var(--border)); padding: 7px 9px; border-radius: var(--r-sm); }
+    .buzz-empty { margin-top: 24px; padding: 24px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-sub); }
+    @media (max-width: 820px) {
+      .buzz-toolbar { grid-template-columns: 1fr; }
+      .buzz-card { grid-template-columns: 1fr; }
+      .buzz-side { align-items:flex-start; text-align:left; }
+      .buzz-score b { font-size: 30px; }
+    }
+  </style>
+</head>
+<body data-page="buzzpost">
+  {% include "_header.html.j2" %}
+  <main class="app-main">
+    <div class="wrap">
+      <section class="buzz-head">
+        <div class="kicker">
+          <span class="dateline"><span class="live-dot"></span> {{ ref_date_label }}</span>
+          <span class="label">BuzzPost / COMMUNITY SIGNAL</span>
+          <span class="count-pill"><b data-count>{{ "%02d"|format(buzzpost_count) }}</b> posts</span>
+        </div>
+        <h1>生成AIコミュニティのバズ投稿</h1>
+        <p class="lead">X 上で話題化しているモデル、AIエディタ、エージェント、生成メディア関連の投稿を日次で集め、ニュース化前の関心のうねりを確認する観測フィードです。</p>
+        <div class="buzz-meta">
+          <span>latest {{ buzzpost_latest or "未実行" }}</span>
+          <span>source: X RSS</span>
+          <span>read-only observation layer</span>
+        </div>
+      </section>
+
+      <section class="buzz-toolbar" aria-label="BuzzPost controls">
+        <input class="buzz-search" type="search" data-search placeholder="post / query / category を検索" aria-label="BuzzPost 検索" />
+        <div class="chip-row" data-filter-bar aria-label="カテゴリフィルタ">
+          <button class="chip all" type="button" aria-pressed="true">All</button>
+          {% for c in buzzpost_categories %}
+          <button class="chip" type="button" data-cat="{{ c.cat }}" aria-pressed="true">
+            <span class="gly">{{ c.glyph }}</span>{{ c.cat_label }}
+          </button>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if not buzz_posts %}
+      <section class="buzz-empty">BuzzPost はまだ収集結果を持っていません。日次バッチが X RSS を生成すると、このページに生成AIコミュニティの話題投稿が表示されます。</section>
+      {% else %}
+      <div class="buzz-list-head">
+        <h2>本日の観測ポスト</h2>
+        <span class="count-pill"><b data-count>{{ "%02d"|format(buzzpost_count) }}</b> / {{ "%02d"|format(buzzpost_count) }} 件を表示</span>
+      </div>
+      <ol class="buzz-list" data-buzz-list>
+        {% for p in buzz_posts %}
+        <li class="buzz-card" data-filter-item data-cat="{{ p.cat }}" data-score="{{ p.score }}">
+          <div class="buzz-score">
+            <b>{{ p.score }}</b>
+            <span>BUZZ SCORE</span>
+          </div>
+          <article class="buzz-body">
+            <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
+            <h2><a href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">{{ p.title }}</a></h2>
+            <p class="buzz-text">{{ p.text }}</p>
+            <div class="buzz-tags">
+              <span class="buzz-tag">{{ p.source }}</span>
+              <span class="buzz-tag">{{ p.source_query }}</span>
+            </div>
+          </article>
+          <div class="buzz-side">
+            <span>{{ p.date }}</span>
+            <span>{{ p.published_at or "time n/a" }}</span>
+            <a class="buzz-open" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">ポストを開く →</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+      <p class="empty" style="display:none;">条件に一致する BuzzPost はありません。</p>
+      {% endif %}
+    </div>
+  </main>
+  {% include "_footer.html.j2" %}
+</body>
+</html>

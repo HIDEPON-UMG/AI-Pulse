@@ -9,7 +9,7 @@ import tools.run_weekly as run_weekly
 
 @pytest.fixture(autouse=True)
 def _no_repo_radar_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    """既存の日次バッチテストでは Repo Radar の外部 API 呼び出しを止める。"""
+    """既存の日次バッチテストでは外部ソーシャル収集を止める。"""
     monkeypatch.setattr(run_daily, "_run_repo_radar_x_rss", lambda: None)
     monkeypatch.setattr(run_daily.collect_repo_radar, "collect", lambda: {
         "candidates": 0,
@@ -20,6 +20,12 @@ def _no_repo_radar_network(monkeypatch: pytest.MonkeyPatch) -> None:
         "ollama_errors": 0,
     })
     monkeypatch.setattr(run_daily, "_export_repo_radar_obsidian", lambda: None)
+    monkeypatch.setattr(run_daily, "_run_buzzpost_x_rss", lambda: None)
+    monkeypatch.setattr(run_daily.collect_buzz_posts, "collect", lambda: {
+        "collected": 0,
+        "written": 0,
+        "degraded": 0,
+    })
 
 
 def test_run_daily_continues_after_ollama_carte_failure(

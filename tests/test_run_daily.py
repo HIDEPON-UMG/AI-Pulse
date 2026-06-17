@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +45,12 @@ class TestRunDailyOrder(unittest.TestCase):
                                   "candidates": 0, "enriched": 0, "evaluated": 0,
                                   "skipped": 0, "degraded": 0, "ollama_errors": 0,
                               }),
+            mock.patch.object(daily, "_run_buzzpost_x_rss",
+                              side_effect=lambda: order.append("buzz_rss")),
+            mock.patch.object(daily.collect_buzz_posts, "collect",
+                              side_effect=lambda: order.append("buzzpost") or {
+                                  "collected": 0, "written": 0, "degraded": 0,
+                              }),
             mock.patch.object(daily, "_export_repo_radar_obsidian",
                               side_effect=lambda: order.append("obsidian")),
             mock.patch.object(daily.backfill_thumb, "backfill",
@@ -56,8 +64,42 @@ class TestRunDailyOrder(unittest.TestCase):
         self.assertLess(order.index("karte"), order.index("x_rss"))
         self.assertLess(order.index("x_rss"), order.index("repo_radar"))
         self.assertLess(order.index("repo_radar"), order.index("obsidian"))
-        self.assertLess(order.index("obsidian"), order.index("thumb"))
+        self.assertLess(order.index("obsidian"), order.index("buzz_rss"))
+        self.assertLess(order.index("buzz_rss"), order.index("buzzpost"))
+        self.assertLess(order.index("buzzpost"), order.index("thumb"))
         self.assertEqual(order[-2:], ["thumb", "generate"])
+
+    def test_buzzpost_rss_updates_searches_before_collecting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runner = root / "run_repo_radar_rss.ps1"
+            search_words = root / "buzzpost-searches.json"
+            updater = root / "update_buzzpost_searches.py"
+            runner.write_text("", encoding="utf-8")
+            updater.write_text("", encoding="utf-8")
+
+            calls: list[list[str]] = []
+
+            def fake_quiet_run(args, **kwargs):
+                calls.append([str(arg) for arg in args])
+                if "update_buzzpost_searches.py" in str(args[-1]):
+                    search_words.write_text("{}", encoding="utf-8")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(daily, "TWITTER_RSS_RUNNER", runner),
+                mock.patch.object(daily, "BUZZPOST_SEARCH_WORD_PATH", search_words),
+                mock.patch.object(daily, "BUZZPOST_SEARCH_UPDATE_SCRIPT", updater),
+                mock.patch.object(daily, "quiet_run", side_effect=fake_quiet_run),
+            ):
+                daily._run_buzzpost_x_rss()
+
+        self.assertIn("update_buzzpost_searches.py", calls[0][-1])
+        self.assertIn("-SearchWordPath", calls[1])
+        self.assertLess(
+            calls[1].index("-SearchWordPath"),
+            calls[1].index("-SkipSearchUpdate"),
+        )
 
 
 if __name__ == "__main__":

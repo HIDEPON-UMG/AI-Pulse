@@ -38,6 +38,14 @@ def test_run_daily_calls_quality_audit_before_carte_update(monkeypatch):
         "degraded": 0,
         "ollama_errors": 0,
     })
+    monkeypatch.setattr(run_daily, "_run_repo_radar_x_rss", lambda: None)
+    monkeypatch.setattr(run_daily, "_export_repo_radar_obsidian", lambda: None)
+    monkeypatch.setattr(run_daily, "_run_buzzpost_x_rss", lambda: None)
+    monkeypatch.setattr(run_daily.collect_buzz_posts, "collect", lambda: {
+        "collected": 0,
+        "written": 0,
+        "degraded": 0,
+    })
     monkeypatch.setattr(run_daily, "_fast_update", lambda entity, events: calls.append("carte"))
     monkeypatch.setattr(run_daily.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(run_daily.backfill_thumb, "backfill", lambda: calls.append("thumb"))
