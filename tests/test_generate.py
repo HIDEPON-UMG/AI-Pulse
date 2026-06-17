@@ -255,23 +255,27 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("スマホのコピーボタン修正", html)
         self.assertNotIn(r"C:\Users\hidek\Obsidian", html)
 
-    def test_repo_radar_nav_label_is_repository_after_karte(self):
-        """Repo Radar のメニュータブは日本語名にし、カルテの右側に置く。
+    def test_main_nav_labels_are_english_with_repositories_after_karte(self):
+        """メニューバーは英語表記にし、Repositories は Karte の右側に置く。
 
-        なぜ重要か: ユーザーが通常のサイト導線として探す対象なので、英語の内部機能名ではなく
-        「リポジトリ」としてカルテ隣に固定する。
+        なぜ重要か: BuzzPost 追加後のメニューバーは UI トーンとして英語に統一する。
         """
         with tempfile.TemporaryDirectory() as d:
             gp.generate(Path(d))
             html = (Path(d) / "repo-radar.html").read_text(encoding="utf-8")
 
-        self.assertIn(">カルテ</a>", html)
-        self.assertIn(">リポジトリ</a>", html)
-        self.assertLess(html.index(">カルテ</a>"), html.index(">リポジトリ</a>"))
+        for label in (">Feed</a>", ">Archive</a>", ">Karte</a>", ">Repositories</a>", ">BuzzPost</a>"):
+            self.assertIn(label, html)
+        self.assertLess(html.index(">Karte</a>"), html.index(">Repositories</a>"))
+        self.assertNotIn(">フィード</a>", html)
+        self.assertNotIn(">アーカイブ</a>", html)
+        self.assertNotIn(">カルテ</a>", html)
+        self.assertNotIn(">リポジトリ</a>", html)
         self.assertNotIn(">Repo Radar</a>", html)
 
     def test_buzzpost_page_is_built_from_public_rows(self):
         """BuzzPost ページは公開 JSONL だけを描画し、X 投稿をカテゴリ別に読める。"""
+        original_post = "Claude Code agents are everywhere today.\n\nhttps://x.com/example/status/111"
         row = {
             "date": "2026-06-18",
             "category": "model",
@@ -280,8 +284,8 @@ class TestGenerate(unittest.TestCase):
             "source": "x-rss:buzzpost-model",
             "source_query": "(GPT-5 OR Claude OR Gemini) lang:en",
             "post_url": "https://x.com/example/status/111",
-            "title": "Claude Code agents are everywhere",
-            "text": "Claude Code agents are everywhere today.",
+            "title": "Generated title must not be shown",
+            "text": original_post,
             "published_at": "2026-06-17T23:10:00+00:00",
             "buzz_score": 156,
         }
@@ -296,10 +300,46 @@ class TestGenerate(unittest.TestCase):
             gp.collect_buzz_posts.load_public_rows = original
         self.assertIn("BuzzPost", html)
         self.assertIn("Claude Code agents are everywhere", html)
+        self.assertIn(original_post, html)
+        self.assertIn('class="x-embed-shell"', html)
+        self.assertIn('<blockquote class="twitter-tweet"', html)
+        self.assertIn('data-theme="dark"', html)
+        self.assertIn('https://platform.twitter.com/widgets.js', html)
+        self.assertNotIn("Generated title must not be shown", html)
+        self.assertNotIn("<h2><a", html)
         self.assertIn("https://x.com/example/status/111", html)
         self.assertIn("モデル/LLM", html)
         self.assertIn("BUZZ SCORE", html)
         self.assertIn('data-page="buzzpost"', html)
+
+    def test_buzzpost_empty_page_explains_threshold_drops(self):
+        """0件時でも、収集未実行なのか閾値除外なのかを画面から判断できる。"""
+        original_rows = gp.collect_buzz_posts.load_public_rows
+        original_stats = gp.collect_buzz_posts.load_stats
+        gp.collect_buzz_posts.load_public_rows = lambda: []
+        gp.collect_buzz_posts.load_stats = lambda: {
+            "latest": "2026-06-18",
+            "candidate_count": 12,
+            "collected": 0,
+            "dropped_threshold": 12,
+            "dropped_duplicate": 0,
+            "degraded": 0,
+            "min_absolute_score": 25,
+            "min_velocity_score": 8.0,
+        }
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                gp.generate(Path(d))
+                html = (Path(d) / "buzz-posts.html").read_text(encoding="utf-8")
+        finally:
+            gp.collect_buzz_posts.load_public_rows = original_rows
+            gp.collect_buzz_posts.load_stats = original_stats
+
+        self.assertIn("<span>候補</span><b>12</b><small>件</small>", html)
+        self.assertIn("<span>閾値未満</span><b>12</b><small>件</small>", html)
+        self.assertIn("absolute_score ≥ 25", html)
+        self.assertIn("velocity_score ≥ 8.0/h", html)
+        self.assertIn("収集は成功しています", html)
 
     def test_karte_index_has_feed_and_karte_update_badges(self):
         """ユーザー要件 2026-06-04:「何が更新されたか」を一目で示すため、

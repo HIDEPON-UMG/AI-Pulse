@@ -1,7 +1,7 @@
 ﻿# AI-Pulse 週次バッチ: 全エンティティのカルテ deep 更新 + サイト再生成
 # Task Scheduler 登録: 月曜 7:00 (毎日 7:00 の日次と同時刻で月曜のみ追加実行)
 #   プログラム: powershell.exe
-#   引数      : -NoProfile -ExecutionPolicy Bypass -File "<このファイルのフルパス>"
+#   引数      : -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "<このファイルのフルパス>"
 #
 # .bat 版 (run_weekly.bat) との差分:
 #   - PS5.1 既定の CP932 文字化けを回避（UTF-8 で stdout/log を統一）

@@ -712,6 +712,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         if any(row["cat"] == cat for row in repo_radar)
     ]
     buzz_posts = _buzzpost_display_rows(collect_buzz_posts.load_public_rows())
+    buzzpost_stats = collect_buzz_posts.load_stats()
     buzzpost_categories = [
         {"cat": cat, "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"]}
         for cat in ("model", "editor", "agent", "media")
@@ -733,7 +734,8 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         "buzz_posts": buzz_posts,
         "buzzpost_count": len(buzz_posts),
         "buzzpost_categories": buzzpost_categories,
-        "buzzpost_latest": buzz_posts[0]["date"] if buzz_posts else None,
+        "buzzpost_latest": buzz_posts[0]["date"] if buzz_posts else buzzpost_stats.get("latest"),
+        "buzzpost_stats": buzzpost_stats,
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),
         "site_url": config.SITE_URL,  # OGP 絶対 URL の組立に使う（_head.html.j2）

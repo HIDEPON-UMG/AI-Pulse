@@ -1,0 +1,11 @@
+{
+  "latest": "2026-06-18",
+  "candidate_count": 73,
+  "collected": 0,
+  "written": 0,
+  "dropped_threshold": 73,
+  "dropped_duplicate": 0,
+  "degraded": 0,
+  "min_absolute_score": 25,
+  "min_velocity_score": 8.0
+}

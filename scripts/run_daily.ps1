@@ -1,7 +1,7 @@
 ﻿# AI-Pulse 日次バッチ: RSS 収集 + 関連カルテ fast 更新 + サイト再生成
 # Task Scheduler 登録: 毎日 7:00
 #   プログラム: powershell.exe
-#   引数      : -NoProfile -ExecutionPolicy Bypass -File "<このファイルのフルパス>"
+#   引数      : -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "<このファイルのフルパス>"
 #
 # .bat 版 (run_daily.bat) との差分:
 #   - PS5.1 既定の CP932 文字化けを回避（UTF-8 で stdout/log を統一）
@@ -110,7 +110,7 @@ if (Test-Path -LiteralPath $Publish) {
     $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次公開 開始" -Encoding UTF8
     $PublishLogPath = Join-Path $LogsDir "publish_$DateStr.log"
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Publish -LogPath $PublishLogPath
+    & powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $Publish -LogPath $PublishLogPath
     $PublishExit = $LASTEXITCODE
     $Stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Add-Content -LiteralPath $LogPath -Value "[$Stamp] 日次公開 終了 (exit $PublishExit, log $PublishLogPath)" -Encoding UTF8
