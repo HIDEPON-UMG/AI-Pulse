@@ -28,6 +28,37 @@ class TestSchemaContract(unittest.TestCase):
         for ev in events:
             self.assertIn(ev["entity_id"], ids, f"{ev['event_id']} の参照が宙ぶらり")
 
+    def test_qwen_robot_suite_is_physical_ai_karte_not_qwen_model_news(self):
+        """Qwen Robot Suite は Qwen 本体ではなく、独立した physical AI カルテとして扱う。
+
+        なぜ重要か: ロボット制御向けモデルスイートは LLM 系列の単なるモデル更新ではなく、
+        物理世界向けの新サービス誕生である。Feed のタグと関連カルテが `モデル/LLM`
+        に残ると、ユーザーが見る分類とカルテ導線が誤る。
+        """
+        entities, events = schema.validate_store(DATA / "entities.jsonl", DATA / "events.jsonl")
+        by_id = {e["entity_id"]: e for e in entities}
+        self.assertIn("qwen-robot-suite", by_id)
+        self.assertEqual(by_id["qwen-robot-suite"]["category"], "physical")
+        self.assertEqual(by_id["qwen-robot-suite"]["kind"], "model")
+        self.assertEqual(by_id["qwen-robot-suite"]["domain"], "robotics")
+
+        robot_event_ids = {
+            "2026-06-16-qwen-gem01",
+            "2026-06-16-qwen-gem02",
+            "2026-06-16-qwen-gem03",
+            "2026-06-16-qwen-gem04",
+            "2026-06-17-qwen-gem02",
+        }
+        robot_events = {ev["event_id"]: ev for ev in events if ev["event_id"] in robot_event_ids}
+        self.assertEqual(set(robot_events), robot_event_ids)
+        for ev in robot_events.values():
+            self.assertEqual(ev["entity_id"], "qwen-robot-suite")
+            self.assertEqual(ev["category"], "physical")
+            self.assertIn("qwen", ev.get("related_entities", []))
+
+        qwen = by_id["qwen"]
+        self.assertNotIn("2026-06-17-qwen-gem02", qwen.get("recent_events", []))
+
     def test_dangling_event_reference_is_rejected(self):
         """存在しない entity を指す event は弾く（リンク切れを表現できない）。"""
         with self.assertRaises(schema.SchemaError):
