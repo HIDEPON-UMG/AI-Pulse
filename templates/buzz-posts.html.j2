@@ -21,10 +21,9 @@
     .buzz-score b { font-size: 28px; line-height: 1; font-weight: 800; }
     .buzz-score span { font-size: 10px; letter-spacing: .12em; color: var(--fg-mute); text-transform: uppercase; }
     .buzz-score small { color: var(--fg-mute); font-size: 11px; line-height: 1.5; text-align:right; }
-    .x-embed-card { min-width:0; display:block; width:min(550px, 100%); margin:0 auto; overflow:hidden; background:#15202b; border: 1px solid #385061; border-radius: 0; }
-    .x-post-card { padding: 18px; color:#d6dee6; font-family: var(--font-body); }
-    .x-post-card p { margin:0 0 16px; white-space: pre-wrap; overflow-wrap:anywhere; line-height:1.65; font-size:15px; }
-    .x-post-card a { color:#57b8ff; text-decoration:none; border-bottom:1px solid #2f6d95; font-family:var(--font-mono); font-size:12px; overflow-wrap:anywhere; }
+    .x-embed-card { min-width:0; display:block; width:min(550px, 100%); margin:0 auto; overflow:hidden; }
+    .x-embed-card .twitter-tweet { width: min(550px, 100%) !important; max-width: 100% !important; margin: 0 auto !important; color-scheme: dark; }
+    .x-embed-card iframe { display:block !important; width: 100% !important; max-width: 100% !important; margin: 0 auto !important; }
     .buzz-meta-rail { display:grid; gap: 10px; min-width:0; }
     .cat-badge { width:max-content; }
     .buzz-tags { display:grid; grid-template-columns: minmax(130px, .6fr) minmax(0, 1.4fr); gap: 10px; }
@@ -110,10 +109,10 @@
               <small>{{ p.date }}<br>{{ p.published_at or "time n/a" }}</small>
             </div>
             <div class="x-embed-card">
-              <div class="x-post-card" aria-label="X post">
-                <p>{{ p.text }}</p>
-                <a href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">{{ p.post_url }} →</a>
-              </div>
+              <blockquote class="twitter-tweet" data-theme="dark" data-dnt="true">
+                <p lang="ja" dir="auto">{{ p.text }}</p>
+                <a href="{{ p.post_url }}">{{ p.post_url }}</a>
+              </blockquote>
             </div>
             <aside class="buzz-meta-rail" aria-label="BuzzPost metadata">
               <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
@@ -132,5 +131,8 @@
     </div>
   </main>
   {% include "_footer.html.j2" %}
+  {% if buzz_posts %}
+  <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+  {% endif %}
 </body>
 </html>
