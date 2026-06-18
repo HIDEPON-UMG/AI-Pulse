@@ -288,6 +288,8 @@ class TestGenerate(unittest.TestCase):
             "text": original_post,
             "published_at": "2026-06-17T23:10:00+00:00",
             "buzz_score": 156,
+            "absolute_score": 120,
+            "velocity_score": 36.2,
         }
         original = gp.collect_buzz_posts.load_public_rows
         gp.collect_buzz_posts.load_public_rows = lambda: [row]
@@ -302,10 +304,15 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("Claude Code agents are everywhere", html)
         self.assertIn(original_post, html)
         self.assertIn('class="x-embed-shell"', html)
+        self.assertIn('class="buzz-side-rail"', html)
+        self.assertLess(html.index('class="buzz-side-rail"'), html.index('class="x-embed-card"'))
         self.assertIn('<blockquote class="twitter-tweet"', html)
         self.assertIn('data-theme="dark"', html)
         self.assertIn("platform.twitter.com/widgets.js", html)
         self.assertNotIn('class="x-post-card"', html)
+        self.assertNotIn('class="buzz-meta-rail"', html)
+        self.assertIn("abs 120", html)
+        self.assertIn("vel 36.2/h", html)
         self.assertNotIn("Generated title must not be shown", html)
         self.assertNotIn("<h2><a", html)
         self.assertIn("https://x.com/example/status/111", html)

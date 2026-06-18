@@ -13,20 +13,20 @@
     .buzz-search:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
     .buzz-list-head { display:flex; justify-content: space-between; align-items:center; gap: 12px; margin: 26px 0 14px; }
     .buzz-list-head h2 { margin:0; font-size: 20px; }
-    .buzz-list { list-style:none; max-width: 760px; margin:0 auto; padding:0; display:grid; gap: 18px; }
+    .buzz-list { list-style:none; max-width: 920px; margin:0 auto; padding:0; display:grid; gap: 30px; }
     .buzz-card { margin:0; }
-    .x-embed-shell { display:grid; grid-template-columns: 1fr; gap: 14px; padding: 18px; background: var(--bg-elev); border: 1px solid var(--border); border-left: 4px solid var(--cat, var(--accent)); border-radius: var(--r-sm); }
-    .buzz-score { display:flex; align-items:flex-start; justify-content:space-between; gap: 14px; font-family: var(--font-mono); color: var(--cat, var(--accent)); }
-    .buzz-score-main { display:grid; gap: 5px; }
-    .buzz-score b { font-size: 28px; line-height: 1; font-weight: 800; }
+    .x-embed-shell { display:grid; grid-template-columns: 150px minmax(0, 1fr); gap: 28px; min-height: 360px; padding: 0 0 0 28px; background: transparent; border: 0; border-left: 4px solid var(--cat, var(--accent)); border-radius: 0; }
+    .buzz-side-rail { display:flex; flex-direction:column; gap: 18px; min-width:0; padding-top: 2px; font-family: var(--font-mono); }
+    .buzz-score { display:grid; gap: 7px; color: var(--cat, var(--accent)); }
+    .buzz-score b { font-size: 44px; line-height: .95; font-weight: 800; }
     .buzz-score span { font-size: 10px; letter-spacing: .12em; color: var(--fg-mute); text-transform: uppercase; }
-    .buzz-score small { color: var(--fg-mute); font-size: 11px; line-height: 1.5; text-align:right; }
-    .x-embed-card { min-width:0; display:block; width:min(550px, 100%); margin:0 auto; overflow:hidden; }
+    .buzz-score small { color: var(--fg-mute); font-size: 11px; line-height: 1.6; text-align:left; }
+    .buzz-score-note { display:grid; gap: 3px; color: var(--fg-mute); font-size: 11px; line-height: 1.5; }
+    .x-embed-card { min-width:0; display:block; width:min(560px, 100%); margin:0 auto; overflow:hidden; }
     .x-embed-card .twitter-tweet { width: min(550px, 100%) !important; max-width: 100% !important; margin: 0 auto !important; color-scheme: dark; }
     .x-embed-card iframe { display:block !important; width: 100% !important; max-width: 100% !important; margin: 0 auto !important; }
-    .buzz-meta-rail { display:grid; gap: 10px; min-width:0; }
     .cat-badge { width:max-content; }
-    .buzz-tags { display:grid; grid-template-columns: minmax(130px, .6fr) minmax(0, 1.4fr); gap: 10px; }
+    .buzz-tags { display:grid; gap: 10px; min-width:0; }
     .buzz-tag { display:block; min-width:0; padding: 8px 10px; border: 1px solid color-mix(in oklch, var(--cat, var(--accent)) 34%, var(--border)); color: var(--fg-sub); font-family: var(--font-mono); font-size: 11px; line-height: 1.45; border-radius: var(--r-sm); overflow-wrap:anywhere; }
     .buzz-tag strong { display:block; color: var(--fg-mute); font-size: 10px; letter-spacing:.08em; text-transform:uppercase; margin-bottom: 4px; }
     .buzz-open { display:inline-flex; align-items:center; justify-content:center; color: var(--accent); text-decoration:none; border: 1px solid color-mix(in oklch, var(--accent) 45%, var(--border)); padding: 9px 11px; border-radius: var(--r-sm); font-family: var(--font-mono); font-size: 12px; }
@@ -38,6 +38,9 @@
     .buzz-empty-note { margin-top: 14px; line-height: 1.7; }
     @media (max-width: 820px) {
       .buzz-toolbar { grid-template-columns: 1fr; }
+      .buzz-list { max-width: 100%; }
+      .x-embed-shell { grid-template-columns: 1fr; gap: 16px; padding: 0 0 0 18px; min-height: 0; }
+      .buzz-side-rail { gap: 12px; }
       .buzz-tags { grid-template-columns: 1fr; }
       .buzz-score b { font-size: 30px; }
       .buzz-empty-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -101,27 +104,30 @@
         {% for p in buzz_posts %}
         <li class="buzz-card" data-filter-item data-cat="{{ p.cat }}" data-score="{{ p.score }}">
           <article class="x-embed-shell">
-            <div class="buzz-score">
-              <div class="buzz-score-main">
+            <aside class="buzz-side-rail" aria-label="BuzzPost metadata">
+              <div class="buzz-score">
                 <b>{{ p.score }}</b>
                 <span>BUZZ SCORE</span>
+                <small>obs {{ p.date }}</small>
               </div>
-              <small>{{ p.date }}<br>{{ p.published_at or "time n/a" }}</small>
-            </div>
+              <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
+              <div class="buzz-score-note">
+                <span>abs {{ p.absolute_score or 0 }}</span>
+                <span>vel {{ "%.1f"|format(p.velocity_score or 0) }}/h</span>
+                <span>{{ p.published_at or "time n/a" }}</span>
+              </div>
+              <div class="buzz-tags">
+                <span class="buzz-tag"><strong>source</strong>{{ p.source }}</span>
+                <span class="buzz-tag"><strong>query</strong>{{ p.source_query }}</span>
+              </div>
+              <a class="buzz-open" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">X で開く →</a>
+            </aside>
             <div class="x-embed-card">
               <blockquote class="twitter-tweet" data-theme="dark" data-dnt="true">
                 <p lang="ja" dir="auto">{{ p.text }}</p>
                 <a href="{{ p.post_url }}">{{ p.post_url }}</a>
               </blockquote>
             </div>
-            <aside class="buzz-meta-rail" aria-label="BuzzPost metadata">
-              <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
-              <div class="buzz-tags">
-                <span class="buzz-tag"><strong>source</strong>{{ p.source }}</span>
-                <span class="buzz-tag"><strong>query</strong>{{ p.source_query }}</span>
-              </div>
-              <a class="buzz-open" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">ポストを開く →</a>
-            </aside>
           </article>
         </li>
         {% endfor %}
