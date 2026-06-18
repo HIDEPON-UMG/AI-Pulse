@@ -474,6 +474,9 @@ def _buzzpost_display_rows(rows: list[dict]) -> list[dict]:
     for row in rows:
         cat = row.get("category") or "model"
         meta = CAT_META.get(cat, CAT_META["model"])
+        post_url = str(row.get("post_url") or "")
+        handle_match = re.search(r"(?:x|twitter)\.com/([^/]+)/status/", post_url, flags=re.IGNORECASE)
+        handle = f"@{handle_match.group(1)}" if handle_match else "@x"
         out.append({
             **row,
             "cat": cat,
@@ -481,7 +484,8 @@ def _buzzpost_display_rows(rows: list[dict]) -> list[dict]:
             "glyph": row.get("glyph") or meta["glyph"],
             "score": int(row.get("buzz_score") or 0),
             "text": str(row.get("text") or ""),
-            "url_text": str(row.get("post_url") or "").replace("https://", ""),
+            "url_text": post_url.replace("https://", ""),
+            "x_handle": handle,
         })
     return out
 

@@ -22,9 +22,15 @@
     .buzz-score span { font-size: 10px; letter-spacing: .12em; color: var(--fg-mute); text-transform: uppercase; }
     .buzz-score small { color: var(--fg-mute); font-size: 11px; line-height: 1.6; text-align:left; }
     .buzz-score-note { display:grid; gap: 3px; color: var(--fg-mute); font-size: 11px; line-height: 1.5; }
-    .x-embed-card { min-width:0; display:block; width:min(580px, 100%); margin:0 auto; padding: 10px; overflow:hidden; background: color-mix(in oklch, var(--cat, var(--accent)) 24%, var(--bg-elev)); border: 1px solid color-mix(in oklch, var(--cat, var(--accent)) 42%, var(--border)); border-radius: 22px; }
-    .x-embed-card .twitter-tweet { width: min(550px, 100%) !important; max-width: 100% !important; margin: 0 auto !important; color-scheme: dark; }
-    .x-embed-card iframe { display:block !important; width: 100% !important; max-width: 100% !important; margin: 0 auto !important; background: color-mix(in oklch, var(--cat, var(--accent)) 24%, var(--bg-elev)) !important; }
+    .x-discord-embed { min-width:0; display:grid; gap: 14px; width:min(620px, 100%); margin:0 auto; padding: 18px 18px 16px; background: #111827; border: 1px solid #2b3545; border-left: 4px solid var(--cat, var(--accent)); border-radius: 4px; box-shadow: 0 10px 24px rgba(0,0,0,.18); }
+    .x-discord-head { display:flex; justify-content:space-between; gap: 12px; align-items:flex-start; min-width:0; }
+    .x-discord-author { display:flex; flex-direction:column; gap: 2px; min-width:0; color: #f2f5f9; font-weight: 700; line-height: 1.35; }
+    .x-discord-author span { color:#9aa4b2; font-family: var(--font-mono); font-size: 12px; font-weight: 500; overflow-wrap:anywhere; }
+    .x-discord-provider { flex:0 0 auto; color:#9aa4b2; font-family: var(--font-mono); font-size: 11px; letter-spacing:.08em; text-transform:uppercase; }
+    .x-discord-text { margin:0; color:#eef2f7; font-size: 17px; line-height: 1.72; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .x-discord-link { display:block; color:#55b6ff; font-family: var(--font-mono); font-size: 13px; line-height: 1.5; overflow-wrap:anywhere; text-decoration:none; }
+    .x-discord-link:hover { text-decoration: underline; }
+    .x-discord-foot { display:flex; flex-wrap:wrap; gap: 10px; color:#9aa4b2; font-family: var(--font-mono); font-size: 11px; }
     .cat-badge { width:max-content; }
     .buzz-tags { display:grid; gap: 10px; min-width:0; }
     .buzz-tag { display:block; min-width:0; padding: 8px 10px; border: 1px solid color-mix(in oklch, var(--cat, var(--accent)) 34%, var(--border)); color: var(--fg-sub); font-family: var(--font-mono); font-size: 11px; line-height: 1.45; border-radius: var(--r-sm); overflow-wrap:anywhere; }
@@ -122,11 +128,20 @@
               </div>
               <a class="buzz-open" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">X で開く →</a>
             </aside>
-            <div class="x-embed-card">
-              <blockquote class="twitter-tweet" data-theme="dark" data-dnt="true">
-                <p lang="ja" dir="auto">{{ p.text }}</p>
-                <a href="{{ p.post_url }}">{{ p.post_url }}</a>
-              </blockquote>
+            <div class="x-discord-embed">
+              <div class="x-discord-head">
+                <div class="x-discord-author">
+                  <strong>{{ p.x_handle }}</strong>
+                  <span>{{ p.url_text }}</span>
+                </div>
+                <span class="x-discord-provider">X / Twitter</span>
+              </div>
+              <p class="x-discord-text">{{ p.text }}</p>
+              <a class="x-discord-link" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">{{ p.post_url }} →</a>
+              <div class="x-discord-foot">
+                <span>{{ p.published_at or "time n/a" }}</span>
+                <span>{{ p.cat_label }}</span>
+              </div>
             </div>
           </article>
         </li>
@@ -137,8 +152,5 @@
     </div>
   </main>
   {% include "_footer.html.j2" %}
-  {% if buzz_posts %}
-  <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-  {% endif %}
 </body>
 </html>
