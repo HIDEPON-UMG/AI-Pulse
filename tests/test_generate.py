@@ -264,16 +264,17 @@ class TestGenerate(unittest.TestCase):
             gp.generate(Path(d))
             html = (Path(d) / "repo-radar.html").read_text(encoding="utf-8")
 
-        for label in (">Feed</a>", ">Archive</a>", ">Karte</a>", ">Repositories</a>", ">BuzzPost</a>"):
+        for label in (">Feed</a>", ">Archive</a>", ">Karte</a>", ">Repo</a>", ">BuzzPost</a>"):
             self.assertIn(label, html)
         self.assertLess(html.index(">Feed</a>"), html.index(">BuzzPost</a>"))
         self.assertLess(html.index(">BuzzPost</a>"), html.index(">Karte</a>"))
-        self.assertLess(html.index(">Karte</a>"), html.index(">Repositories</a>"))
-        self.assertLess(html.index(">Repositories</a>"), html.index(">Archive</a>"))
+        self.assertLess(html.index(">Karte</a>"), html.index(">Repo</a>"))
+        self.assertLess(html.index(">Repo</a>"), html.index(">Archive</a>"))
         self.assertNotIn(">フィード</a>", html)
         self.assertNotIn(">アーカイブ</a>", html)
         self.assertNotIn(">カルテ</a>", html)
         self.assertNotIn(">リポジトリ</a>", html)
+        self.assertNotIn(">Repositories</a>", html)
         self.assertNotIn(">Repo Radar</a>", html)
 
     def test_buzzpost_page_is_built_from_public_rows(self):
@@ -363,6 +364,9 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("width:min(548px, 100%)", html)
         self.assertIn("font-family: 'Meiryo UI'", html)
         self.assertIn("font-size: 36px", html)
+        self.assertIn(".buzz-toolbar .chip-row", html)
+        self.assertIn("overflow-x:auto", html)
+        self.assertIn("flex-wrap:nowrap", html)
         self.assertIn("rel 8", html)
         self.assertIn('data-sort="score_desc"', html)
         self.assertIn('value="score_desc"', html)

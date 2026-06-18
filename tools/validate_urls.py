@@ -27,6 +27,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -47,6 +48,8 @@ _UAS = (
     ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 "
      "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"),
 )
+
+_ANTIBOT_400_HOSTS = frozenset({"ai.meta.com"})
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,7 @@ def _verify_one(ref: UrlRef, *, timeout: float) -> UrlVerdict:
     - 任意の段で **404 / 410 が出たら即 FATAL** (UA 偽装の裏にも見える 404 を露出させる)
     - 任意の段で 200-399 が返れば OK 確定
     - 全段 403/405/501 のみ → anti-bot 継続として ambiguous OK
+    - ai.meta.com は実在 URL でも 400 を返すため、全段 400 のみなら ambiguous OK
     - DNS 解決失敗 → 1 段目で FATAL に格上げ (捏造ホスト疑い)
     - その他のネットワークエラーが続く → ambiguous OK (オフライン環境で誤発火させない)
     """
@@ -155,6 +159,10 @@ def _verify_one(ref: UrlRef, *, timeout: float) -> UrlVerdict:
         if all(s in (403, 405, 501) for s in valid_codes):
             return UrlVerdict(ref, valid_codes[-1], True,
                               f"{' → '.join(details)} (anti-bot 全段継続・ambiguous)")
+        host = urllib.parse.urlparse(ref.url).hostname or ""
+        if host in _ANTIBOT_400_HOSTS and all(s == 400 for s in valid_codes):
+            return UrlVerdict(ref, valid_codes[-1], True,
+                              f"{' → '.join(details)} (anti-bot 400 全段継続・ambiguous)")
         return UrlVerdict(ref, valid_codes[-1], False, " → ".join(details))
 
     # 全段ネットワークエラー (オフライン環境等) → ambiguous OK

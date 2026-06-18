@@ -59,6 +59,9 @@
     .buzz-empty-note { margin-top: 14px; line-height: 1.7; }
     @media (max-width: 820px) {
       .buzz-toolbar { grid-template-columns: 1fr; }
+      .buzz-toolbar .chip-row { width:100%; max-width:none; margin:0; padding:0 2px 2px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+      .buzz-toolbar .chip-row::-webkit-scrollbar { display:none; }
+      .buzz-toolbar .chip-row .chip { flex:0 0 auto; }
       .buzz-list { max-width: 100%; }
       .x-discord-embed { width:100%; }
       .buzz-empty-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

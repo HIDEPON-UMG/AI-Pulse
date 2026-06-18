@@ -194,7 +194,7 @@ class TestBrandingInvariants(unittest.TestCase):
     def test_app_js_implements_swipe_nav_with_locked_order(self):
         """app.js の initSwipeNav 不変条件を locked-in する。
 
-        ナビ順序 feed → archive → karte_index は UI ヘッダの並びと一致させており、
+        ナビ順序 feed → buzzpost → karte_index → repo_radar → archive は UI ヘッダの並びと一致させており、
         将来 boot() から initSwipeNav を外したり、ORDER 配列の並び/値が変わると
         スマホ操作の方向感覚が壊れる。これを 1 件で物理検出する。
         """
@@ -209,8 +209,8 @@ class TestBrandingInvariants(unittest.TestCase):
         self.assertIsNotNone(m, "ORDER 配列が見つからない")
         order = re.findall(r'"([^"]+)"', m.group(1))
         self.assertEqual(
-            order, ["feed", "archive", "karte_index"],
-            f"swipe ナビ順序 (feed → archive → karte_index) が崩れている: {order}",
+            order, ["feed", "buzzpost", "karte_index", "repo_radar", "archive"],
+            f"swipe ナビ順序 (feed → buzzpost → karte_index → repo_radar → archive) が崩れている: {order}",
         )
         # 個別カルテ (data-page="karte") は ORDER に含まれない設計を locked-in
         self.assertNotIn(

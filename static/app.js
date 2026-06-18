@@ -77,10 +77,10 @@
     render();
   }
 
-  /* ---- Mobile swipe navigation (フィード ↔ アーカイブ ↔ カルテ一覧) ----
-     ユーザー要件 2026-06-05: スマホで横スワイプして主要 3 ページを順序遷移したい。
-     - 順序: feed → archive → karte_index (左スワイプ = 次のページへ)
-     - 両端 (feed の右端 / karte_index の左端) では何もしない (循環しない)
+  /* ---- Mobile swipe navigation (表示順に沿った主要ページ遷移) ----
+     ユーザー要件 2026-06-18: スマホの横スワイプ順をメニュー表示順に一致させる。
+     - 順序: feed → buzzpost → karte_index → repo_radar → archive (左スワイプ = 次のページへ)
+     - 両端 (feed の右端 / archive の左端) では何もしない (循環しない)
      - 個別カルテ (data-page="karte") では発火しない (戻る導線は親カルテ一覧経由)
      - desktop (>= 769px) では発火しない (誤クリック防止 + マウス UX を変えない)
      - スクロール領域内の縦スクロールと干渉しないよう、垂直移動が大きい時はキャンセル
@@ -93,13 +93,15 @@
   function initSwipeNav() {
     if (document.documentElement.clientWidth >= 769) return;  // desktop は対象外
     var page = document.body.dataset.page || "";
-    var ORDER = ["feed", "archive", "karte_index"];
+    var ORDER = ["feed", "buzzpost", "karte_index", "repo_radar", "archive"];
     var idx = ORDER.indexOf(page);
     if (idx < 0) return;  // 個別カルテなど ORDER 外は対象外
     var TARGETS = {
       "feed": "index.html",
-      "archive": "archive.html",
+      "buzzpost": "buzz-posts.html",
       "karte_index": "karte-index.html",
+      "repo_radar": "repo-radar.html",
+      "archive": "archive.html",
     };
     var X_THRESHOLD = 60;   // 水平移動 60px 以上で発火 (人差し指ストロークの平均)
     var Y_TOLERANCE = 50;   // 垂直 50px 超は縦スクロール意図とみなしキャンセル
