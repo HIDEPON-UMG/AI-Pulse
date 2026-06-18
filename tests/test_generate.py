@@ -317,8 +317,23 @@ class TestGenerate(unittest.TestCase):
                 '</blockquote>'
             ),
         }
+        past_row = {
+            **row,
+            "date": "2026-06-17",
+            "post_url": "https://x.com/example/status/old",
+            "text": "Older BuzzPost item",
+            "text_original": "Older BuzzPost item",
+            "translated": False,
+            "buzz_score": 80,
+            "absolute_score": 50,
+            "relative_score": 20,
+            "velocity_score": 10.0,
+            "x_embed_html": "",
+            "media_urls": [],
+            "link_previews": [],
+        }
         original = gp.collect_buzz_posts.load_public_rows
-        gp.collect_buzz_posts.load_public_rows = lambda: [row]
+        gp.collect_buzz_posts.load_public_rows = lambda: [row, past_row]
         try:
             with tempfile.TemporaryDirectory() as d:
                 r = gp.generate(Path(d))
@@ -327,6 +342,9 @@ class TestGenerate(unittest.TestCase):
         finally:
             gp.collect_buzz_posts.load_public_rows = original
         self.assertIn("BuzzPost", html)
+        self.assertIn("Today’s Buzz Posts", html)
+        self.assertIn("Past Buzz Posts", html)
+        self.assertNotIn("本日の観測ポスト", html)
         self.assertNotIn("Claude Code エージェントが今日は至るところにいます", html)
         self.assertNotIn("Claude Code agents are everywhere", html)
         self.assertNotIn("原文を表示", html)

@@ -528,6 +528,23 @@ def _buzzpost_display_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
+def _buzzpost_sections(rows: list[dict]) -> list[dict]:
+    if not rows:
+        return []
+    latest = max(str(row.get("date") or "") for row in rows)
+    sections = [
+        {
+            "title": "Today’s Buzz Posts",
+            "rows": [row for row in rows if str(row.get("date") or "") == latest],
+        },
+        {
+            "title": "Past Buzz Posts",
+            "rows": [row for row in rows if str(row.get("date") or "") != latest],
+        },
+    ]
+    return [section for section in sections if section["rows"]]
+
+
 def _safe_x_embed_html(value: str) -> Markup:
     embed = re.sub(r"(?is)<script\b[^>]*>.*?</script>", "", value or "").strip()
     if not embed.lower().startswith('<blockquote class="twitter-tweet"'):
@@ -793,6 +810,7 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         if any(row["cat"] == cat for row in repo_radar)
     ]
     buzz_posts = _buzzpost_display_rows(collect_buzz_posts.load_public_rows())
+    buzzpost_sections = _buzzpost_sections(buzz_posts)
     buzzpost_stats = collect_buzz_posts.load_stats()
     buzzpost_categories = [
         {"cat": cat, "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"]}
@@ -813,9 +831,10 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         "repo_radar_categories": repo_radar_categories,
         "repo_radar_sources": repo_radar_sources,
         "buzz_posts": buzz_posts,
+        "buzzpost_sections": buzzpost_sections,
         "buzzpost_count": len(buzz_posts),
         "buzzpost_categories": buzzpost_categories,
-        "buzzpost_latest": buzz_posts[0]["date"] if buzz_posts else buzzpost_stats.get("latest"),
+        "buzzpost_latest": max((row["date"] for row in buzz_posts), default=buzzpost_stats.get("latest")),
         "buzzpost_stats": buzzpost_stats,
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),

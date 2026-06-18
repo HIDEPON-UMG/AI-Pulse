@@ -21,6 +21,7 @@ BUZZPOST_MIN_ABSOLUTE_SCORE = int(os.environ.get("BUZZPOST_MIN_ABSOLUTE_SCORE", 
 BUZZPOST_MIN_VELOCITY_SCORE = float(os.environ.get("BUZZPOST_MIN_VELOCITY_SCORE", "8"))
 BUZZPOST_EXCLUDED_HASHTAG_RE = re.compile(r"(?:[#＃]\s*AIイラスト|絵師)", re.IGNORECASE)
 BUZZPOST_PREVIEW_LIMIT = int(os.environ.get("BUZZPOST_PREVIEW_LIMIT", "2"))
+BUZZPOST_HISTORY_LIMIT = int(os.environ.get("BUZZPOST_HISTORY_LIMIT", "160"))
 X_OEMBED_URL = "https://publish.twitter.com/oembed"
 
 CAT_META = {
@@ -345,6 +346,10 @@ def _public_row(row: dict) -> dict:
     return {k: v for k, v in row.items() if k not in {"publishable", "drop_reason"}}
 
 
+def _history_key(row: dict) -> tuple[str, str]:
+    return (str(row.get("date") or ""), str(row.get("post_url") or ""))
+
+
 def _parse_buzzpost_items(
     xml_text: str,
     *,
@@ -566,18 +571,18 @@ def collect(
     )
     rows = [row for row in candidate_rows if _publishable_buzz(row)]
     existing = _load_existing(output_path)
-    by_url = {
-        str(row.get("post_url")): row
+    by_history_key = {
+        _history_key(row): row
         for row in existing
         if row.get("post_url") and _publishable_buzz(row)
     }
     for row in rows:
-        by_url[row["post_url"]] = _public_row(row)
+        by_history_key[_history_key(row)] = _public_row(row)
     merged = sorted(
-        by_url.values(),
+        by_history_key.values(),
         key=lambda r: (r.get("date", ""), r.get("buzz_score", 0), r.get("published_at", "")),
         reverse=True,
-    )[:120]
+    )[:BUZZPOST_HISTORY_LIMIT]
     _write_jsonl(output_path, merged)
     stats = {
         "latest": today or datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=9))).date().isoformat(),
@@ -595,7 +600,7 @@ def collect(
     return stats
 
 
-def load_public_rows(path: Path = BUZZPOST_PATH, *, limit: int = 80) -> list[dict]:
+def load_public_rows(path: Path = BUZZPOST_PATH, *, limit: int = BUZZPOST_HISTORY_LIMIT) -> list[dict]:
     rows = [row for row in _load_existing(path) if _publishable_buzz(row)]
     rows.sort(key=lambda r: (r.get("date", ""), r.get("buzz_score", 0), r.get("published_at", "")), reverse=True)
     return rows[:limit]

@@ -509,6 +509,55 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
     assert rows[0]["score_basis"] == "query_min_faves"
 
 
+def test_collect_preserves_same_post_url_across_observation_dates(tmp_path):
+    rss = tmp_path / "buzzpost-model.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-model</title>
+    <description>(Claude OR LLM) lang:ja min_faves:50</description>
+    <item>
+      <title>2026-06-18 09:30:00</title>
+      <link>https://x.com/example/status/repeat</link>
+      <pubDate>Thu, 18 Jun 2026 09:30:00 +0900</pubDate>
+      <description>Claude Code の運用知見が共有されている</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+    out = tmp_path / "buzz_posts.jsonl"
+    out.write_text(
+        json.dumps(
+            {
+                "date": "2026-06-17",
+                "category": "model",
+                "post_url": "https://x.com/example/status/repeat",
+                "text": "Yesterday observation",
+                "buzz_score": 70,
+                "absolute_score": 50,
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    buzz.collect(rss_paths=str(rss), output_path=out, today="2026-06-18")
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+
+    assert [
+        (row["date"], row["post_url"])
+        for row in rows
+        if row["post_url"] == "https://x.com/example/status/repeat"
+    ] == [
+        ("2026-06-18", "https://x.com/example/status/repeat"),
+        ("2026-06-17", "https://x.com/example/status/repeat"),
+    ]
+
+
 def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
     rss = tmp_path / "buzzpost-model.xml"
     rss.write_text(

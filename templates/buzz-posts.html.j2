@@ -114,64 +114,68 @@
         {% endif %}
       </section>
       {% else %}
-      <div class="buzz-list-head">
-        <h2>本日の観測ポスト</h2>
-        <span class="count-pill"><b data-count>{{ "%02d"|format(buzzpost_count) }}</b> / {{ "%02d"|format(buzzpost_count) }} 件を表示</span>
-      </div>
-      <ol class="buzz-list" data-buzz-list>
-        {% for p in buzz_posts %}
-        <li class="buzz-card" data-filter-item data-cat="{{ p.cat }}" data-score="{{ p.score }}" data-published="{{ p.published_at or "" }}">
-          <article class="x-embed-shell">
-            <div class="x-discord-embed">
-              <div class="x-discord-score">
-                <b>{{ p.score }}</b>
-                <span>BUZZ SCORE</span>
-                <span>abs {{ p.absolute_score or 0 }}</span>
-                <span>rel {{ p.relative_score or 0 }}</span>
-                <span>vel {{ "%.1f"|format(p.velocity_score or 0) }}/h</span>
-                <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
-              </div>
-              {% if p.x_embed_html %}
-                <div class="x-oembed-frame">
-                  {{ p.x_embed_html }}
+      {% for section in buzzpost_sections %}
+      <section data-date-group>
+        <div class="buzz-list-head">
+          <h2>{{ section.title }}</h2>
+          <span class="count-pill">{{ "%02d"|format(section.rows|length) }} posts</span>
+        </div>
+        <ol class="buzz-list" data-buzz-list>
+          {% for p in section.rows %}
+          <li class="buzz-card" data-filter-item data-cat="{{ p.cat }}" data-score="{{ p.score }}" data-published="{{ p.published_at or "" }}">
+            <article class="x-embed-shell">
+              <div class="x-discord-embed">
+                <div class="x-discord-score">
+                  <b>{{ p.score }}</b>
+                  <span>BUZZ SCORE</span>
+                  <span>abs {{ p.absolute_score or 0 }}</span>
+                  <span>rel {{ p.relative_score or 0 }}</span>
+                  <span>vel {{ "%.1f"|format(p.velocity_score or 0) }}/h</span>
+                  <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
                 </div>
-              {% elif p.translated %}
-              <button class="x-translation-toggle" type="button" data-translation-toggle aria-expanded="false">
-                <span data-show-original>原文を表示</span><span data-show-translation hidden>翻訳を表示</span>
-              </button>
-              <p class="x-discord-text" data-translated-text>{{ p.text_html }}</p>
-              <p class="x-discord-text" data-original-text hidden>{{ p.text_original_html }}</p>
-              {% else %}
-              <p class="x-discord-text">{{ p.text_html }}</p>
-              {% endif %}
-              {% if not p.x_embed_html %}
-              {% if p.media_urls %}
-              <div class="x-discord-media-grid">
-                {% for url in p.media_urls[:4] %}
-                <img src="{{ url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                {% if p.x_embed_html %}
+                  <div class="x-oembed-frame">
+                    {{ p.x_embed_html }}
+                  </div>
+                {% elif p.translated %}
+                <button class="x-translation-toggle" type="button" data-translation-toggle aria-expanded="false">
+                  <span data-show-original>原文を表示</span><span data-show-translation hidden>翻訳を表示</span>
+                </button>
+                <p class="x-discord-text" data-translated-text>{{ p.text_html }}</p>
+                <p class="x-discord-text" data-original-text hidden>{{ p.text_original_html }}</p>
+                {% else %}
+                <p class="x-discord-text">{{ p.text_html }}</p>
+                {% endif %}
+                {% if not p.x_embed_html %}
+                {% if p.media_urls %}
+                <div class="x-discord-media-grid">
+                  {% for url in p.media_urls[:4] %}
+                  <img src="{{ url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  {% endfor %}
+                </div>
+                {% endif %}
+                {% for preview in p.link_previews[:1] %}
+                <a class="x-link-preview" href="{{ preview.url }}" target="_blank" rel="noopener noreferrer">
+                  <img src="{{ preview.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  <span class="x-link-preview-body">
+                    {% if preview.title %}<span class="x-link-preview-title">{{ preview.title }}</span>{% endif %}
+                    <span class="x-link-preview-site">{{ preview.site_name or preview.url }}</span>
+                  </span>
+                </a>
                 {% endfor %}
+                <a class="x-discord-link" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">{{ p.post_url }} →</a>
+                <div class="x-discord-foot">
+                  <span>{{ p.published_at or "time n/a" }}</span>
+                  <span>{{ p.cat_label }}</span>
+                </div>
+                {% endif %}
               </div>
-              {% endif %}
-              {% for preview in p.link_previews[:1] %}
-              <a class="x-link-preview" href="{{ preview.url }}" target="_blank" rel="noopener noreferrer">
-                <img src="{{ preview.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                <span class="x-link-preview-body">
-                  {% if preview.title %}<span class="x-link-preview-title">{{ preview.title }}</span>{% endif %}
-                  <span class="x-link-preview-site">{{ preview.site_name or preview.url }}</span>
-                </span>
-              </a>
-              {% endfor %}
-              <a class="x-discord-link" href="{{ p.post_url }}" target="_blank" rel="noopener noreferrer">{{ p.post_url }} →</a>
-              <div class="x-discord-foot">
-                <span>{{ p.published_at or "time n/a" }}</span>
-                <span>{{ p.cat_label }}</span>
-              </div>
-              {% endif %}
-            </div>
-          </article>
-        </li>
-        {% endfor %}
-      </ol>
+            </article>
+          </li>
+          {% endfor %}
+        </ol>
+      </section>
+      {% endfor %}
       <p class="empty" style="display:none;">条件に一致する BuzzPost はありません。</p>
       {% endif %}
     </div>
@@ -207,23 +211,27 @@
       });
     });
     function sortBuzzPosts(mode) {
-      var list = document.querySelector('[data-buzz-list]');
-      if (!list) return;
-      var items = Array.from(list.querySelectorAll('[data-filter-item]'));
+      var lists = Array.from(document.querySelectorAll('[data-buzz-list]'));
+      if (!lists.length) return;
       var scoreOf = function (item) {
         return Number(item.dataset.score || 0);
       };
-      items.sort(function (a, b) {
-        if (mode === 'date_desc') {
-          return String(b.dataset.published || '').localeCompare(String(a.dataset.published || ''));
-        }
-        return scoreOf(b) - scoreOf(a);
-      });
-      items.forEach(function (item) {
-        list.appendChild(item);
+      lists.forEach(function (list) {
+        var items = Array.from(list.querySelectorAll('[data-filter-item]'));
+        items.sort(function (a, b) {
+          if (mode === 'date_desc') {
+            return String(b.dataset.published || '').localeCompare(String(a.dataset.published || ''));
+          }
+          return scoreOf(b) - scoreOf(a);
+        });
+        items.forEach(function (item) {
+          list.appendChild(item);
+        });
       });
       if (window.twttr && window.twttr.widgets) {
-        window.twttr.widgets.load(list);
+        lists.forEach(function (list) {
+          window.twttr.widgets.load(list);
+        });
       }
     }
     var sortControl = document.querySelector('[data-sort]');
