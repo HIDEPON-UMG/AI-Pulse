@@ -160,3 +160,32 @@ def translate_headline_ja(
             )
 
     raise LLMError(f"未知の HYBRID_MODE: {mode!r}")
+
+
+def translate_buzzpost_text_ja(text: str) -> str:
+    """BuzzPost の英語本文を日本語へ翻訳する。HYBRID_MODE に従い local / Gemini を切替。
+
+    X 風の表示では日本語をデフォルトにしつつ原文へ切替できるよう、収集側は
+    text_original と翻訳後 text を分けて保持する。ここは翻訳境界だけを担う。
+    """
+    mode = config.HYBRID_MODE
+
+    if mode == "gemini_only":
+        return llm_gemini.translate_buzzpost_text_ja(text)
+
+    if mode == "local_only":
+        return llm_local.translate_buzzpost_text_ja(text)
+
+    if mode == "gemini_first":
+        try:
+            return llm_gemini.translate_buzzpost_text_ja(text)
+        except LLMError:
+            return llm_local.translate_buzzpost_text_ja(text)
+
+    if mode == "local_first":
+        try:
+            return llm_local.translate_buzzpost_text_ja(text)
+        except LLMError:
+            return llm_gemini.translate_buzzpost_text_ja(text)
+
+    raise LLMError(f"未知の HYBRID_MODE: {mode!r}")

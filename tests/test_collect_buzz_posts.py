@@ -54,9 +54,13 @@ def test_buzzpost_rss_extracts_ai_category_posts(tmp_path):
             "published_at": "2026-06-17T23:10:00+00:00",
             "buzz_score": 312,
             "absolute_score": 156,
+            "relative_score": 0,
             "velocity_score": 156.0,
             "score_basis": "embedded_metrics",
             "engagement": {"likes": 120, "reposts": 18, "replies": 0, "quotes": 0},
+            "author_name": "example",
+            "author_handle": "@example",
+            "profile_image_url": "https://unavatar.io/x/example",
         }
     ]
 
@@ -190,6 +194,258 @@ def test_buzzpost_keeps_original_post_line_breaks_and_urls(tmp_path):
     assert rows[0]["text"] == original_text
 
 
+def test_buzzpost_extracts_media_images_from_content_encoded(tmp_path):
+    rss = tmp_path / "buzzpost-media.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>buzzpost-media</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/with-media</link>
+      <content:encoded>Image workflow likes 90 reposts 5&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example-one.jpg&quot;&gt;&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example-two.jpg&quot;&gt;</content:encoded>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(str(rss), today="2026-06-18")
+
+    assert degraded is False
+    assert rows[0]["media_urls"] == [
+        "https://pbs.twimg.com/media/example-one.jpg",
+        "https://pbs.twimg.com/media/example-two.jpg",
+    ]
+    assert "<img" not in rows[0]["text"]
+
+
+def test_buzzpost_extracts_author_profile_metadata_when_rss_has_it(tmp_path):
+    rss = tmp_path / "buzzpost-agent.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>buzzpost-agent</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/author</link>
+      <dc:creator>Example Labs</dc:creator>
+      <media:thumbnail url="https://pbs.twimg.com/profile_images/example/avatar.jpg" />
+      <description>Agent workflow likes 90 reposts 5</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(str(rss), today="2026-06-18")
+
+    assert degraded is False
+    assert rows[0]["author_name"] == "Example Labs"
+    assert rows[0]["profile_image_url"] == "https://pbs.twimg.com/profile_images/example/avatar.jpg"
+
+
+def test_buzzpost_falls_back_to_unavatar_profile_image_from_handle(tmp_path):
+    rss = tmp_path / "buzzpost-agent.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-agent</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/author</link>
+      <author>Example Labs (@example)</author>
+      <description>Agent workflow likes 90 reposts 5</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(str(rss), today="2026-06-18")
+
+    assert degraded is False
+    assert rows[0]["author_name"] == "Example Labs"
+    assert rows[0]["profile_image_url"] == "https://unavatar.io/x/example"
+
+
+def test_buzzpost_fetches_link_preview_image_from_post_urls(tmp_path):
+    rss = tmp_path / "buzzpost-agent.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-agent</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/preview</link>
+      <author>Example Labs (@example)</author>
+      <description>Agent workflow likes 90 reposts 5 https://t.co/preview</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    def fake_request_text(url: str, *, timeout: int = 20) -> str:
+        assert url == "https://t.co/preview"
+        return (
+            '<html><head><meta property="og:title" content="Preview title">'
+            '<meta property="og:image" content="https://example.com/preview.jpg">'
+            '<meta property="og:site_name" content="Example"></head></html>'
+        )
+
+    rows, degraded = buzz.collect_from_rss_paths(
+        str(rss),
+        today="2026-06-18",
+        request_text=fake_request_text,
+        fetch_link_previews=True,
+    )
+
+    assert degraded is False
+    assert rows[0]["link_previews"] == [
+        {
+            "url": "https://t.co/preview",
+            "title": "Preview title",
+            "site_name": "Example",
+            "image_url": "https://example.com/preview.jpg",
+        }
+    ]
+
+
+def test_buzzpost_fetches_x_oembed_without_script_for_missing_rss_media(tmp_path):
+    rss = tmp_path / "buzzpost-agent.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-agent</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/with-video</link>
+      <author>Example Labs (@example)</author>
+      <description>Video card is only present in X embed. 90 likes 5 reposts https://t.co/media</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+    seen_urls: list[str] = []
+
+    def fake_request_text(url: str, *, timeout: int = 20) -> str:
+        seen_urls.append(url)
+        assert "publish.twitter.com/oembed" in url
+        return json.dumps(
+            {
+                "html": (
+                    '<blockquote class="twitter-tweet" data-dnt="true" data-theme="dark">'
+                    '<p lang="ja" dir="ltr">Video post <a href="https://t.co/media">pic.twitter.com/media</a></p>'
+                    '<a href="https://x.com/example/status/with-video">June 18, 2026</a>'
+                    '</blockquote><script async src="https://platform.x.com/widgets.js"></script>'
+                ),
+                "provider_name": "X",
+            }
+        )
+
+    rows, degraded = buzz.collect_from_rss_paths(
+        str(rss),
+        today="2026-06-18",
+        request_text=fake_request_text,
+        fetch_x_embeds=True,
+    )
+
+    assert degraded is False
+    assert seen_urls
+    assert rows[0]["x_embed_html"].startswith('<blockquote class="twitter-tweet"')
+    assert 'data-theme="dark"' in rows[0]["x_embed_html"]
+    assert "pic.twitter.com/media" in rows[0]["x_embed_html"]
+    assert "<script" not in rows[0]["x_embed_html"].lower()
+
+
+def test_buzzpost_fetches_x_oembed_even_when_rss_media_exists(tmp_path):
+    rss = tmp_path / "buzzpost-agent.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-agent</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/with-image</link>
+      <author>Example Labs (@example)</author>
+      <description>Image is present in RSS too. 90 likes 5 reposts&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example.jpg&quot;&gt;</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    def fake_request_text(url: str, *, timeout: int = 20) -> str:
+        assert "publish.twitter.com/oembed" in url
+        return json.dumps(
+            {
+                "html": (
+                    '<blockquote class="twitter-tweet" data-dnt="true" data-theme="dark">'
+                    '<p lang="ja" dir="ltr">Image post</p>'
+                    '<a href="https://x.com/example/status/with-image">June 18, 2026</a>'
+                    "</blockquote>"
+                ),
+                "provider_name": "X",
+            }
+        )
+
+    rows, degraded = buzz.collect_from_rss_paths(
+        str(rss),
+        today="2026-06-18",
+        request_text=fake_request_text,
+        fetch_x_embeds=True,
+    )
+
+    assert degraded is False
+    assert rows[0]["media_urls"] == ["https://pbs.twimg.com/media/example.jpg"]
+    assert rows[0]["x_embed_html"].startswith('<blockquote class="twitter-tweet"')
+
+
+def test_buzzpost_translates_english_posts_and_keeps_original_for_toggle(tmp_path):
+    rss = tmp_path / "buzzpost-model.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-model</title>
+    <item>
+      <title>2026-06-18 09:10:00</title>
+      <link>https://x.com/example/status/english</link>
+      <author>Example Labs (@example)</author>
+      <description>Claude Code agents are everywhere today. 90 likes 5 reposts</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(
+        str(rss),
+        today="2026-06-18",
+        translate_text_ja=lambda text: "Claude Code エージェントが今日は至るところにいます。90 likes 5 reposts",
+    )
+
+    assert degraded is False
+    assert rows[0]["text_original"] == "Claude Code agents are everywhere today. 90 likes 5 reposts"
+    assert rows[0]["text"] == "Claude Code エージェントが今日は至るところにいます。90 likes 5 reposts"
+    assert rows[0]["translated"] is True
+
+
 def test_buzzpost_drops_zero_and_below_threshold_scores(tmp_path):
     rss = tmp_path / "buzzpost-model.xml"
     rss.write_text(
@@ -253,6 +509,48 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
     assert rows[0]["score_basis"] == "query_min_faves"
 
 
+def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
+    rss = tmp_path / "buzzpost-model.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-model</title>
+    <description>(Claude OR LLM) lang:ja min_faves:50 since:2026-06-08 -filter:replies</description>
+    <item>
+      <title>2026-06-18 09:50:00</title>
+      <link>https://x.com/example/status/fast</link>
+      <pubDate>Thu, 18 Jun 2026 09:50:00 +0900</pubDate>
+      <description>Claude Code の新しい運用知見</description>
+    </item>
+    <item>
+      <title>2026-06-18 06:00:00</title>
+      <link>https://x.com/example/status/slow</link>
+      <pubDate>Thu, 18 Jun 2026 06:00:00 +0900</pubDate>
+      <description>LLM ワークフローの共有</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(
+        str(rss),
+        today="2026-06-18",
+        observed_at="2026-06-18T01:00:00+00:00",
+    )
+
+    assert degraded is False
+    assert [row["post_url"] for row in rows] == [
+        "https://x.com/example/status/fast",
+        "https://x.com/example/status/slow",
+    ]
+    assert {row["absolute_score"] for row in rows} == {50}
+    assert rows[0]["relative_score"] > rows[1]["relative_score"]
+    assert rows[0]["buzz_score"] > rows[1]["buzz_score"]
+
+
 def test_buzzpost_excludes_ai_illustration_hashtag_even_when_score_is_high(tmp_path):
     rss = tmp_path / "buzzpost-media.xml"
     rss.write_text(
@@ -284,6 +582,39 @@ def test_buzzpost_excludes_ai_illustration_hashtag_even_when_score_is_high(tmp_p
     assert degraded is False
     assert [row["post_url"] for row in rows] == ["https://x.com/example/status/kept"]
     assert all("#AIイラスト" not in row["text"] for row in rows)
+
+
+def test_buzzpost_excludes_illustrator_keyword_even_when_score_is_high(tmp_path):
+    rss = tmp_path / "buzzpost-media.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-media</title>
+    <description>("画像生成AI") lang:ja min_faves:50</description>
+    <item>
+      <title>2026-06-18 09:30:00</title>
+      <link>https://x.com/example/status/illustrator</link>
+      <description>生成AIと絵師の対立話題 likes 999 reposts 100</description>
+      <pubDate>Thu, 18 Jun 2026 09:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>2026-06-18 09:40:00</title>
+      <link>https://x.com/example/status/kept</link>
+      <description>Sora workflow update likes 80 reposts 5</description>
+      <pubDate>Thu, 18 Jun 2026 09:40:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(str(rss), today="2026-06-18")
+
+    assert degraded is False
+    assert [row["post_url"] for row in rows] == ["https://x.com/example/status/kept"]
+    assert all("絵師" not in row["text"] for row in rows)
 
 
 def test_buzzpost_keeps_fast_growing_post_below_absolute_threshold(tmp_path):

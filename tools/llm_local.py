@@ -439,3 +439,38 @@ def translate_headline_ja(
     if not text:
         raise LLMError("Ollama が空応答 (translate_headline_ja / think=false 確認)")
     return text.replace("\n", " ").strip().strip('"').strip("'").strip()
+
+
+def translate_buzzpost_text_ja(text: str) -> str:
+    """BuzzPost の英語本文を自然な日本語へ翻訳する。llm_gemini と同契約。"""
+    user = (
+        "次のX投稿本文を日本語に翻訳してください。URL、@handle、#hashtag、製品名、会社名、"
+        "モデル名は原文のまま残してください。改行は元の読みやすさに近い形で維持し、"
+        "説明や前置きは付けず、翻訳本文だけを返してください。\n\n"
+        f"{text}"
+    )
+    req = {
+        "model": config.OLLAMA_MODEL,
+        "messages": [{"role": "user", "content": user}],
+        "think": False,
+        "stream": False,
+        "options": {"temperature": 0.2},
+    }
+    data = json.dumps(req).encode("utf-8")
+    url = f"{config.OLLAMA_HOST}/api/chat"
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(
+                url, data=data, headers={"Content-Type": "application/json"}
+            ),
+            timeout=config.OLLAMA_TIMEOUT_SEC,
+        ) as r:
+            resp = json.load(r)
+    except urllib.error.URLError as exc:
+        raise LLMError(
+            f"Ollama 接続失敗 (translate_buzzpost_text_ja, {url}): {exc}"
+        ) from exc
+    translated = (resp.get("message", {}).get("content") or "").strip()
+    if not translated:
+        raise LLMError("Ollama が空応答 (translate_buzzpost_text_ja / think=false 確認)")
+    return translated.strip().strip('"').strip("'").strip()

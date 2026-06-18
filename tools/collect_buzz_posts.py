@@ -19,7 +19,9 @@ BUZZPOST_STATS_PATH = DATA / "buzz_posts_stats.json"
 DEFAULT_X_RSS_DIR = ROOT.parent / "twitter-rss" / "output"
 BUZZPOST_MIN_ABSOLUTE_SCORE = int(os.environ.get("BUZZPOST_MIN_ABSOLUTE_SCORE", "25"))
 BUZZPOST_MIN_VELOCITY_SCORE = float(os.environ.get("BUZZPOST_MIN_VELOCITY_SCORE", "8"))
-BUZZPOST_EXCLUDED_HASHTAG_RE = re.compile(r"[#＃]\s*AIイラスト", re.IGNORECASE)
+BUZZPOST_EXCLUDED_HASHTAG_RE = re.compile(r"(?:[#＃]\s*AIイラスト|絵師)", re.IGNORECASE)
+BUZZPOST_PREVIEW_LIMIT = int(os.environ.get("BUZZPOST_PREVIEW_LIMIT", "2"))
+X_OEMBED_URL = "https://publish.twitter.com/oembed"
 
 CAT_META = {
     "model": {"label": "モデル/LLM", "glyph": "◆"},
@@ -112,6 +114,155 @@ def _clean_text(value: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _extract_media_urls(value: str) -> list[str]:
+    text = html.unescape(value or "")
+    urls: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r"""(?is)<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']""", text):
+        url = match.group(1).strip()
+        if not url.startswith("https://pbs.twimg.com/"):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        urls.append(url)
+    return urls
+
+
+def _extract_profile_image_url(item: ET.Element) -> str:
+    for child in list(item):
+        name = _local_name(child.tag)
+        if name not in {"thumbnail", "avatar", "image"}:
+            continue
+        url = (child.attrib.get("url") or child.attrib.get("href") or "").strip()
+        if url.startswith("https://pbs.twimg.com/profile_images/"):
+            return url
+    return ""
+
+
+def _handle_from_url(post_url: str) -> str:
+    match = re.search(r"(?:x|twitter)\.com/([^/]+)/status/", post_url, flags=re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def _parse_author(value: str, post_url: str) -> tuple[str, str]:
+    text = _clean_text(value or "")
+    match = re.search(r"\(@([A-Za-z0-9_]{1,32})\)\s*$", text)
+    if match:
+        name = text[: match.start()].strip() or match.group(1)
+        return name, match.group(1)
+    handle = _handle_from_url(post_url)
+    return (text or handle or "X user"), handle
+
+
+def _profile_image_fallback(handle: str) -> str:
+    if not handle:
+        return ""
+    return f"https://unavatar.io/x/{urllib.parse.quote(handle)}"
+
+
+_TEXT_URL_RE = re.compile(r"https?://[^\s<>\"]+")
+
+
+def _extract_text_urls(text: str, *, post_url: str = "") -> list[str]:
+    urls: list[str] = []
+    seen: set[str] = set()
+    for match in _TEXT_URL_RE.finditer(text or ""):
+        url = match.group(0).rstrip(".,、。)]）")
+        if url == post_url:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        urls.append(url)
+    return urls
+
+
+def _meta_content(html_text: str, key: str) -> str:
+    pattern = (
+        rf"""(?is)<meta\b(?=[^>]*(?:property|name)\s*=\s*["']{re.escape(key)}["'])"""
+        rf"""(?=[^>]*content\s*=\s*["']([^"']+)["'])[^>]*>"""
+    )
+    match = re.search(pattern, html_text or "")
+    return html.unescape(match.group(1).strip()) if match else ""
+
+
+def _link_preview(url: str, *, request_text=_request_text) -> dict | None:
+    try:
+        page = request_text(url, timeout=12)
+    except Exception:
+        return None
+    image_url = _meta_content(page, "og:image") or _meta_content(page, "twitter:image")
+    if not image_url:
+        return None
+    image_url = urllib.parse.urljoin(url, image_url)
+    if not image_url.startswith(("http://", "https://")):
+        return None
+    return {
+        "url": url,
+        "title": _meta_content(page, "og:title") or _meta_content(page, "twitter:title"),
+        "site_name": _meta_content(page, "og:site_name"),
+        "image_url": image_url,
+    }
+
+
+def _link_previews(text: str, *, post_url: str, request_text=_request_text) -> list[dict]:
+    previews: list[dict] = []
+    for url in _extract_text_urls(text, post_url=post_url)[:BUZZPOST_PREVIEW_LIMIT]:
+        preview = _link_preview(url, request_text=request_text)
+        if preview:
+            previews.append(preview)
+    return previews
+
+
+def _sanitize_x_oembed_html(value: str) -> str:
+    embed = re.sub(r"(?is)<script\b[^>]*>.*?</script>", "", value or "").strip()
+    if not embed.lower().startswith('<blockquote class="twitter-tweet"'):
+        return ""
+    if "<script" in embed.lower() or "<iframe" in embed.lower():
+        return ""
+    return embed
+
+
+def _x_oembed_html(post_url: str, *, request_text=_request_text) -> str:
+    if not post_url.startswith(("https://x.com/", "https://twitter.com/")):
+        return ""
+    params = urllib.parse.urlencode(
+        {
+            "url": post_url,
+            "theme": "dark",
+            "dnt": "true",
+            "omit_script": "true",
+            "hide_thread": "false",
+        }
+    )
+    try:
+        payload = json.loads(request_text(f"{X_OEMBED_URL}?{params}", timeout=12))
+    except Exception:
+        return ""
+    if str(payload.get("provider_name") or "").lower() not in {"x", "twitter"}:
+        return ""
+    return _sanitize_x_oembed_html(str(payload.get("html") or ""))
+
+
+def _mostly_english(text: str) -> bool:
+    compact = re.sub(r"\s+", "", text or "")
+    if len(compact) < 12:
+        return False
+    ascii_count = sum(1 for ch in compact if ord(ch) < 128)
+    cjk_count = sum(1 for ch in compact if "\u3040" <= ch <= "\u30ff" or "\u4e00" <= ch <= "\u9fff")
+    return ascii_count / len(compact) >= 0.82 and cjk_count == 0
+
+
+def _default_translate_text_ja(text: str) -> str:
+    try:
+        import llm_hybrid  # type: ignore
+
+        return llm_hybrid.translate_buzzpost_text_ja(text)
+    except Exception:
+        return ""
+
+
 def _observed_datetime(value: str | datetime | None = None) -> datetime:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -156,6 +307,27 @@ def _velocity_score(score: int, published: datetime | None, observed_at: datetim
     return score / age_hours
 
 
+def _base_buzz_score(row: dict) -> float:
+    return float(row.get("absolute_score") or 0) + float(row.get("velocity_score") or 0.0)
+
+
+def _apply_relative_scores(rows: list[dict]) -> None:
+    publishable_rows = [row for row in rows if _publishable_buzz(row)]
+    if not publishable_rows:
+        return
+    base_scores = [_base_buzz_score(row) for row in publishable_rows]
+    min_score = min(base_scores)
+    max_score = max(base_scores)
+    score_range = max_score - min_score
+    for row, base_score in zip(publishable_rows, base_scores):
+        if score_range <= 0:
+            relative_score = 0
+        else:
+            relative_score = int(round(((base_score - min_score) / score_range) * 50))
+        row["relative_score"] = relative_score
+        row["buzz_score"] = int(round(base_score + relative_score))
+
+
 def _publishable_buzz(row: dict) -> bool:
     if _excluded_buzzpost_text(str(row.get("text") or "")):
         return False
@@ -179,6 +351,10 @@ def _parse_buzzpost_items(
     source_name: str,
     today: str,
     observed_at: datetime,
+    request_text=_request_text,
+    fetch_link_previews: bool = False,
+    fetch_x_embeds: bool = False,
+    translate_text_ja=None,
 ) -> list[dict]:
     cat = SOURCE_CATEGORIES.get(source_name)
     if not cat:
@@ -201,9 +377,18 @@ def _parse_buzzpost_items(
         post_url = fields.get("link") or fields.get("guid") or ""
         if "x.com/" not in post_url and "twitter.com/" not in post_url:
             continue
-        text = _clean_text(fields.get("description") or fields.get("encoded") or "")
+        content_html = fields.get("description") or fields.get("encoded") or ""
+        text = _clean_text(content_html)
         if not text:
             continue
+        text_original = text
+        translated = False
+        if translate_text_ja and _mostly_english(text_original):
+            translated_text = (translate_text_ja(text_original) or "").strip()
+            if translated_text and translated_text != text_original:
+                text = translated_text
+                translated = True
+        media_urls = _extract_media_urls(content_html)
         published = _parse_rss_datetime(fields.get("pubdate") or fields.get("title") or "")
         metrics = _buzz_metrics(text)
         absolute_score = _absolute_score(metrics)
@@ -229,8 +414,31 @@ def _parse_buzzpost_items(
             "score_basis": score_basis,
             "engagement": metrics,
         }
+        author_name, author_handle = _parse_author(fields.get("creator") or fields.get("author") or "", post_url)
+        profile_image_url = _extract_profile_image_url(item)
+        if author_name:
+            row["author_name"] = author_name
+        if author_handle:
+            row["author_handle"] = f"@{author_handle}"
+        if profile_image_url:
+            row["profile_image_url"] = profile_image_url
+        elif author_handle:
+            row["profile_image_url"] = _profile_image_fallback(author_handle)
+        if translated:
+            row["text_original"] = text_original
+            row["translated"] = True
+        if fetch_link_previews:
+            link_previews = _link_previews(text_original, post_url=post_url, request_text=request_text)
+            if link_previews:
+                row["link_previews"] = link_previews
+        if media_urls:
+            row["media_urls"] = media_urls
         row["publishable"] = _publishable_buzz(row)
         row["drop_reason"] = "" if row["publishable"] else ("excluded_hashtag" if _excluded_buzzpost_text(text) else "threshold")
+        if fetch_x_embeds and row["publishable"]:
+            embed_html = _x_oembed_html(post_url, request_text=request_text)
+            if embed_html:
+                row["x_embed_html"] = embed_html
         rows.append(row)
     return rows
 
@@ -242,6 +450,9 @@ def collect_from_rss_paths(
     today: str | None = None,
     observed_at: str | datetime | None = None,
     include_unpublishable: bool = False,
+    fetch_link_previews: bool = False,
+    fetch_x_embeds: bool = False,
+    translate_text_ja=None,
 ) -> tuple[list[dict], bool]:
     raw_paths = rss_paths if rss_paths is not None else _default_rss_paths()
     locations = _split_rss_locations(raw_paths)
@@ -255,7 +466,16 @@ def collect_from_rss_paths(
     for location in locations:
         try:
             for name, xml_text in _iter_rss_xml(location, request_text=request_text):
-                for row in _parse_buzzpost_items(xml_text, source_name=name, today=date_key, observed_at=observed_dt):
+                for row in _parse_buzzpost_items(
+                    xml_text,
+                    source_name=name,
+                    today=date_key,
+                    observed_at=observed_dt,
+                    request_text=request_text,
+                    fetch_link_previews=fetch_link_previews,
+                    fetch_x_embeds=fetch_x_embeds,
+                    translate_text_ja=translate_text_ja,
+                ):
                     key = row["post_url"]
                     if key in seen:
                         continue
@@ -264,6 +484,7 @@ def collect_from_rss_paths(
         except Exception:
             degraded = True
             continue
+    _apply_relative_scores(rows)
     public_rows = rows if include_unpublishable else [_public_row(row) for row in rows if _publishable_buzz(row)]
     public_rows.sort(key=lambda r: (r.get("date", ""), r.get("buzz_score", 0), r.get("published_at", "")), reverse=True)
     return public_rows, degraded
@@ -320,15 +541,28 @@ def collect(
     stats_path: Path | None = None,
     today: str | None = None,
     observed_at: str | datetime | None = None,
+    fetch_link_previews: bool | None = None,
+    fetch_x_embeds: bool | None = None,
+    translate_text_ja=None,
 ) -> dict:
     stats_path = stats_path or (
         BUZZPOST_STATS_PATH if output_path == BUZZPOST_PATH else output_path.with_name("buzz_posts_stats.json")
     )
+    real_output = output_path == BUZZPOST_PATH
+    if fetch_link_previews is None:
+        fetch_link_previews = real_output
+    if fetch_x_embeds is None:
+        fetch_x_embeds = real_output
+    if translate_text_ja is None and real_output:
+        translate_text_ja = _default_translate_text_ja
     candidate_rows, degraded = collect_from_rss_paths(
         rss_paths,
         today=today,
         observed_at=observed_at,
         include_unpublishable=True,
+        fetch_link_previews=fetch_link_previews,
+        fetch_x_embeds=fetch_x_embeds,
+        translate_text_ja=translate_text_ja,
     )
     rows = [row for row in candidate_rows if _publishable_buzz(row)]
     existing = _load_existing(output_path)

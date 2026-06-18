@@ -457,3 +457,31 @@ def translate_headline_ja(
     if not text:
         raise LLMError("Gemini が空応答 (translate_headline_ja)")
     return text.replace("\n", " ").strip().strip('"').strip("'").strip()
+
+
+def translate_buzzpost_text_ja(text: str) -> str:
+    """BuzzPost の英語本文を自然な日本語へ翻訳する。失敗で LLMError。"""
+    user = (
+        "次のX投稿本文を日本語に翻訳してください。URL、@handle、#hashtag、製品名、会社名、"
+        "モデル名は原文のまま残してください。改行は元の読みやすさに近い形で維持し、"
+        "説明や前置きは付けず、翻訳本文だけを返してください。\n\n"
+        f"{text}"
+    )
+    cfg = types.GenerateContentConfig(
+        response_mime_type="text/plain",
+        temperature=0.2,
+    )
+    _get_bucket().acquire()
+    client = _get_client()
+    try:
+        resp = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=user,
+            config=cfg,
+        )
+    except Exception as exc:
+        raise LLMError(f"Gemini translate_buzzpost_text_ja 失敗: {exc}") from exc
+    translated = (resp.text or "").strip()
+    if not translated:
+        raise LLMError("Gemini が空応答 (translate_buzzpost_text_ja)")
+    return translated.strip().strip('"').strip("'").strip()

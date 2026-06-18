@@ -255,8 +255,8 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("スマホのコピーボタン修正", html)
         self.assertNotIn(r"C:\Users\hidek\Obsidian", html)
 
-    def test_main_nav_labels_are_english_with_repositories_after_karte(self):
-        """メニューバーは英語表記にし、Repositories は Karte の右側に置く。
+    def test_main_nav_labels_are_english_with_buzzpost_next_to_feed_and_archive_last(self):
+        """メニューバーは英語表記にし、BuzzPost は Feed の右、Archive は一番右に置く。
 
         なぜ重要か: BuzzPost 追加後のメニューバーは UI トーンとして英語に統一する。
         """
@@ -266,7 +266,10 @@ class TestGenerate(unittest.TestCase):
 
         for label in (">Feed</a>", ">Archive</a>", ">Karte</a>", ">Repositories</a>", ">BuzzPost</a>"):
             self.assertIn(label, html)
+        self.assertLess(html.index(">Feed</a>"), html.index(">BuzzPost</a>"))
+        self.assertLess(html.index(">BuzzPost</a>"), html.index(">Karte</a>"))
         self.assertLess(html.index(">Karte</a>"), html.index(">Repositories</a>"))
+        self.assertLess(html.index(">Repositories</a>"), html.index(">Archive</a>"))
         self.assertNotIn(">フィード</a>", html)
         self.assertNotIn(">アーカイブ</a>", html)
         self.assertNotIn(">カルテ</a>", html)
@@ -285,11 +288,34 @@ class TestGenerate(unittest.TestCase):
             "source_query": "(GPT-5 OR Claude OR Gemini) lang:en",
             "post_url": "https://x.com/example/status/111",
             "title": "Generated title must not be shown",
-            "text": original_post,
+            "text_original": original_post + "\nRelated https://t.co/example",
+            "text": "Claude Code エージェントが今日は至るところにいます。\n\nhttps://x.com/example/status/111\n関連 https://t.co/example",
+            "translated": True,
+            "author_name": "Example Labs",
+            "profile_image_url": "https://pbs.twimg.com/profile_images/example/avatar.jpg",
             "published_at": "2026-06-17T23:10:00+00:00",
             "buzz_score": 156,
             "absolute_score": 120,
+            "relative_score": 8,
             "velocity_score": 36.2,
+            "media_urls": [
+                "https://pbs.twimg.com/media/example-one.jpg",
+                "https://pbs.twimg.com/media/example-two.jpg",
+            ],
+            "link_previews": [
+                {
+                    "url": "https://t.co/example",
+                    "title": "Example preview",
+                    "site_name": "Example",
+                    "image_url": "https://example.com/preview.jpg",
+                }
+            ],
+            "x_embed_html": (
+                '<blockquote class="twitter-tweet" data-dnt="true" data-theme="dark">'
+                '<p lang="ja" dir="ltr">Official X embed with media <a href="https://t.co/example">pic.twitter.com/example</a></p>'
+                '<a href="https://x.com/example/status/111">June 18, 2026</a>'
+                '</blockquote>'
+            ),
         }
         original = gp.collect_buzz_posts.load_public_rows
         gp.collect_buzz_posts.load_public_rows = lambda: [row]
@@ -301,29 +327,49 @@ class TestGenerate(unittest.TestCase):
         finally:
             gp.collect_buzz_posts.load_public_rows = original
         self.assertIn("BuzzPost", html)
-        self.assertIn("Claude Code agents are everywhere", html)
-        self.assertIn(original_post, html)
+        self.assertNotIn("Claude Code エージェントが今日は至るところにいます", html)
+        self.assertNotIn("Claude Code agents are everywhere", html)
+        self.assertNotIn("原文を表示", html)
+        self.assertNotIn("翻訳を表示", html)
         self.assertIn('class="x-embed-shell"', html)
-        self.assertIn('class="buzz-side-rail"', html)
-        self.assertLess(html.index('class="buzz-side-rail"'), html.index('class="x-discord-embed"'))
-        self.assertIn("align-items:start", html)
+        self.assertNotIn('class="buzz-side-rail"', html)
+        self.assertNotIn("<aside", html)
         self.assertIn('class="x-discord-embed"', html)
-        self.assertIn('class="x-discord-author"', html)
-        self.assertIn("width:min(520px, 100%)", html)
-        self.assertIn("font-size: 14px", html)
-        self.assertIn("@example", html)
-        self.assertIn('class="x-discord-provider"', html)
-        self.assertIn("X / Twitter", html)
+        self.assertNotIn('class="x-discord-author"', html)
+        self.assertNotIn('class="x-discord-avatar"', html)
+        self.assertNotIn('src="https://pbs.twimg.com/profile_images/example/avatar.jpg"', html)
+        self.assertEqual(html.count("Example Labs"), 0)
+        self.assertIn("width:min(548px, 100%)", html)
+        self.assertIn("font-family: 'Meiryo UI'", html)
+        self.assertIn("font-size: 36px", html)
+        self.assertIn("rel 8", html)
+        self.assertIn('data-sort="score_desc"', html)
+        self.assertIn('value="score_desc"', html)
+        self.assertIn("sortBuzzPosts", html)
+        self.assertIn("Number(item.dataset.score || 0)", html)
+        self.assertEqual(html.count("@example"), 0)
+        self.assertNotIn('class="x-discord-text-link"', html)
+        self.assertNotIn('class="x-link-preview"', html)
+        self.assertNotIn('src="https://example.com/preview.jpg"', html)
+        self.assertNotIn("Example preview", html)
+        self.assertNotIn('class="x-discord-provider"', html)
+        self.assertIn('class="x-discord-score"', html)
+        self.assertIn('class="x-oembed-frame"', html)
+        self.assertIn('<blockquote class="twitter-tweet" data-dnt="true" data-theme="dark">', html)
+        self.assertIn("https://platform.x.com/widgets.js", html)
+        self.assertNotIn('class="x-discord-media-grid"', html)
+        self.assertNotIn('src="https://pbs.twimg.com/media/example-one.jpg"', html)
+        self.assertNotIn('src="https://pbs.twimg.com/media/example-two.jpg"', html)
         self.assertNotIn("width:min(620px, 100%)", html)
         self.assertNotIn("min-height: 360px", html)
         self.assertNotIn("font-size: 17px", html)
-        self.assertNotIn('<blockquote class="twitter-tweet"', html)
         self.assertNotIn("platform.twitter.com/widgets.js", html)
-        self.assertNotIn("<iframe", html)
         self.assertNotIn("clip-path: inset(0 round 16px)", html)
         self.assertNotIn('class="x-embed-corner', html)
         self.assertNotIn('class="x-post-card"', html)
         self.assertNotIn('class="buzz-meta-rail"', html)
+        self.assertNotIn("<strong>source</strong>", html)
+        self.assertNotIn("<strong>query</strong>", html)
         self.assertIn("abs 120", html)
         self.assertIn("vel 36.2/h", html)
         self.assertNotIn("Generated title must not be shown", html)

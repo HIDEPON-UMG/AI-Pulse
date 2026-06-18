@@ -476,18 +476,95 @@ def _buzzpost_display_rows(rows: list[dict]) -> list[dict]:
         meta = CAT_META.get(cat, CAT_META["model"])
         post_url = str(row.get("post_url") or "")
         handle_match = re.search(r"(?:x|twitter)\.com/([^/]+)/status/", post_url, flags=re.IGNORECASE)
-        handle = f"@{handle_match.group(1)}" if handle_match else "@x"
+        handle = str(row.get("author_handle") or "").strip()
+        if not handle:
+            handle = f"@{handle_match.group(1)}" if handle_match else "@x"
+        display_name = str(row.get("author_name") or "").strip() or handle.lstrip("@") or "X user"
+        profile_image_url = str(row.get("profile_image_url") or "")
+        if not (
+            profile_image_url.startswith("https://pbs.twimg.com/profile_images/")
+            or profile_image_url.startswith("https://unavatar.io/x/")
+        ):
+            profile_image_url = ""
+        text = str(row.get("text") or "")
+        text_original = str(row.get("text_original") or text)
+        link_previews = [
+            {
+                "url": str(preview.get("url") or ""),
+                "title": str(preview.get("title") or ""),
+                "site_name": str(preview.get("site_name") or ""),
+                "image_url": str(preview.get("image_url") or ""),
+            }
+            for preview in (row.get("link_previews") or [])
+            if str(preview.get("url") or "").startswith(("http://", "https://"))
+            and str(preview.get("image_url") or "").startswith(("http://", "https://"))
+        ]
+        media_urls = [
+            str(url)
+            for url in (row.get("media_urls") or [])
+            if str(url).startswith("https://pbs.twimg.com/")
+        ]
+        x_embed_html = _safe_x_embed_html(str(row.get("x_embed_html") or ""))
         out.append({
             **row,
             "cat": cat,
             "cat_label": row.get("category_label") or meta["label"],
             "glyph": row.get("glyph") or meta["glyph"],
             "score": int(row.get("buzz_score") or 0),
-            "text": str(row.get("text") or ""),
+            "text": text,
+            "text_original": text_original,
+            "text_html": _linkify_text(text),
+            "text_original_html": _linkify_text(text_original),
+            "translated": bool(row.get("translated") and text_original != text),
             "url_text": post_url.replace("https://", ""),
             "x_handle": handle,
+            "display_name": display_name,
+            "avatar_initial": display_name[:1].upper(),
+            "profile_image_url": profile_image_url,
+            "media_urls": media_urls,
+            "link_previews": link_previews,
+            "x_embed_html": x_embed_html,
         })
     return out
+
+
+def _safe_x_embed_html(value: str) -> Markup:
+    embed = re.sub(r"(?is)<script\b[^>]*>.*?</script>", "", value or "").strip()
+    if not embed.lower().startswith('<blockquote class="twitter-tweet"'):
+        return Markup("")
+    if "<script" in embed.lower() or "<iframe" in embed.lower():
+        return Markup("")
+    return Markup(embed)
+
+
+_URL_RE = re.compile(r"https?://[^\s<>\"]+")
+
+
+def _linkify_text(text: str) -> Markup:
+    """BuzzPost 本文中の URL だけを安全にリンク化する。
+
+    先に通常テキスト部分を escape し、URL も href/text ともに escape してから a タグ化する。
+    Jinja の autoescape を迂回するのは、この関数が作った最小 HTML だけに限定する。
+    """
+    if not text:
+        return Markup("")
+    parts: list[str] = []
+    pos = 0
+    for match in _URL_RE.finditer(text):
+        parts.append(str(escape(text[pos:match.start()])))
+        raw_url = match.group(0)
+        trailing = ""
+        while raw_url and raw_url[-1] in ".,、。)]）":
+            trailing = raw_url[-1] + trailing
+            raw_url = raw_url[:-1]
+        href = escape(raw_url)
+        parts.append(
+            f'<a class="x-discord-text-link" href="{href}" target="_blank" rel="noopener noreferrer">{href}</a>'
+        )
+        parts.append(str(escape(trailing)))
+        pos = match.end()
+    parts.append(str(escape(text[pos:])))
+    return Markup("".join(parts))
 
 
 def _story(ev: dict, ent_by_id: dict, ref: dt.date, *, feature: bool) -> dict:
