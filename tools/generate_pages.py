@@ -534,10 +534,14 @@ def _buzzpost_sections(rows: list[dict]) -> list[dict]:
     latest = max(str(row.get("date") or "") for row in rows)
     sections = [
         {
+            "id": "buzzpost-today",
+            "nav_label": "Today",
             "title": "Today’s Buzz Posts",
             "rows": [row for row in rows if str(row.get("date") or "") == latest],
         },
         {
+            "id": "buzzpost-past",
+            "nav_label": "Past",
             "title": "Past Buzz Posts",
             "rows": [row for row in rows if str(row.get("date") or "") != latest],
         },
