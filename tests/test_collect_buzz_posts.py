@@ -55,6 +55,7 @@ def test_buzzpost_rss_extracts_ai_category_posts(tmp_path):
             "buzz_score": 312,
             "absolute_score": 156,
             "velocity_score": 156.0,
+            "score_basis": "embedded_metrics",
             "engagement": {"likes": 120, "reposts": 18, "replies": 0, "quotes": 0},
         }
     ]
@@ -222,6 +223,34 @@ def test_buzzpost_drops_zero_and_below_threshold_scores(tmp_path):
     assert degraded is False
     assert [row["post_url"] for row in rows] == ["https://x.com/example/status/403"]
     assert rows[0]["buzz_score"] >= buzz.BUZZPOST_MIN_ABSOLUTE_SCORE
+
+
+def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path):
+    rss = tmp_path / "buzzpost-model.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-model</title>
+    <description>(Claude OR LLM) lang:ja min_faves:50 since:2026-06-08 -filter:replies</description>
+    <item>
+      <title>2026-06-18 09:30:00</title>
+      <link>https://x.com/example/status/901</link>
+      <pubDate>Thu, 18 Jun 2026 09:30:00 +0900</pubDate>
+      <description>Claude Code の運用知見がかなり共有されている</description>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(str(rss), today="2026-06-18")
+
+    assert degraded is False
+    assert [row["post_url"] for row in rows] == ["https://x.com/example/status/901"]
+    assert rows[0]["absolute_score"] == 50
+    assert rows[0]["score_basis"] == "query_min_faves"
 
 
 def test_buzzpost_keeps_fast_growing_post_below_absolute_threshold(tmp_path):

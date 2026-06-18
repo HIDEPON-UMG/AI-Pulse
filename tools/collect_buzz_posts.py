@@ -141,6 +141,11 @@ def _absolute_score(metrics: dict[str, int]) -> int:
     )
 
 
+def _query_min_faves(source_query: str) -> int:
+    match = re.search(r"\bmin_faves:(\d+)\b", source_query or "", flags=re.IGNORECASE)
+    return int(match.group(1)) if match else 0
+
+
 def _velocity_score(score: int, published: datetime | None, observed_at: datetime) -> float:
     if not published or score <= 0:
         return 0.0
@@ -179,6 +184,7 @@ def _parse_buzzpost_items(
         if _local_name(child.tag) != "item"
     }
     source_query = channel_fields.get("description") or channel_fields.get("title") or ""
+    query_min_faves = _query_min_faves(source_query)
     meta = CAT_META[cat]
     rows: list[dict] = []
     for item in root.iter():
@@ -194,6 +200,10 @@ def _parse_buzzpost_items(
         published = _parse_rss_datetime(fields.get("pubdate") or fields.get("title") or "")
         metrics = _buzz_metrics(text)
         absolute_score = _absolute_score(metrics)
+        score_basis = "embedded_metrics"
+        if absolute_score <= 0 and query_min_faves > 0:
+            absolute_score = query_min_faves
+            score_basis = "query_min_faves"
         velocity_score = _velocity_score(absolute_score, published, observed_at)
         row = {
             "date": today,
@@ -209,6 +219,7 @@ def _parse_buzzpost_items(
             "buzz_score": int(round(absolute_score + velocity_score)),
             "absolute_score": absolute_score,
             "velocity_score": round(velocity_score, 2),
+            "score_basis": score_basis,
             "engagement": metrics,
         }
         row["publishable"] = _publishable_buzz(row)
