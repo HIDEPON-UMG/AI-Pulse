@@ -19,6 +19,7 @@ BUZZPOST_STATS_PATH = DATA / "buzz_posts_stats.json"
 DEFAULT_X_RSS_DIR = ROOT.parent / "twitter-rss" / "output"
 BUZZPOST_MIN_ABSOLUTE_SCORE = int(os.environ.get("BUZZPOST_MIN_ABSOLUTE_SCORE", "25"))
 BUZZPOST_MIN_VELOCITY_SCORE = float(os.environ.get("BUZZPOST_MIN_VELOCITY_SCORE", "8"))
+BUZZPOST_EXCLUDED_HASHTAG_RE = re.compile(r"[#＃]\s*AIイラスト", re.IGNORECASE)
 
 CAT_META = {
     "model": {"label": "モデル/LLM", "glyph": "◆"},
@@ -156,10 +157,16 @@ def _velocity_score(score: int, published: datetime | None, observed_at: datetim
 
 
 def _publishable_buzz(row: dict) -> bool:
+    if _excluded_buzzpost_text(str(row.get("text") or "")):
+        return False
     return (
         int(row.get("absolute_score") or row.get("buzz_score") or 0) >= BUZZPOST_MIN_ABSOLUTE_SCORE
         or float(row.get("velocity_score") or 0.0) >= BUZZPOST_MIN_VELOCITY_SCORE
     )
+
+
+def _excluded_buzzpost_text(text: str) -> bool:
+    return bool(BUZZPOST_EXCLUDED_HASHTAG_RE.search(text or ""))
 
 
 def _public_row(row: dict) -> dict:
@@ -223,7 +230,7 @@ def _parse_buzzpost_items(
             "engagement": metrics,
         }
         row["publishable"] = _publishable_buzz(row)
-        row["drop_reason"] = "" if row["publishable"] else "threshold"
+        row["drop_reason"] = "" if row["publishable"] else ("excluded_hashtag" if _excluded_buzzpost_text(text) else "threshold")
         rows.append(row)
     return rows
 
@@ -293,6 +300,7 @@ def load_stats(path: Path = BUZZPOST_STATS_PATH) -> dict:
             "collected": 0,
             "written": 0,
             "dropped_threshold": 0,
+            "dropped_excluded": 0,
             "dropped_duplicate": 0,
             "degraded": 0,
             "min_absolute_score": BUZZPOST_MIN_ABSOLUTE_SCORE,
@@ -301,6 +309,7 @@ def load_stats(path: Path = BUZZPOST_STATS_PATH) -> dict:
     loaded = json.loads(path.read_text(encoding="utf-8", errors="replace"))
     loaded.setdefault("min_absolute_score", BUZZPOST_MIN_ABSOLUTE_SCORE)
     loaded.setdefault("min_velocity_score", BUZZPOST_MIN_VELOCITY_SCORE)
+    loaded.setdefault("dropped_excluded", 0)
     return loaded
 
 
@@ -341,7 +350,8 @@ def collect(
         "candidate_count": len(candidate_rows),
         "collected": len(rows),
         "written": len(merged),
-        "dropped_threshold": len([row for row in candidate_rows if not _publishable_buzz(row)]),
+        "dropped_threshold": len([row for row in candidate_rows if row.get("drop_reason") == "threshold"]),
+        "dropped_excluded": len([row for row in candidate_rows if row.get("drop_reason") == "excluded_hashtag"]),
         "dropped_duplicate": 0,
         "degraded": int(degraded),
         "min_absolute_score": BUZZPOST_MIN_ABSOLUTE_SCORE,

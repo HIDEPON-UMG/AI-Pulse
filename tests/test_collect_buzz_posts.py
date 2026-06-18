@@ -253,6 +253,39 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
     assert rows[0]["score_basis"] == "query_min_faves"
 
 
+def test_buzzpost_excludes_ai_illustration_hashtag_even_when_score_is_high(tmp_path):
+    rss = tmp_path / "buzzpost-media.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>buzzpost-media</title>
+    <description>("画像生成AI") lang:ja min_faves:50</description>
+    <item>
+      <title>2026-06-18 09:30:00</title>
+      <link>https://x.com/example/status/ai-illust</link>
+      <description>おはようございます #AIイラスト likes 999 reposts 100</description>
+      <pubDate>Thu, 18 Jun 2026 09:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>2026-06-18 09:40:00</title>
+      <link>https://x.com/example/status/kept</link>
+      <description>Sora workflow update likes 80 reposts 5</description>
+      <pubDate>Thu, 18 Jun 2026 09:40:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    rows, degraded = buzz.collect_from_rss_paths(str(rss), today="2026-06-18")
+
+    assert degraded is False
+    assert [row["post_url"] for row in rows] == ["https://x.com/example/status/kept"]
+    assert all("#AIイラスト" not in row["text"] for row in rows)
+
+
 def test_buzzpost_keeps_fast_growing_post_below_absolute_threshold(tmp_path):
     rss = tmp_path / "buzzpost-agent.xml"
     rss.write_text(
@@ -282,6 +315,37 @@ def test_buzzpost_keeps_fast_growing_post_below_absolute_threshold(tmp_path):
     assert len(rows) == 1
     assert rows[0]["absolute_score"] < buzz.BUZZPOST_MIN_ABSOLUTE_SCORE
     assert rows[0]["velocity_score"] >= buzz.BUZZPOST_MIN_VELOCITY_SCORE
+
+
+def test_load_public_rows_hides_existing_ai_illustration_hashtag_rows(tmp_path):
+    path = tmp_path / "buzz_posts.jsonl"
+    path.write_text(
+        "\n".join(
+            json.dumps(row, ensure_ascii=False)
+            for row in [
+                {
+                    "date": "2026-06-18",
+                    "post_url": "https://x.com/example/status/ai-illust",
+                    "text": "朝の投稿 #AIイラスト likes 999",
+                    "buzz_score": 999,
+                    "absolute_score": 999,
+                },
+                {
+                    "date": "2026-06-18",
+                    "post_url": "https://x.com/example/status/kept",
+                    "text": "Claude Code update likes 50",
+                    "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                    "absolute_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                },
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rows = buzz.load_public_rows(path)
+
+    assert [row["post_url"] for row in rows] == ["https://x.com/example/status/kept"]
 
 
 def test_load_public_rows_hides_existing_zero_score_rows(tmp_path):

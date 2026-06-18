@@ -1,9 +1,10 @@
 {
   "latest": "2026-06-18",
   "candidate_count": 74,
-  "collected": 74,
-  "written": 74,
+  "collected": 69,
+  "written": 69,
   "dropped_threshold": 0,
+  "dropped_excluded": 5,
   "dropped_duplicate": 0,
   "degraded": 0,
   "min_absolute_score": 25,
