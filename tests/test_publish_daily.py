@@ -8,6 +8,14 @@ def test_publish_daily_tracks_repo_radar_data() -> None:
     assert "'data\\repo_radar.jsonl'" in script
 
 
+def test_publish_daily_tracks_buzzpost_data() -> None:
+    """BuzzPost の公開データと stats を日次公開の commit/push 対象に含める。"""
+    script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")
+
+    assert "'data\\buzz_posts.jsonl'" in script
+    assert "'data\\buzz_posts_stats.json'" in script
+
+
 def test_publish_daily_does_not_treat_native_stderr_as_failure() -> None:
     """git push の通常 stderr 出力を PowerShell 例外として誤検出しない。"""
     script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")

@@ -86,7 +86,13 @@ try {
     }
 
     # GitHub Pages は push 後の Actions で site/ を再生成する。site/ は gitignore 対象なので commit しない。
-    $Targets = @('data\events.jsonl', 'data\entities.jsonl', 'data\repo_radar.jsonl')
+    $Targets = @(
+        'data\events.jsonl',
+        'data\entities.jsonl',
+        'data\repo_radar.jsonl',
+        'data\buzz_posts.jsonl',
+        'data\buzz_posts_stats.json'
+    )
     $PublishStatus = Invoke-GitCapture (@('status', '--porcelain', '--') + $Targets)
 
     if (-not $PublishStatus) {
