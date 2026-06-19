@@ -29,8 +29,13 @@
 """
 from __future__ import annotations
 
+import json
 import sys
+import time
+from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -38,8 +43,237 @@ import config  # noqa: E402
 import llm_gemini  # noqa: E402
 import llm_local  # noqa: E402
 
+LOG_DIR = ROOT / "_logs"
+
 # 呼出側は llm_hybrid.LLMError 1 種だけ捕捉すればよい（llm_gemini.LLMError と同一実体）。
 LLMError = llm_gemini.LLMError
+
+
+def _format_error(exc: BaseException | None) -> str | None:
+    if exc is None:
+        return None
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _route_log_path(now: datetime | None = None) -> Path:
+    now = now or datetime.now()
+    return LOG_DIR / f"llm_routes_{now:%Y%m%d}.jsonl"
+
+
+def _write_route_record(record: dict[str, Any]) -> None:
+    """LLM route の観測ログを追記する。失敗しても本線の生成結果は壊さない。"""
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with _route_log_path().open("a", encoding="utf-8") as fp:
+            fp.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    except OSError as exc:
+        print(f"LLM route telemetry write failed: {exc}", file=sys.stderr)
+
+
+def _record_route(
+    *,
+    mode: str,
+    function: str,
+    final_backend: str | None,
+    fallback_used: bool,
+    local_error: BaseException | None,
+    gemini_error: BaseException | None,
+    started_at: float,
+) -> None:
+    _write_route_record(
+        {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "mode": mode,
+            "function": function,
+            "final_backend": final_backend,
+            "fallback_used": fallback_used,
+            "local_error": _format_error(local_error),
+            "gemini_error": _format_error(gemini_error),
+            "elapsed_ms": int((time.perf_counter() - started_at) * 1000),
+        }
+    )
+
+
+def _call_with_route(
+    *,
+    function: str,
+    local_call: Callable[[], Any],
+    gemini_call: Callable[[], Any],
+) -> Any:
+    mode = config.HYBRID_MODE
+    started_at = time.perf_counter()
+    local_error: BaseException | None = None
+    gemini_error: BaseException | None = None
+
+    if mode == "gemini_only":
+        try:
+            result = gemini_call()
+        except LLMError as exc:
+            gemini_error = exc
+            _record_route(
+                mode=mode,
+                function=function,
+                final_backend=None,
+                fallback_used=False,
+                local_error=None,
+                gemini_error=gemini_error,
+                started_at=started_at,
+            )
+            raise
+        _record_route(
+            mode=mode,
+            function=function,
+            final_backend="gemini",
+            fallback_used=False,
+            local_error=None,
+            gemini_error=None,
+            started_at=started_at,
+        )
+        return result
+
+    if mode == "local_only":
+        try:
+            result = local_call()
+        except LLMError as exc:
+            local_error = exc
+            _record_route(
+                mode=mode,
+                function=function,
+                final_backend=None,
+                fallback_used=False,
+                local_error=local_error,
+                gemini_error=None,
+                started_at=started_at,
+            )
+            raise
+        _record_route(
+            mode=mode,
+            function=function,
+            final_backend="local",
+            fallback_used=False,
+            local_error=None,
+            gemini_error=None,
+            started_at=started_at,
+        )
+        return result
+
+    if mode == "gemini_first":
+        try:
+            result = gemini_call()
+        except LLMError as exc:
+            gemini_error = exc
+        else:
+            _record_route(
+                mode=mode,
+                function=function,
+                final_backend="gemini",
+                fallback_used=False,
+                local_error=None,
+                gemini_error=None,
+                started_at=started_at,
+            )
+            return result
+
+        try:
+            result = local_call()
+        except LLMError as exc:
+            local_error = exc
+            _record_route(
+                mode=mode,
+                function=function,
+                final_backend=None,
+                fallback_used=True,
+                local_error=local_error,
+                gemini_error=gemini_error,
+                started_at=started_at,
+            )
+            raise
+        _record_route(
+            mode=mode,
+            function=function,
+            final_backend="local",
+            fallback_used=True,
+            local_error=None,
+            gemini_error=gemini_error,
+            started_at=started_at,
+        )
+        return result
+
+    if mode == "local_first":
+        try:
+            result = local_call()
+        except LLMError as exc:
+            local_error = exc
+        else:
+            _record_route(
+                mode=mode,
+                function=function,
+                final_backend="local",
+                fallback_used=False,
+                local_error=None,
+                gemini_error=None,
+                started_at=started_at,
+            )
+            return result
+
+        try:
+            result = gemini_call()
+        except LLMError as exc:
+            gemini_error = exc
+            _record_route(
+                mode=mode,
+                function=function,
+                final_backend=None,
+                fallback_used=True,
+                local_error=local_error,
+                gemini_error=gemini_error,
+                started_at=started_at,
+            )
+            raise
+        _record_route(
+            mode=mode,
+            function=function,
+            final_backend="gemini",
+            fallback_used=True,
+            local_error=local_error,
+            gemini_error=None,
+            started_at=started_at,
+        )
+        return result
+
+    raise LLMError(f"未知の HYBRID_MODE: {mode!r}（local_first / gemini_first / gemini_only / local_only のいずれか）")
+
+
+def summarize_route_records(log_path: Path | None = None) -> dict[str, dict[str, int]]:
+    """当日の LLM route telemetry を function 別に集計する。QUALITY_AUDIT は分母に含めない。"""
+    path = log_path or _route_log_path()
+    summary: dict[str, dict[str, int]] = {}
+    if not path.exists():
+        return summary
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        function = str(record.get("function") or "unknown")
+        stats = summary.setdefault(
+            function,
+            {"total": 0, "local": 0, "gemini": 0, "fallback": 0, "errors": 0},
+        )
+        stats["total"] += 1
+        backend = record.get("final_backend")
+        if backend == "local":
+            stats["local"] += 1
+        elif backend == "gemini":
+            stats["gemini"] += 1
+        else:
+            stats["errors"] += 1
+        if record.get("fallback_used"):
+            stats["fallback"] += 1
+    return summary
 
 
 def generate_event_extras(article_text: str, meta: dict) -> dict:
@@ -56,29 +290,11 @@ def generate_event_extras(article_text: str, meta: dict) -> dict:
     Raises:
         LLMError: 採用された経路（or 両経路）が失敗した場合
     """
-    mode = config.HYBRID_MODE
-
-    if mode == "gemini_only":
-        return llm_gemini.generate_event_extras(article_text, meta)
-
-    if mode == "local_only":
-        return llm_local.generate_event_extras(article_text, meta)
-
-    if mode == "gemini_first":
-        # クォータ温存より「Gemini で品質保証」を優先したい比較・A/B 用。
-        try:
-            return llm_gemini.generate_event_extras(article_text, meta)
-        except LLMError:
-            return llm_local.generate_event_extras(article_text, meta)
-
-    if mode == "local_first":
-        # 既定。常に local を 1 度試し、Ollama が LLMError を返した時のみ Gemini に落とす。
-        try:
-            return llm_local.generate_event_extras(article_text, meta)
-        except LLMError:
-            return llm_gemini.generate_event_extras(article_text, meta)
-
-    raise LLMError(f"未知の HYBRID_MODE: {mode!r}（local_first / gemini_first / gemini_only / local_only のいずれか）")
+    return _call_with_route(
+        function="generate_event_extras",
+        local_call=lambda: llm_local.generate_event_extras(article_text, meta),
+        gemini_call=lambda: llm_gemini.generate_event_extras(article_text, meta),
+    )
 
 
 def regenerate_rationale(
@@ -95,29 +311,13 @@ def regenerate_rationale(
     llm_hybrid.regenerate_rationale を呼ぶだけで HYBRID_MODE 切替を意識しない
     (generate_event_extras / translate_headline_ja と同じ分岐ルール)。
     """
-    mode = config.HYBRID_MODE
     args = (headline, summary, summary_points, importance_label)
     kw = {"entity_context": entity_context}
-
-    if mode == "gemini_only":
-        return llm_gemini.regenerate_rationale(*args, **kw)
-
-    if mode == "local_only":
-        return llm_local.regenerate_rationale(*args, **kw)
-
-    if mode == "gemini_first":
-        try:
-            return llm_gemini.regenerate_rationale(*args, **kw)
-        except LLMError:
-            return llm_local.regenerate_rationale(*args, **kw)
-
-    if mode == "local_first":
-        try:
-            return llm_local.regenerate_rationale(*args, **kw)
-        except LLMError:
-            return llm_gemini.regenerate_rationale(*args, **kw)
-
-    raise LLMError(f"未知の HYBRID_MODE: {mode!r}")
+    return _call_with_route(
+        function="regenerate_rationale",
+        local_call=lambda: llm_local.regenerate_rationale(*args, **kw),
+        gemini_call=lambda: llm_gemini.regenerate_rationale(*args, **kw),
+    )
 
 
 def translate_headline_ja(
@@ -131,35 +331,15 @@ def translate_headline_ja(
     llm_hybrid.translate_headline_ja を呼ぶだけで、フォールバック判断 / 例外整理を
     意識しない（generate_event_extras と同じ分岐ルール）。
     """
-    mode = config.HYBRID_MODE
-
-    if mode == "gemini_only":
-        return llm_gemini.translate_headline_ja(headline, entity_context=entity_context)
-
-    if mode == "local_only":
-        return llm_local.translate_headline_ja(headline, entity_context=entity_context)
-
-    if mode == "gemini_first":
-        try:
-            return llm_gemini.translate_headline_ja(
-                headline, entity_context=entity_context
-            )
-        except LLMError:
-            return llm_local.translate_headline_ja(
-                headline, entity_context=entity_context
-            )
-
-    if mode == "local_first":
-        try:
-            return llm_local.translate_headline_ja(
-                headline, entity_context=entity_context
-            )
-        except LLMError:
-            return llm_gemini.translate_headline_ja(
-                headline, entity_context=entity_context
-            )
-
-    raise LLMError(f"未知の HYBRID_MODE: {mode!r}")
+    return _call_with_route(
+        function="translate_headline_ja",
+        local_call=lambda: llm_local.translate_headline_ja(
+            headline, entity_context=entity_context
+        ),
+        gemini_call=lambda: llm_gemini.translate_headline_ja(
+            headline, entity_context=entity_context
+        ),
+    )
 
 
 def translate_buzzpost_text_ja(text: str) -> str:
@@ -168,24 +348,8 @@ def translate_buzzpost_text_ja(text: str) -> str:
     X 風の表示では日本語をデフォルトにしつつ原文へ切替できるよう、収集側は
     text_original と翻訳後 text を分けて保持する。ここは翻訳境界だけを担う。
     """
-    mode = config.HYBRID_MODE
-
-    if mode == "gemini_only":
-        return llm_gemini.translate_buzzpost_text_ja(text)
-
-    if mode == "local_only":
-        return llm_local.translate_buzzpost_text_ja(text)
-
-    if mode == "gemini_first":
-        try:
-            return llm_gemini.translate_buzzpost_text_ja(text)
-        except LLMError:
-            return llm_local.translate_buzzpost_text_ja(text)
-
-    if mode == "local_first":
-        try:
-            return llm_local.translate_buzzpost_text_ja(text)
-        except LLMError:
-            return llm_gemini.translate_buzzpost_text_ja(text)
-
-    raise LLMError(f"未知の HYBRID_MODE: {mode!r}")
+    return _call_with_route(
+        function="translate_buzzpost_text_ja",
+        local_call=lambda: llm_local.translate_buzzpost_text_ja(text),
+        gemini_call=lambda: llm_gemini.translate_buzzpost_text_ja(text),
+    )

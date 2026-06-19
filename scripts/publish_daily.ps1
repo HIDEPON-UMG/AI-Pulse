@@ -93,6 +93,11 @@ try {
         'data\buzz_posts.jsonl',
         'data\buzz_posts_stats.json'
     )
+
+    if (-not $DryRun -and -not $SkipAudit) {
+        Invoke-Native "URL gate" $PythonExe @('tools\audit_urls.py', '--gate')
+    }
+
     $PublishStatus = Invoke-GitCapture (@('status', '--porcelain', '--') + $Targets)
 
     if (-not $PublishStatus) {
@@ -113,10 +118,6 @@ try {
         }
         Write-Log "DRYRUN: git add / commit / push / remote HEAD 照合を実行予定"
         exit 0
-    }
-
-    if (-not $SkipAudit) {
-        Invoke-Native "URL gate" $PythonExe @('tools\audit_urls.py', '--gate')
     }
 
     Invoke-Native "git add" $Git (@('add', '--') + $Targets)

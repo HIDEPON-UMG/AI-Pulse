@@ -18,6 +18,7 @@ import collect_buzz_posts  # noqa: E402
 import collect_repo_radar  # noqa: E402
 import collect_rss  # noqa: E402
 import generate_pages  # noqa: E402
+import llm_hybrid  # noqa: E402
 import quality_audit  # noqa: E402
 import repo_radar_obsidian  # noqa: E402
 import research_ollama as carte  # noqa: E402
@@ -31,6 +32,32 @@ TWITTER_RSS_RUNNER = PROJECT_FOLDERS / "twitter-rss" / "scripts" / "run_repo_rad
 BUZZPOST_SEARCH_WORD_PATH = PROJECT_FOLDERS / "twitter-rss" / "data" / "buzzpost-searches.json"
 BUZZPOST_SEARCH_UPDATE_SCRIPT = PROJECT_FOLDERS / "twitter-rss" / "scripts" / "update_buzzpost_searches.py"
 IDEASTASH_VAULT = Path(os.environ.get("IDEASTASH_VAULT", Path.home() / "Obsidian" / "IdeaStash"))
+
+
+def _print_llm_route_summary() -> None:
+    """当日の llm_hybrid route を集計して日次ログに出す。品質監査は別 metric 扱い。"""
+    try:
+        summary = llm_hybrid.summarize_route_records()
+    except Exception as exc:
+        print(f"LLM route 集計失敗（本線継続）: {exc}", file=sys.stderr)
+        return
+
+    if not summary:
+        print("LLM route 集計: records 0")
+        return
+
+    total = sum(stats["total"] for stats in summary.values())
+    fallback = sum(stats["fallback"] for stats in summary.values())
+    rate = (fallback / total * 100) if total else 0.0
+    print(f"LLM route 集計: records {total} / fallback {fallback} ({rate:.1f}%)")
+    for function, stats in sorted(summary.items()):
+        function_rate = (stats["fallback"] / stats["total"] * 100) if stats["total"] else 0.0
+        print(
+            "  "
+            f"{function}: total {stats['total']} / local {stats['local']} / "
+            f"gemini {stats['gemini']} / fallback {stats['fallback']} "
+            f"({function_rate:.1f}%) / errors {stats['errors']}"
+        )
 
 
 def _fast_update(entity: dict, events: list[dict]) -> None:
@@ -252,6 +279,7 @@ def run_daily() -> None:
             "日次本線は完了（RSS収集・品質監査・サイト再生成済み）。",
             file=sys.stderr,
         )
+    _print_llm_route_summary()
     print("=== 日次バッチ 完了 ===")
 
 

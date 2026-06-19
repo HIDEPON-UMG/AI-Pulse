@@ -40,3 +40,13 @@ def test_publish_daily_verifies_public_freshness_after_push() -> None:
 
     assert "tools\\check_public_freshness.py" in script
     assert "--expected-date" in script
+
+
+def test_publish_daily_runs_url_gate_before_no_change_skip() -> None:
+    """既存公開 URL の link rot を、公開対象に変更が無い日でも検知する。"""
+    script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")
+
+    url_gate_index = script.index('Invoke-Native "URL gate"')
+
+    assert url_gate_index < script.index("$PublishStatus = Invoke-GitCapture")
+    assert url_gate_index < script.index("公開対象に変更なし")

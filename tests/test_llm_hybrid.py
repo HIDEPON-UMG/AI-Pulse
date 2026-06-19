@@ -16,7 +16,9 @@
 """
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -80,6 +82,29 @@ class TestHybridLocalFirst(unittest.TestCase):
         self.assertEqual(mock_local.call_count, 1, "local_first は事前スキップせず必ず local を試すべき")
         self.assertEqual(mock_gemini.call_count, 0, "local 成功時に Gemini を呼んではいけない")
 
+    def test_local_success_writes_route_telemetry(self):
+        """local 成功時の LLM route を後から fallback 率集計できる形で保存する。"""
+        with tempfile.TemporaryDirectory() as temp_dir, \
+             patch.object(llm_hybrid, "LOG_DIR", Path(temp_dir)), \
+             patch.object(llm_local, "generate_event_extras", return_value=_VALID_PAYLOAD_LOCAL) as mock_local, \
+             patch.object(llm_gemini, "generate_event_extras") as mock_gemini:
+            result = llm_hybrid.generate_event_extras("本文" * 200, _META)
+            route_logs = list(Path(temp_dir).glob("llm_routes_*.jsonl"))
+            record = json.loads(route_logs[0].read_text(encoding="utf-8").strip())
+
+        self.assertEqual(result["score"], 72)
+        self.assertEqual(mock_local.call_count, 1)
+        self.assertEqual(mock_gemini.call_count, 0)
+        self.assertEqual(len(route_logs), 1)
+        self.assertEqual(record["mode"], "local_first")
+        self.assertEqual(record["function"], "generate_event_extras")
+        self.assertEqual(record["final_backend"], "local")
+        self.assertFalse(record["fallback_used"])
+        self.assertIsNone(record["local_error"])
+        self.assertIsNone(record["gemini_error"])
+        self.assertIsInstance(record["elapsed_ms"], int)
+        self.assertIn("ts", record)
+
     def test_local_error_falls_back_to_gemini(self):
         """local が LLMError を投げたら Gemini にフォールバックして返す。"""
         with patch.object(llm_local, "generate_event_extras", side_effect=llm_gemini.LLMError("Ollama 接続失敗")) as mock_local, \
@@ -88,6 +113,27 @@ class TestHybridLocalFirst(unittest.TestCase):
         self.assertEqual(result["score"], 88, "Gemini の payload がフォールバックで返るべき")
         self.assertEqual(mock_local.call_count, 1)
         self.assertEqual(mock_gemini.call_count, 1)
+
+    def test_local_error_fallback_writes_route_telemetry(self):
+        """local 失敗から Gemini fallback した事実を route telemetry に残す。"""
+        with tempfile.TemporaryDirectory() as temp_dir, \
+             patch.object(llm_hybrid, "LOG_DIR", Path(temp_dir)), \
+             patch.object(llm_local, "generate_event_extras", side_effect=llm_gemini.LLMError("Ollama 接続失敗")) as mock_local, \
+             patch.object(llm_gemini, "generate_event_extras", return_value=_VALID_PAYLOAD_GEMINI) as mock_gemini:
+            result = llm_hybrid.generate_event_extras("本文" * 200, _META)
+            route_logs = list(Path(temp_dir).glob("llm_routes_*.jsonl"))
+            record = json.loads(route_logs[0].read_text(encoding="utf-8").strip())
+
+        self.assertEqual(result["score"], 88)
+        self.assertEqual(mock_local.call_count, 1)
+        self.assertEqual(mock_gemini.call_count, 1)
+        self.assertEqual(len(route_logs), 1)
+        self.assertEqual(record["mode"], "local_first")
+        self.assertEqual(record["function"], "generate_event_extras")
+        self.assertEqual(record["final_backend"], "gemini")
+        self.assertTrue(record["fallback_used"])
+        self.assertIn("Ollama 接続失敗", record["local_error"])
+        self.assertIsNone(record["gemini_error"])
 
 
 class TestHybridModeOverrides(unittest.TestCase):
