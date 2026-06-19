@@ -9,7 +9,7 @@ import re
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +22,7 @@ BUZZPOST_MIN_VELOCITY_SCORE = float(os.environ.get("BUZZPOST_MIN_VELOCITY_SCORE"
 BUZZPOST_EXCLUDED_HASHTAG_RE = re.compile(r"(?:[#＃]\s*AIイラスト|絵師)", re.IGNORECASE)
 BUZZPOST_PREVIEW_LIMIT = int(os.environ.get("BUZZPOST_PREVIEW_LIMIT", "2"))
 BUZZPOST_HISTORY_LIMIT = int(os.environ.get("BUZZPOST_HISTORY_LIMIT", "160"))
+BUZZPOST_HISTORY_DAYS = int(os.environ.get("BUZZPOST_HISTORY_DAYS", "7"))
 X_OEMBED_URL = "https://publish.twitter.com/oembed"
 
 CAT_META = {
@@ -513,6 +514,30 @@ def _load_existing(path: Path) -> list[dict]:
     return rows
 
 
+def _row_date(row: dict) -> date | None:
+    try:
+        return datetime.strptime(str(row.get("date") or ""), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _latest_row_date(rows: list[dict]) -> date | None:
+    dates = [date for row in rows if (date := _row_date(row)) is not None]
+    return max(dates, default=None)
+
+
+def _filter_recent_days(rows: list[dict], *, days: int = BUZZPOST_HISTORY_DAYS) -> list[dict]:
+    latest = _latest_row_date(rows)
+    if latest is None:
+        return rows
+    cutoff = latest - timedelta(days=max(1, days) - 1)
+    return [
+        row
+        for row in rows
+        if (date := _row_date(row)) is not None and cutoff <= date <= latest
+    ]
+
+
 def _write_stats(path: Path, stats: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(stats, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -531,11 +556,13 @@ def load_stats(path: Path = BUZZPOST_STATS_PATH) -> dict:
             "degraded": 0,
             "min_absolute_score": BUZZPOST_MIN_ABSOLUTE_SCORE,
             "min_velocity_score": BUZZPOST_MIN_VELOCITY_SCORE,
+            "history_days": BUZZPOST_HISTORY_DAYS,
         }
     loaded = json.loads(path.read_text(encoding="utf-8", errors="replace"))
     loaded.setdefault("min_absolute_score", BUZZPOST_MIN_ABSOLUTE_SCORE)
     loaded.setdefault("min_velocity_score", BUZZPOST_MIN_VELOCITY_SCORE)
     loaded.setdefault("dropped_excluded", 0)
+    loaded.setdefault("history_days", BUZZPOST_HISTORY_DAYS)
     return loaded
 
 
@@ -582,7 +609,8 @@ def collect(
         by_history_key.values(),
         key=lambda r: (r.get("date", ""), r.get("buzz_score", 0), r.get("published_at", "")),
         reverse=True,
-    )[:BUZZPOST_HISTORY_LIMIT]
+    )
+    merged = _filter_recent_days(merged)[:BUZZPOST_HISTORY_LIMIT]
     _write_jsonl(output_path, merged)
     stats = {
         "latest": today or datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=9))).date().isoformat(),
@@ -595,6 +623,7 @@ def collect(
         "degraded": int(degraded),
         "min_absolute_score": BUZZPOST_MIN_ABSOLUTE_SCORE,
         "min_velocity_score": BUZZPOST_MIN_VELOCITY_SCORE,
+        "history_days": BUZZPOST_HISTORY_DAYS,
     }
     _write_stats(stats_path, stats)
     return stats
@@ -603,6 +632,7 @@ def collect(
 def load_public_rows(path: Path = BUZZPOST_PATH, *, limit: int = BUZZPOST_HISTORY_LIMIT) -> list[dict]:
     rows = [row for row in _load_existing(path) if _publishable_buzz(row)]
     rows.sort(key=lambda r: (r.get("date", ""), r.get("buzz_score", 0), r.get("published_at", "")), reverse=True)
+    rows = _filter_recent_days(rows)
     return rows[:limit]
 
 

@@ -528,24 +528,43 @@ def _buzzpost_display_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
+def _buzzpost_row_date(row: dict) -> dt.date | None:
+    try:
+        return dt.datetime.strptime(str(row.get("date") or ""), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _buzzpost_recent_rows(rows: list[dict]) -> list[dict]:
+    dates = [date for row in rows if (date := _buzzpost_row_date(row)) is not None]
+    latest = max(dates, default=None)
+    if latest is None:
+        return []
+    cutoff = latest - dt.timedelta(days=max(1, collect_buzz_posts.BUZZPOST_HISTORY_DAYS) - 1)
+    return [
+        row
+        for row in rows
+        if (date := _buzzpost_row_date(row)) is not None and cutoff <= date <= latest
+    ]
+
+
 def _buzzpost_sections(rows: list[dict]) -> list[dict]:
     if not rows:
         return []
-    latest = max(str(row.get("date") or "") for row in rows)
-    sections = [
-        {
-            "id": "buzzpost-today",
-            "nav_label": "Today",
-            "title": "Today’s Buzz Posts",
-            "rows": [row for row in rows if str(row.get("date") or "") == latest],
-        },
-        {
-            "id": "buzzpost-past",
-            "nav_label": "Past",
-            "title": "Past Buzz Posts",
-            "rows": [row for row in rows if str(row.get("date") or "") != latest],
-        },
-    ]
+    recent_rows = _buzzpost_recent_rows(rows)
+    latest = max((str(row.get("date") or "") for row in recent_rows), default="")
+    dates = sorted({str(row.get("date") or "") for row in recent_rows if row.get("date")}, reverse=True)
+    sections = []
+    for date_key in dates:
+        section_rows = [row for row in recent_rows if str(row.get("date") or "") == date_key]
+        sections.append({
+            "id": f"buzzpost-{date_key}",
+            "date": date_key,
+            "nav_label": date_key,
+            "title": f"{date_key} Buzz Posts",
+            "default": date_key == latest,
+            "rows": section_rows,
+        })
     return [section for section in sections if section["rows"]]
 
 
@@ -813,9 +832,20 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         for cat in CAT_META
         if any(row["cat"] == cat for row in repo_radar)
     ]
-    buzz_posts = _buzzpost_display_rows(collect_buzz_posts.load_public_rows())
+    buzz_posts = _buzzpost_recent_rows(_buzzpost_display_rows(collect_buzz_posts.load_public_rows()))
     buzzpost_sections = _buzzpost_sections(buzz_posts)
     buzzpost_stats = collect_buzz_posts.load_stats()
+    buzzpost_dates = [section["date"] for section in buzzpost_sections]
+    buzzpost_latest = buzzpost_dates[0] if buzzpost_dates else buzzpost_stats.get("latest", "")
+    try:
+        buzzpost_date_min = (
+            dt.datetime.strptime(buzzpost_latest, "%Y-%m-%d").date()
+            - dt.timedelta(days=max(1, collect_buzz_posts.BUZZPOST_HISTORY_DAYS) - 1)
+        ).isoformat()
+    except ValueError:
+        buzzpost_date_min = buzzpost_dates[-1] if buzzpost_dates else ""
+    buzzpost_date_max = buzzpost_latest
+    buzzpost_current_count = len(buzzpost_sections[0]["rows"]) if buzzpost_sections else 0
     buzzpost_categories = [
         {"cat": cat, "cat_label": CAT_META[cat]["label"], "glyph": CAT_META[cat]["glyph"]}
         for cat in ("model", "editor", "agent", "media")
@@ -836,9 +866,12 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
         "repo_radar_sources": repo_radar_sources,
         "buzz_posts": buzz_posts,
         "buzzpost_sections": buzzpost_sections,
-        "buzzpost_count": len(buzz_posts),
+        "buzzpost_count": buzzpost_current_count,
         "buzzpost_categories": buzzpost_categories,
-        "buzzpost_latest": max((row["date"] for row in buzz_posts), default=buzzpost_stats.get("latest")),
+        "buzzpost_latest": buzzpost_latest,
+        "buzzpost_date_min": buzzpost_date_min,
+        "buzzpost_date_max": buzzpost_date_max,
+        "buzzpost_current_date": buzzpost_latest,
         "buzzpost_stats": buzzpost_stats,
         "ref_date_label": f"{ref.isoformat()} ({WEEKDAY_JA[ref.weekday()]})",
         "build": ref.isoformat(),

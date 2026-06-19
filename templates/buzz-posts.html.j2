@@ -8,7 +8,9 @@
     .buzz-head h1 { margin: 18px 0 10px; font-size: clamp(30px, 4.8vw, 54px); line-height: 1.05; }
     .buzz-head .lead { max-width: 850px; color: var(--fg-sub); font-size: 16px; line-height: 1.8; }
     .buzz-meta { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 14px; color: var(--fg-mute); font-family: var(--font-mono); font-size: 12px; }
-    .buzz-toolbar { position: sticky; top: var(--header-h); z-index: 20; display: grid; grid-template-columns: minmax(220px, 280px) minmax(140px, 180px) 1fr; gap: 18px; align-items: center; padding: 14px 0; background: color-mix(in oklch, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft); }
+    .buzz-toolbar { position: sticky; top: var(--header-h); z-index: 20; display: grid; grid-template-columns: minmax(160px, 190px) minmax(220px, 280px) minmax(140px, 180px) 1fr; gap: 18px; align-items: center; padding: 14px 0; background: color-mix(in oklch, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft); }
+    .buzz-date { min-height: 42px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg); padding: 0 12px; font-family: var(--font-mono); font-size: 12px; border-radius: var(--r-sm); color-scheme: dark; }
+    .buzz-date:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
     .buzz-search { min-height: 42px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg); padding: 0 14px; font-family: var(--font-body); font-size: 14px; border-radius: var(--r-sm); }
     .buzz-search:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
     .buzz-sort { min-height: 42px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg); padding: 0 12px; font-family: var(--font-mono); font-size: 12px; border-radius: var(--r-sm); }
@@ -27,6 +29,7 @@
     .x-discord-score b { color: var(--cat, var(--accent)); font-size: 36px; line-height: 1; }
     .x-discord-score .cat-badge { width:auto; }
     .x-oembed-frame { width:min(550px, 100%); margin: 2px auto 0; overflow:hidden; background:#000; border-radius: 12px; }
+    .x-oembed-frame:empty { min-height: 92px; background: color-mix(in oklch, var(--bg-elev) 72%, #000); border: 1px dashed var(--border); }
     .x-oembed-frame .twitter-tweet { margin:0 !important; }
     .x-oembed-frame iframe { display:block !important; max-width:100% !important; margin:0 !important; background:#000 !important; }
     .x-translation-toggle { width:max-content; border:0; background:transparent; color:#38bdf8; padding:0; font-family: 'Meiryo UI', Meiryo, 'Yu Gothic UI', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight:700; cursor:pointer; }
@@ -88,6 +91,7 @@
       </section>
 
       <section class="buzz-toolbar" aria-label="BuzzPost controls">
+        <input class="buzz-date" type="date" data-buzz-date-picker min="{{ buzzpost_date_min }}" max="{{ buzzpost_date_max }}" value="{{ buzzpost_current_date }}" aria-label="BuzzPost 日付" />
         <input class="buzz-search" type="search" data-search placeholder="post / query / category を検索" aria-label="BuzzPost 検索" />
         <select class="buzz-sort" data-sort="score_desc" aria-label="並び替え">
           <option value="score_desc" selected>Score high</option>
@@ -127,7 +131,7 @@
         {% endfor %}
       </nav>
       {% for section in buzzpost_sections %}
-      <section id="{{ section.id }}" data-date-group>
+      <section id="{{ section.id }}" data-date-group data-date="{{ section.date }}"{% if not section.default %} hidden{% endif %}>
         <div class="buzz-list-head">
           <h2>{{ section.title }}</h2>
           <span class="count-pill">{{ "%02d"|format(section.rows|length) }} posts</span>
@@ -147,7 +151,11 @@
                 </div>
                 {% if p.x_embed_html %}
                   <div class="x-oembed-frame">
+                    {% if section.default %}
                     {{ p.x_embed_html }}
+                    {% else %}
+                    <span data-x-lazy-embed="{{ p.x_embed_html|forceescape }}"></span>
+                    {% endif %}
                   </div>
                 {% elif p.translated %}
                 <button class="x-translation-toggle" type="button" data-translation-toggle aria-expanded="false">
@@ -224,6 +232,10 @@
     });
     function sortBuzzPosts(mode) {
       var lists = Array.from(document.querySelectorAll('[data-buzz-list]'));
+      lists = lists.filter(function (list) {
+        var group = list.closest('[data-date-group]');
+        return !group || !group.hidden;
+      });
       if (!lists.length) return;
       var scoreOf = function (item) {
         return Number(item.dataset.score || 0);
@@ -253,6 +265,47 @@
         sortBuzzPosts(sortControl.value);
       });
       sortBuzzPosts(sortControl.value);
+    }
+    function ensureLazyXEmbeds(root) {
+      if (!root) return;
+      root.querySelectorAll('[data-x-lazy-embed]').forEach(function (slot) {
+        if (slot.dataset.loaded === 'true') return;
+        var html = slot.dataset.xLazyEmbed || '';
+        if (!html) return;
+        var frame = slot.closest('.x-oembed-frame');
+        if (!frame) return;
+        frame.innerHTML = html;
+        frame.dataset.loaded = 'true';
+      });
+      if (window.twttr && window.twttr.widgets) {
+        window.twttr.widgets.load(root);
+      }
+    }
+    function showBuzzDate(date) {
+      var activeGroup = null;
+      document.querySelectorAll('[data-date-group]').forEach(function (group) {
+        var active = group.dataset.date === date;
+        group.hidden = !active;
+        if (active) activeGroup = group;
+      });
+      document.querySelectorAll('.buzz-section-nav a').forEach(function (link) {
+        var active = link.getAttribute('href') === '#buzzpost-' + date;
+        link.setAttribute('aria-current', active ? 'true' : 'false');
+      });
+      if (activeGroup) {
+        var count = activeGroup.querySelectorAll('[data-filter-item]').length;
+        var topCount = document.querySelector('[data-count]');
+        if (topCount) topCount.textContent = String(count).padStart(2, '0');
+        ensureLazyXEmbeds(activeGroup);
+        sortBuzzPosts(sortControl ? sortControl.value : 'score_desc');
+      }
+    }
+    var datePicker = document.querySelector('[data-buzz-date-picker]');
+    if (datePicker) {
+      datePicker.addEventListener('change', function () {
+        showBuzzDate(datePicker.value);
+      });
+      showBuzzDate(datePicker.value);
     }
   </script>
 </body>

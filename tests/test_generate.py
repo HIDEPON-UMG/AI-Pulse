@@ -329,12 +329,23 @@ class TestGenerate(unittest.TestCase):
             "absolute_score": 50,
             "relative_score": 20,
             "velocity_score": 10.0,
-            "x_embed_html": "",
+            "x_embed_html": (
+                '<blockquote class="twitter-tweet" data-dnt="true" data-theme="dark">'
+                '<p lang="ja" dir="ltr">Past X embed must be lazy</p>'
+                '<a href="https://x.com/example/status/old">June 17, 2026</a>'
+                '</blockquote>'
+            ),
             "media_urls": [],
             "link_previews": [],
         }
+        expired_row = {
+            **past_row,
+            "date": "2026-06-10",
+            "post_url": "https://x.com/example/status/expired",
+            "text": "Expired BuzzPost item",
+        }
         original = gp.collect_buzz_posts.load_public_rows
-        gp.collect_buzz_posts.load_public_rows = lambda: [row, past_row]
+        gp.collect_buzz_posts.load_public_rows = lambda: [row, past_row, expired_row]
         try:
             with tempfile.TemporaryDirectory() as d:
                 r = gp.generate(Path(d))
@@ -343,11 +354,21 @@ class TestGenerate(unittest.TestCase):
         finally:
             gp.collect_buzz_posts.load_public_rows = original
         self.assertIn("BuzzPost", html)
-        self.assertIn("Today’s Buzz Posts", html)
-        self.assertIn("Past Buzz Posts", html)
-        self.assertIn('href="#buzzpost-today"', html)
-        self.assertIn('href="#buzzpost-past"', html)
-        self.assertIn('id="buzzpost-past"', html)
+        self.assertIn("2026-06-18 Buzz Posts", html)
+        self.assertIn("2026-06-17 Buzz Posts", html)
+        self.assertNotIn("2026-06-10 Buzz Posts", html)
+        self.assertIn('type="date"', html)
+        self.assertIn('data-buzz-date-picker', html)
+        self.assertIn('min="2026-06-12"', html)
+        self.assertIn('max="2026-06-18"', html)
+        self.assertIn('value="2026-06-18"', html)
+        self.assertIn('href="#buzzpost-2026-06-18"', html)
+        self.assertIn('href="#buzzpost-2026-06-17"', html)
+        self.assertIn('id="buzzpost-2026-06-18"', html)
+        self.assertIn('id="buzzpost-2026-06-17"', html)
+        self.assertIn('data-date-group data-date="2026-06-18"', html)
+        self.assertIn('data-date-group data-date="2026-06-17" hidden', html)
+        self.assertNotIn("Expired BuzzPost item", html)
         self.assertNotIn("本日の観測ポスト", html)
         self.assertNotIn("Claude Code エージェントが今日は至るところにいます", html)
         self.assertNotIn("Claude Code agents are everywhere", html)
@@ -381,6 +402,10 @@ class TestGenerate(unittest.TestCase):
         self.assertIn('class="x-discord-score"', html)
         self.assertIn('class="x-oembed-frame"', html)
         self.assertIn('<blockquote class="twitter-tweet" data-dnt="true" data-theme="dark">', html)
+        self.assertEqual(html.count('<blockquote class="twitter-tweet"'), 1)
+        self.assertIn("data-x-lazy-embed=", html)
+        self.assertIn("&lt;blockquote class=&#34;twitter-tweet&#34;", html)
+        self.assertNotIn("<p lang=\"ja\" dir=\"ltr\">Past X embed must be lazy</p>", html)
         self.assertIn("https://platform.x.com/widgets.js", html)
         self.assertNotIn('class="x-discord-media-grid"', html)
         self.assertNotIn('src="https://pbs.twimg.com/media/example-one.jpg"', html)

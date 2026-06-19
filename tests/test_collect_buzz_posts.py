@@ -753,3 +753,94 @@ def test_load_public_rows_hides_existing_zero_score_rows(tmp_path):
     rows = buzz.load_public_rows(path)
 
     assert [row["post_url"] for row in rows] == ["https://x.com/example/status/602"]
+
+
+def test_load_public_rows_retains_only_latest_seven_calendar_days(tmp_path):
+    path = tmp_path / "buzz_posts.jsonl"
+    rows = []
+    for day in range(1, 10):
+        date = f"2026-06-{day:02d}"
+        rows.append(
+            {
+                "date": date,
+                "post_url": f"https://x.com/example/status/{day}",
+                "text": f"BuzzPost {day} likes 80",
+                "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                "absolute_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+            }
+        )
+    path.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    loaded = buzz.load_public_rows(path)
+
+    assert {row["date"] for row in loaded} == {
+        "2026-06-03",
+        "2026-06-04",
+        "2026-06-05",
+        "2026-06-06",
+        "2026-06-07",
+        "2026-06-08",
+        "2026-06-09",
+    }
+
+
+def test_collect_writes_only_latest_seven_calendar_days(tmp_path):
+    output = tmp_path / "buzz_posts.jsonl"
+    existing = []
+    for day in range(1, 9):
+        date = f"2026-06-{day:02d}"
+        existing.append(
+            {
+                "date": date,
+                "post_url": f"https://x.com/example/status/existing-{day}",
+                "text": f"Existing BuzzPost {day} likes 80",
+                "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                "absolute_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+            }
+        )
+    output.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in existing),
+        encoding="utf-8",
+    )
+    rss = tmp_path / "buzzpost-model.xml"
+    rss.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>buzzpost-model</title>
+    <description>(GPT-5 OR Claude) lang:ja min_faves:50</description>
+    <item>
+      <title>2026-06-09 09:00:00</title>
+      <link>https://x.com/example/status/new-9</link>
+      <pubDate>Tue, 09 Jun 2026 09:00:00 +0900</pubDate>
+      <content:encoded>Claude Code update likes 80</content:encoded>
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    buzz.collect(
+        rss_paths=str(rss),
+        output_path=output,
+        today="2026-06-09",
+        observed_at="2026-06-09T09:30:00+09:00",
+        fetch_link_previews=False,
+        fetch_x_embeds=False,
+        translate_text_ja=lambda text: text,
+    )
+
+    written = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert {row["date"] for row in written} == {
+        "2026-06-03",
+        "2026-06-04",
+        "2026-06-05",
+        "2026-06-06",
+        "2026-06-07",
+        "2026-06-08",
+        "2026-06-09",
+    }
