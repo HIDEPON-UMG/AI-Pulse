@@ -1,12 +1,13 @@
 {
-  "latest": "2026-06-19",
-  "candidate_count": 75,
-  "collected": 70,
+  "latest": "2026-06-20",
+  "candidate_count": 224,
+  "collected": 140,
   "written": 160,
-  "dropped_threshold": 0,
-  "dropped_excluded": 5,
+  "dropped_threshold": 76,
+  "dropped_excluded": 8,
   "dropped_duplicate": 0,
   "degraded": 0,
   "min_absolute_score": 25,
-  "min_velocity_score": 8.0
+  "min_velocity_score": 8.0,
+  "history_days": 7
 }
