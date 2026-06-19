@@ -37,6 +37,51 @@ SOURCE_CATEGORIES = {
     "buzzpost-agent": "agent",
     "buzzpost-media": "media",
 }
+BUZZPOST_TREND_TERMS = {
+    "model": (
+        "gpt-5", "gpt-5.5", "gpt-5.6", "fable", "mythos", "gemini 3",
+        "qwen", "deepseek", "frontier model", "llm benchmark", "swe-bench",
+        "モデル", "ベンチマーク",
+    ),
+    "editor": (
+        "claude code", "codex", "cursor", "composer", "windsurf", "ona",
+        "ai coding", "coding agent", "コーディング", "aiエディタ",
+    ),
+    "agent": (
+        "agentic", "ai agent", "ai agents", "autonomous agent",
+        "model context protocol", "mcp server", "mcp client", "rag pipeline",
+        "computer use", "ai control roadmap", "deepmind", "エージェント",
+        "自律", "ロードマップ",
+    ),
+    "media": (
+        "openai sora", "veo", "runway", "midjourney", "text-to-video", "video generation",
+        "image generation model", "voice model", "動画生成", "画像生成モデル", "音声モデル",
+    ),
+}
+BUZZPOST_CONTEXT_TERMS = {
+    "model": (
+        "model", "llm", "benchmark", "frontier", "reasoning", "eval", "ai",
+        "モデル", "ベンチマーク", "推論", "生成ai",
+    ),
+    "agent": (
+        "ai", "agent", "agentic", "llm", "claude", "codex", "chatgpt", "gemini",
+        "server", "client", "protocol", "model context protocol", "エージェント",
+        "生成ai", "サーバー", "連携", "プロトコル",
+    ),
+    "media": (
+        "openai", "ai", "text-to-video", "video generation", "image generation",
+        "動画生成", "画像生成", "生成ai", "モデル",
+    ),
+}
+BUZZPOST_AMBIGUOUS_TERMS = {
+    "model": ("claude", "gemini", "llm"),
+    "agent": ("mcp", "rag"),
+    "media": ("sora",),
+}
+BUZZPOST_GENERIC_USAGE_RE = re.compile(
+    r"(おはよう|最近いろいろ生成AI|生成AI(?:込み|に教わり|を使って|で仕事)|仕事のパフォーマンス|今の働き方)",
+    re.IGNORECASE,
+)
 
 
 def _load_local_env() -> None:
@@ -72,6 +117,15 @@ def _split_rss_locations(raw_paths: str) -> list[str]:
 
 def _default_rss_paths() -> str:
     return os.environ.get("BUZZPOST_X_RSS_PATHS") or str(DEFAULT_X_RSS_DIR)
+
+
+def _source_category(source_name: str) -> str | None:
+    if source_name in SOURCE_CATEGORIES:
+        return SOURCE_CATEGORIES[source_name]
+    for prefix, cat in SOURCE_CATEGORIES.items():
+        if source_name.startswith(f"{prefix}-"):
+            return cat
+    return None
 
 
 def _iter_rss_xml(location: str, *, request_text=_request_text) -> list[tuple[str, str]]:
@@ -333,6 +387,8 @@ def _apply_relative_scores(rows: list[dict]) -> None:
 def _publishable_buzz(row: dict) -> bool:
     if _excluded_buzzpost_text(str(row.get("text") or "")):
         return False
+    if not _trend_relevant_buzz(row):
+        return False
     return (
         int(row.get("absolute_score") or row.get("buzz_score") or 0) >= BUZZPOST_MIN_ABSOLUTE_SCORE
         or float(row.get("velocity_score") or 0.0) >= BUZZPOST_MIN_VELOCITY_SCORE
@@ -341,6 +397,42 @@ def _publishable_buzz(row: dict) -> bool:
 
 def _excluded_buzzpost_text(text: str) -> bool:
     return bool(BUZZPOST_EXCLUDED_HASHTAG_RE.search(text or ""))
+
+
+def _trend_relevant_buzz(row: dict) -> bool:
+    text = str(row.get("text") or "")
+    haystack = " ".join(
+        str(v)
+        for v in (
+            text,
+            row.get("text_original"),
+            row.get("title"),
+        )
+        if v
+    ).lower()
+    cat = str(row.get("category") or "")
+    if BUZZPOST_GENERIC_USAGE_RE.search(text):
+        return False
+    terms = BUZZPOST_TREND_TERMS.get(cat, ())
+    if terms and any(term.lower() in haystack for term in terms):
+        return True
+    ambiguous_terms = BUZZPOST_AMBIGUOUS_TERMS.get(cat, ())
+    context_terms = BUZZPOST_CONTEXT_TERMS.get(cat, ())
+    if ambiguous_terms and context_terms:
+        has_ambiguous_term = any(_contains_token(haystack, term) for term in ambiguous_terms)
+        has_context = any(term.lower() in haystack for term in context_terms)
+        if has_ambiguous_term and has_context:
+            return True
+    return False
+
+
+def _contains_token(text: str, token: str) -> bool:
+    return bool(
+        re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(token.lower())}(?![A-Za-z0-9_\u3040-\u30ff\u3400-\u9fff])",
+            text,
+        )
+    )
 
 
 def _public_row(row: dict) -> dict:
@@ -362,7 +454,7 @@ def _parse_buzzpost_items(
     fetch_x_embeds: bool = False,
     translate_text_ja=None,
 ) -> list[dict]:
-    cat = SOURCE_CATEGORIES.get(source_name)
+    cat = _source_category(source_name)
     if not cat:
         return []
     root = ET.fromstring(xml_text)
