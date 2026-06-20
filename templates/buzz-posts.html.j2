@@ -8,7 +8,12 @@
     .buzz-head h1 { margin: 18px 0 10px; font-size: clamp(30px, 4.8vw, 54px); line-height: 1.05; }
     .buzz-head .lead { max-width: 850px; color: var(--fg-sub); font-size: 16px; line-height: 1.8; }
     .buzz-meta { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 14px; color: var(--fg-mute); font-family: var(--font-mono); font-size: 12px; }
-    .buzz-toolbar { position: sticky; top: var(--header-h); z-index: 20; display: grid; grid-template-columns: minmax(160px, 190px) minmax(220px, 280px) minmax(140px, 180px) 1fr; gap: 18px; align-items: center; padding: 14px 0; background: color-mix(in oklch, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft); }
+    .buzz-toolbar { position: sticky; top: var(--header-h); z-index: 20; display: grid; grid-template-columns: minmax(160px, 190px) minmax(220px, 1fr) minmax(140px, 180px); gap: 12px 18px; align-items: center; padding: 14px 0; background: color-mix(in oklch, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft); transition: transform .18s ease, opacity .18s ease; }
+    .buzz-toolbar > .buzz-date,
+    .buzz-toolbar > .buzz-search,
+    .buzz-toolbar > .buzz-sort { width:100%; min-width:0; box-sizing:border-box; }
+    .buzz-toolbar .chip-row { grid-column: 1 / -1; width:100%; max-width:none; margin:0; padding:0 2px 2px; flex-wrap:wrap; align-items:center; overflow:visible; }
+    .buzz-toolbar .chip-row .chip { flex:0 0 auto; }
     .buzz-date { min-height: 42px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg); padding: 0 12px; font-family: var(--font-mono); font-size: 12px; border-radius: var(--r-sm); color-scheme: dark; }
     .buzz-date:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
     .buzz-search { min-height: 42px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg); padding: 0 14px; font-family: var(--font-body); font-size: 14px; border-radius: var(--r-sm); }
@@ -27,7 +32,7 @@
     .x-discord-embed { min-width:0; display:grid; gap: 10px; width:min(548px, 100%); margin:0 auto; padding: 14px 16px; background: #323339; border: 1px solid #454751; border-left: 4px solid var(--cat, var(--accent)); border-radius: var(--r-sm); box-shadow: 0 8px 18px rgba(0,0,0,.16); }
     .x-discord-score { display:flex; flex-wrap:wrap; gap: 8px; align-items:center; color:#c9d1dc; font-family: var(--font-mono); font-size: 11px; }
     .x-discord-score b { color: var(--cat, var(--accent)); font-size: 36px; line-height: 1; }
-    .x-discord-score .cat-badge { width:auto; }
+    .x-discord-score .cat-badge { width:auto; flex-basis:100%; margin-top:2px; }
     .x-oembed-frame { width:min(550px, 100%); margin: 2px auto 0; overflow:hidden; background:#000; border-radius: 12px; }
     .x-oembed-frame:empty { min-height: 92px; background: color-mix(in oklch, var(--bg-elev) 72%, #000); border: 1px dashed var(--border); }
     .x-oembed-frame .twitter-tweet { margin:0 !important; }
@@ -49,7 +54,7 @@
     .x-discord-link { display:block; color:var(--accent); font-family: var(--font-mono); font-size: 12px; line-height: 1.45; overflow-wrap:anywhere; text-decoration:none; }
     .x-discord-link:hover { text-decoration: underline; }
     .x-discord-foot { display:flex; flex-wrap:wrap; gap: 10px; color:#9aa4b2; font-family: var(--font-mono); font-size: 11px; }
-    .cat-badge { width:max-content; }
+    .cat-badge { width:max-content; max-width:100%; }
     .buzz-tags { display:grid; gap: 10px; min-width:0; }
     .buzz-tag { display:block; min-width:0; padding: 8px 10px; border: 1px solid color-mix(in oklch, var(--cat, var(--accent)) 34%, var(--border)); color: var(--fg-sub); font-family: var(--font-mono); font-size: 11px; line-height: 1.45; border-radius: var(--r-sm); overflow-wrap:anywhere; }
     .buzz-tag strong { display:block; color: var(--fg-mute); font-size: 10px; letter-spacing:.08em; text-transform:uppercase; margin-bottom: 4px; }
@@ -61,7 +66,8 @@
     .buzz-empty-stat b { display:block; color: var(--fg); font-size: 22px; }
     .buzz-empty-note { margin-top: 14px; line-height: 1.7; }
     @media (max-width: 820px) {
-      .buzz-toolbar { grid-template-columns: 1fr; }
+      .buzz-toolbar { grid-template-columns: 1fr; gap: 10px; transform: translateY(0); }
+      .buzz-toolbar.is-hidden { transform: translateY(calc(-100% - var(--header-h))); opacity:0; pointer-events:none; }
       .buzz-toolbar .chip-row { width:100%; max-width:none; margin:0; padding:0 2px 2px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
       .buzz-toolbar .chip-row::-webkit-scrollbar { display:none; }
       .buzz-toolbar .chip-row .chip { flex:0 0 auto; }
@@ -90,7 +96,7 @@
         </div>
       </section>
 
-      <section class="buzz-toolbar" aria-label="BuzzPost controls">
+      <section class="buzz-toolbar" data-buzz-toolbar aria-label="BuzzPost controls">
         <input class="buzz-date" type="date" data-buzz-date-picker min="{{ buzzpost_date_min }}" max="{{ buzzpost_date_max }}" value="{{ buzzpost_current_date }}" aria-label="BuzzPost 日付" />
         <input class="buzz-search" type="search" data-search placeholder="post / query / category を検索" aria-label="BuzzPost 検索" />
         <select class="buzz-sort" data-sort="score_desc" aria-label="並び替え">
@@ -118,7 +124,7 @@
             <div class="buzz-empty-stat"><span>閾値未満</span><b>{{ s.dropped_threshold }}</b><small>件</small></div>
             <div class="buzz-empty-stat"><span>取得状態</span><b>{{ "注意" if s.degraded else "正常" }}</b><small>RSS</small></div>
           </div>
-          <p class="buzz-empty-note">掲載条件は <strong>absolute_score ≥ {{ s.min_absolute_score }}</strong> または <strong>velocity_score ≥ {{ "%.1f"|format(s.min_velocity_score) }}/h</strong> です。0点や弱い反応の投稿は、候補に入っても feed には表示しません。</p>
+          <p class="buzz-empty-note">掲載条件は <strong>likes ≥ {{ s.min_likes or 100 }}</strong> です。0点や弱い反応の投稿は、候補に入っても feed には表示しません。</p>
         {% else %}
           <strong>BuzzPost はまだ収集結果を持っていません。</strong>日次バッチが X RSS を生成すると、このページに生成AIコミュニティの話題投稿が表示されます。
           <p class="buzz-empty-note">未実行、RSS出力なし、または取得失敗の可能性があります。日次バッチの BuzzPost collect ログを確認してください。</p>
@@ -149,6 +155,15 @@
                   <span>vel {{ "%.1f"|format(p.velocity_score or 0) }}/h</span>
                   <span class="cat-badge"><span class="gly">{{ p.glyph }}</span>{{ p.cat_label }}</span>
                 </div>
+                {% if p.translated %}
+                <button class="x-translation-toggle" type="button" data-translation-toggle aria-expanded="false">
+                  <span data-show-original>原文を表示</span><span data-show-translation hidden>翻訳を表示</span>
+                </button>
+                <p class="x-discord-text" data-translated-text>{{ p.text_html }}</p>
+                <p class="x-discord-text" data-original-text hidden>{{ p.text_original_html }}</p>
+                {% elif not p.x_embed_html %}
+                <p class="x-discord-text">{{ p.text_html }}</p>
+                {% endif %}
                 {% if p.x_embed_html %}
                   <div class="x-oembed-frame">
                     {% if section.default %}
@@ -157,14 +172,6 @@
                     <span data-x-lazy-embed="{{ p.x_embed_html|forceescape }}"></span>
                     {% endif %}
                   </div>
-                {% elif p.translated %}
-                <button class="x-translation-toggle" type="button" data-translation-toggle aria-expanded="false">
-                  <span data-show-original>原文を表示</span><span data-show-translation hidden>翻訳を表示</span>
-                </button>
-                <p class="x-discord-text" data-translated-text>{{ p.text_html }}</p>
-                <p class="x-discord-text" data-original-text hidden>{{ p.text_original_html }}</p>
-                {% else %}
-                <p class="x-discord-text">{{ p.text_html }}</p>
                 {% endif %}
                 {% if not p.x_embed_html %}
                 {% if p.media_urls %}
@@ -307,6 +314,37 @@
       });
       showBuzzDate(datePicker.value);
     }
+    (function initBuzzToolbarAutoHide() {
+      var toolbar = document.querySelector('[data-buzz-toolbar]');
+      if (!toolbar) return;
+      var media = window.matchMedia('(max-width: 820px)');
+      var lastY = window.scrollY || 0;
+      var ticking = false;
+      function setHidden(hidden) {
+        toolbar.classList.toggle('is-hidden', Boolean(hidden && media.matches));
+      }
+      function update() {
+        ticking = false;
+        var y = window.scrollY || 0;
+        var delta = y - lastY;
+        if (!media.matches || toolbar.matches(':focus-within') || y < 24) {
+          setHidden(false);
+        } else if (delta > 8) {
+          setHidden(true);
+        } else if (delta < -8) {
+          setHidden(false);
+        }
+        lastY = y;
+      }
+      window.addEventListener('scroll', function () {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(update);
+      }, { passive: true });
+      var reset = function () { setHidden(false); };
+      if (media.addEventListener) media.addEventListener('change', reset);
+      else if (media.addListener) media.addListener(reset);
+    })();
   </script>
 </body>
 </html>

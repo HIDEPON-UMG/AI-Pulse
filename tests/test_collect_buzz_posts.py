@@ -76,7 +76,7 @@ def test_collect_writes_public_buzzpost_jsonl(tmp_path):
     <item>
       <title>Agentic AI workflow thread</title>
       <link>https://x.com/example/status/222</link>
-      <description>New MCP workflow is getting traction. likes 20 reposts 3 replies 2</description>
+      <description>New MCP workflow is getting traction. likes 120 reposts 3 replies 2</description>
     </item>
   </channel>
 </rss>
@@ -135,8 +135,7 @@ def test_collect_writes_buzzpost_stats_for_threshold_diagnostics(tmp_path):
     saved = json.loads(stats_path.read_text(encoding="utf-8"))
     assert saved["candidate_count"] == 2
     assert saved["dropped_threshold"] == 2
-    assert saved["min_absolute_score"] == buzz.BUZZPOST_MIN_ABSOLUTE_SCORE
-    assert saved["min_velocity_score"] == buzz.BUZZPOST_MIN_VELOCITY_SCORE
+    assert saved["min_likes"] == buzz.BUZZPOST_MIN_LIKES
 
 
 def test_collect_writes_stats_next_to_custom_output_by_default(tmp_path):
@@ -149,7 +148,7 @@ def test_collect_writes_stats_next_to_custom_output_by_default(tmp_path):
     <item>
       <title>Worth showing</title>
       <link>https://x.com/example/status/801</link>
-      <description>Agentic AI MCP workflow. 30 likes 4 reposts 2 replies</description>
+      <description>Agentic AI MCP workflow. 130 likes 4 reposts 2 replies</description>
     </item>
   </channel>
 </rss>
@@ -170,7 +169,7 @@ def test_buzzpost_keeps_original_post_line_breaks_and_urls(tmp_path):
         "\n"
         "手順もそのまま残したい https://x.com/example/status/333\n"
         "Cursor との比較も追記\n"
-        "likes 35 reposts 4 replies 2"
+        "likes 135 reposts 4 replies 2"
     )
     rss.write_text(
         f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -204,7 +203,7 @@ def test_buzzpost_extracts_media_images_from_content_encoded(tmp_path):
     <item>
       <title>2026-06-18 09:10:00</title>
       <link>https://x.com/example/status/with-media</link>
-      <content:encoded>Sora image generation model workflow likes 90 reposts 5&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example-one.jpg&quot;&gt;&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example-two.jpg&quot;&gt;</content:encoded>
+      <content:encoded>Sora image generation model workflow likes 120 reposts 5&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example-one.jpg&quot;&gt;&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example-two.jpg&quot;&gt;</content:encoded>
     </item>
   </channel>
 </rss>
@@ -234,7 +233,7 @@ def test_buzzpost_extracts_author_profile_metadata_when_rss_has_it(tmp_path):
       <link>https://x.com/example/status/author</link>
       <dc:creator>Example Labs</dc:creator>
       <media:thumbnail url="https://pbs.twimg.com/profile_images/example/avatar.jpg" />
-      <description>AI agents MCP workflow likes 90 reposts 5</description>
+      <description>AI agents MCP workflow likes 120 reposts 5</description>
     </item>
   </channel>
 </rss>
@@ -260,7 +259,7 @@ def test_buzzpost_falls_back_to_unavatar_profile_image_from_handle(tmp_path):
       <title>2026-06-18 09:10:00</title>
       <link>https://x.com/example/status/author</link>
       <author>Example Labs (@example)</author>
-      <description>AI agents MCP workflow likes 90 reposts 5</description>
+      <description>AI agents MCP workflow likes 120 reposts 5</description>
     </item>
   </channel>
 </rss>
@@ -286,7 +285,7 @@ def test_buzzpost_fetches_link_preview_image_from_post_urls(tmp_path):
       <title>2026-06-18 09:10:00</title>
       <link>https://x.com/example/status/preview</link>
       <author>Example Labs (@example)</author>
-      <description>AI agents MCP workflow likes 90 reposts 5 https://t.co/preview</description>
+      <description>AI agents MCP workflow likes 120 reposts 5 https://t.co/preview</description>
     </item>
   </channel>
 </rss>
@@ -331,7 +330,7 @@ def test_buzzpost_fetches_x_oembed_without_script_for_missing_rss_media(tmp_path
       <title>2026-06-18 09:10:00</title>
       <link>https://x.com/example/status/with-video</link>
       <author>Example Labs (@example)</author>
-      <description>AI agents MCP video card is only present in X embed. 90 likes 5 reposts https://t.co/media</description>
+      <description>AI agents MCP video card is only present in X embed. 120 likes 5 reposts https://t.co/media</description>
     </item>
   </channel>
 </rss>
@@ -381,7 +380,7 @@ def test_buzzpost_fetches_x_oembed_even_when_rss_media_exists(tmp_path):
       <title>2026-06-18 09:10:00</title>
       <link>https://x.com/example/status/with-image</link>
       <author>Example Labs (@example)</author>
-      <description>AI agents MCP image is present in RSS too. 90 likes 5 reposts&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example.jpg&quot;&gt;</description>
+      <description>AI agents MCP image is present in RSS too. 120 likes 5 reposts&lt;br&gt;&lt;img src=&quot;https://pbs.twimg.com/media/example.jpg&quot;&gt;</description>
     </item>
   </channel>
 </rss>
@@ -426,7 +425,7 @@ def test_buzzpost_translates_english_posts_and_keeps_original_for_toggle(tmp_pat
       <title>2026-06-18 09:10:00</title>
       <link>https://x.com/example/status/english</link>
       <author>Example Labs (@example)</author>
-      <description>Claude Fable frontier model reports are everywhere today. 90 likes 5 reposts</description>
+      <description>Claude Fable frontier model reports are everywhere today. 120 likes 5 reposts</description>
     </item>
   </channel>
 </rss>
@@ -437,13 +436,14 @@ def test_buzzpost_translates_english_posts_and_keeps_original_for_toggle(tmp_pat
     rows, degraded = buzz.collect_from_rss_paths(
         str(rss),
         today="2026-06-18",
-        translate_text_ja=lambda text: "Claude Fable frontier model の報告が今日は至るところにあります。90 likes 5 reposts",
+        translate_text_ja=lambda text: "Claude Fable frontier model の報告が今日は至るところにあります。",
     )
 
     assert degraded is False
-    assert rows[0]["text_original"] == "Claude Fable frontier model reports are everywhere today. 90 likes 5 reposts"
-    assert rows[0]["text"] == "Claude Fable frontier model の報告が今日は至るところにあります。90 likes 5 reposts"
+    assert rows[0]["text_original"] == "Claude Fable frontier model reports are everywhere today. 120 likes 5 reposts"
+    assert rows[0]["text"] == "Claude Fable frontier model の報告が今日は至るところにあります。"
     assert rows[0]["translated"] is True
+    assert rows[0]["engagement"]["likes"] == 120
 
 
 def test_buzzpost_drops_zero_and_below_threshold_scores(tmp_path):
@@ -466,7 +466,7 @@ def test_buzzpost_drops_zero_and_below_threshold_scores(tmp_path):
     <item>
       <title>Worth showing</title>
       <link>https://x.com/example/status/403</link>
-      <description>Claude Fable model real community signal. likes 30 reposts 4 replies 3</description>
+      <description>Claude Fable model real community signal. likes 130 reposts 4 replies 3</description>
     </item>
   </channel>
 </rss>
@@ -478,7 +478,7 @@ def test_buzzpost_drops_zero_and_below_threshold_scores(tmp_path):
 
     assert degraded is False
     assert [row["post_url"] for row in rows] == ["https://x.com/example/status/403"]
-    assert rows[0]["buzz_score"] >= buzz.BUZZPOST_MIN_ABSOLUTE_SCORE
+    assert rows[0]["engagement"]["likes"] >= buzz.BUZZPOST_MIN_LIKES
 
 
 def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path):
@@ -488,7 +488,7 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
 <rss version="2.0">
   <channel>
     <title>buzzpost-model</title>
-    <description>(Claude OR LLM) lang:ja min_faves:50 since:2026-06-08 -filter:replies</description>
+    <description>(Claude OR LLM) lang:ja min_faves:100 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/901</link>
@@ -505,7 +505,7 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
 
     assert degraded is False
     assert [row["post_url"] for row in rows] == ["https://x.com/example/status/901"]
-    assert rows[0]["absolute_score"] == 50
+    assert rows[0]["absolute_score"] == 100
     assert rows[0]["score_basis"] == "query_min_faves"
 
 
@@ -516,7 +516,7 @@ def test_buzzpost_excludes_generic_daily_genai_usage_even_when_min_faves_query(t
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>buzzpost-model-ja</title>
-    <description>("LLM" OR "Claude Fable") lang:ja min_faves:50 since:2026-06-08 -filter:replies</description>
+    <description>("LLM" OR "Claude Fable") lang:ja min_faves:100 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/generic</link>
@@ -551,16 +551,16 @@ def test_buzzpost_excludes_ambiguous_short_terms_without_ai_context(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-media-ja</title>
-    <description>("Sora" OR "動画生成AI") lang:ja min_faves:50</description>
+    <description>("Sora" OR "動画生成AI") lang:ja min_faves:100</description>
     <item>
       <title>2026-06-19 09:10:00</title>
       <link>https://x.com/example/status/sora-stage</link>
-      <description>鹿児島空港「航空展示室 SORA STAGE」にて。90 likes 5 reposts</description>
+      <description>鹿児島空港「航空展示室 SORA STAGE」にて。120 likes 5 reposts</description>
     </item>
     <item>
       <title>2026-06-19 09:12:00</title>
       <link>https://x.com/example/status/sora-kun</link>
-      <description>サッカ用に描いたsoraくんさん。90 likes 5 reposts</description>
+      <description>サッカ用に描いたsoraくんさん。120 likes 5 reposts</description>
     </item>
   </channel>
 </rss>
@@ -572,11 +572,11 @@ def test_buzzpost_excludes_ambiguous_short_terms_without_ai_context(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-agent-ja</title>
-    <description>("MCP" OR "AIエージェント") lang:ja min_faves:50</description>
+    <description>("MCP" OR "AIエージェント") lang:ja min_faves:100</description>
     <item>
       <title>2026-06-19 09:14:00</title>
       <link>https://x.com/example/status/game-mcp</link>
-      <description>UE5.8のMCPのテスト。Cableアクター600本で接続。90 likes 5 reposts</description>
+      <description>UE5.8のMCPのテスト。Cableアクター600本で接続。120 likes 5 reposts</description>
     </item>
   </channel>
 </rss>
@@ -597,12 +597,12 @@ def test_buzzpost_keeps_english_agentic_trend_post_and_translates(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-agent-en</title>
-    <description>("AI Control Roadmap" OR "agentic AI") lang:en min_faves:50 since:2026-06-08 -filter:replies</description>
+    <description>("AI Control Roadmap" OR "agentic AI") lang:en min_faves:100 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/roadmap</link>
       <pubDate>Thu, 18 Jun 2026 09:30:00 +0000</pubDate>
-      <description>Google DeepMind AI Control Roadmap is a big deal for agentic AI safety and coding agents. 80 likes 12 reposts</description>
+      <description>Google DeepMind AI Control Roadmap is a big deal for agentic AI safety and coding agents. 120 likes 12 reposts</description>
     </item>
   </channel>
 </rss>
@@ -613,7 +613,7 @@ def test_buzzpost_keeps_english_agentic_trend_post_and_translates(tmp_path):
     rows, degraded = buzz.collect_from_rss_paths(
         str(rss),
         today="2026-06-18",
-        translate_text_ja=lambda text: "Google DeepMind の AI Control Roadmap は agentic AI safety の重要トレンドです。80 likes 12 reposts",
+        translate_text_ja=lambda text: "Google DeepMind の AI Control Roadmap は agentic AI safety の重要トレンドです。",
     )
 
     assert degraded is False
@@ -630,7 +630,7 @@ def test_collect_preserves_same_post_url_across_observation_dates(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-model</title>
-    <description>(Claude OR LLM) lang:ja min_faves:50</description>
+    <description>(Claude OR LLM) lang:ja min_faves:100</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/repeat</link>
@@ -666,10 +666,7 @@ def test_collect_preserves_same_post_url_across_observation_dates(tmp_path):
         (row["date"], row["post_url"])
         for row in rows
         if row["post_url"] == "https://x.com/example/status/repeat"
-    ] == [
-        ("2026-06-18", "https://x.com/example/status/repeat"),
-        ("2026-06-17", "https://x.com/example/status/repeat"),
-    ]
+    ] == [("2026-06-18", "https://x.com/example/status/repeat")]
 
 
 def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
@@ -679,7 +676,7 @@ def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-model</title>
-    <description>(Claude OR LLM) lang:ja min_faves:50 since:2026-06-08 -filter:replies</description>
+    <description>(Claude OR LLM) lang:ja min_faves:100 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:50:00</title>
       <link>https://x.com/example/status/fast</link>
@@ -709,7 +706,7 @@ def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
         "https://x.com/example/status/fast",
         "https://x.com/example/status/slow",
     ]
-    assert {row["absolute_score"] for row in rows} == {50}
+    assert {row["absolute_score"] for row in rows} == {100}
     assert rows[0]["relative_score"] > rows[1]["relative_score"]
     assert rows[0]["buzz_score"] > rows[1]["buzz_score"]
 
@@ -721,7 +718,7 @@ def test_buzzpost_excludes_ai_illustration_hashtag_even_when_score_is_high(tmp_p
 <rss version="2.0">
   <channel>
     <title>buzzpost-media</title>
-    <description>("画像生成AI") lang:ja min_faves:50</description>
+    <description>("画像生成AI") lang:ja min_faves:100</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/ai-illust</link>
@@ -731,7 +728,7 @@ def test_buzzpost_excludes_ai_illustration_hashtag_even_when_score_is_high(tmp_p
     <item>
       <title>2026-06-18 09:40:00</title>
       <link>https://x.com/example/status/kept</link>
-      <description>OpenAI Sora video generation workflow update likes 80 reposts 5</description>
+      <description>OpenAI Sora video generation workflow update likes 120 reposts 5</description>
       <pubDate>Thu, 18 Jun 2026 09:40:00 +0000</pubDate>
     </item>
   </channel>
@@ -754,7 +751,7 @@ def test_buzzpost_excludes_illustrator_keyword_even_when_score_is_high(tmp_path)
 <rss version="2.0">
   <channel>
     <title>buzzpost-media</title>
-    <description>("画像生成AI") lang:ja min_faves:50</description>
+    <description>("画像生成AI") lang:ja min_faves:100</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/illustrator</link>
@@ -764,7 +761,7 @@ def test_buzzpost_excludes_illustrator_keyword_even_when_score_is_high(tmp_path)
     <item>
       <title>2026-06-18 09:40:00</title>
       <link>https://x.com/example/status/kept</link>
-      <description>OpenAI Sora video generation workflow update likes 80 reposts 5</description>
+      <description>OpenAI Sora video generation workflow update likes 120 reposts 5</description>
       <pubDate>Thu, 18 Jun 2026 09:40:00 +0000</pubDate>
     </item>
   </channel>
@@ -780,7 +777,7 @@ def test_buzzpost_excludes_illustrator_keyword_even_when_score_is_high(tmp_path)
     assert all("絵師" not in row["text"] for row in rows)
 
 
-def test_buzzpost_keeps_fast_growing_post_below_absolute_threshold(tmp_path):
+def test_buzzpost_drops_fast_growing_post_below_like_threshold(tmp_path):
     rss = tmp_path / "buzzpost-agent.xml"
     rss.write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
@@ -806,9 +803,7 @@ def test_buzzpost_keeps_fast_growing_post_below_absolute_threshold(tmp_path):
     )
 
     assert degraded is False
-    assert len(rows) == 1
-    assert rows[0]["absolute_score"] < buzz.BUZZPOST_MIN_ABSOLUTE_SCORE
-    assert rows[0]["velocity_score"] >= buzz.BUZZPOST_MIN_VELOCITY_SCORE
+    assert rows == []
 
 
 def test_load_public_rows_hides_existing_ai_illustration_hashtag_rows(tmp_path):
@@ -828,9 +823,9 @@ def test_load_public_rows_hides_existing_ai_illustration_hashtag_rows(tmp_path):
                     "date": "2026-06-18",
                     "post_url": "https://x.com/example/status/kept",
                     "category": "editor",
-                    "text": "Claude Code update likes 50",
-                    "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
-                    "absolute_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                    "text": "Claude Code update likes 120",
+                    "buzz_score": buzz.BUZZPOST_MIN_LIKES,
+                    "absolute_score": buzz.BUZZPOST_MIN_LIKES,
                 },
             ]
         )
@@ -858,8 +853,8 @@ def test_load_public_rows_hides_existing_zero_score_rows(tmp_path):
                     "date": "2026-06-18",
                     "post_url": "https://x.com/example/status/602",
                     "category": "model",
-                    "text": "Claude Fable update likes 50",
-                    "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                    "text": "Claude Fable update likes 120",
+                    "buzz_score": buzz.BUZZPOST_MIN_LIKES,
                 },
             ]
         )
@@ -882,9 +877,9 @@ def test_load_public_rows_retains_only_latest_seven_calendar_days(tmp_path):
                 "date": date,
                 "post_url": f"https://x.com/example/status/{day}",
                 "category": "model",
-                "text": f"Claude Fable BuzzPost {day} likes 80",
-                "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
-                "absolute_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                "text": f"Claude Fable frontier model BuzzPost {day} likes 120",
+                "buzz_score": buzz.BUZZPOST_MIN_LIKES,
+                "absolute_score": buzz.BUZZPOST_MIN_LIKES,
             }
         )
     path.write_text(
@@ -915,9 +910,9 @@ def test_collect_writes_only_latest_seven_calendar_days(tmp_path):
                 "date": date,
                 "post_url": f"https://x.com/example/status/existing-{day}",
                 "category": "model",
-                "text": f"Claude Fable Existing BuzzPost {day} likes 80",
-                "buzz_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
-                "absolute_score": buzz.BUZZPOST_MIN_ABSOLUTE_SCORE,
+                "text": f"Claude Fable frontier model Existing BuzzPost {day} likes 120",
+                "buzz_score": buzz.BUZZPOST_MIN_LIKES,
+                "absolute_score": buzz.BUZZPOST_MIN_LIKES,
             }
         )
     output.write_text(
@@ -930,12 +925,12 @@ def test_collect_writes_only_latest_seven_calendar_days(tmp_path):
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>buzzpost-model</title>
-    <description>(GPT-5 OR Claude) lang:ja min_faves:50</description>
+    <description>(GPT-5 OR Claude) lang:ja min_faves:100</description>
     <item>
       <title>2026-06-09 09:00:00</title>
       <link>https://x.com/example/status/new-9</link>
       <pubDate>Tue, 09 Jun 2026 09:00:00 +0900</pubDate>
-      <content:encoded>Claude Fable model update likes 80</content:encoded>
+      <content:encoded>Claude Fable model update likes 120</content:encoded>
     </item>
   </channel>
 </rss>

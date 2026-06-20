@@ -369,11 +369,12 @@ class TestGenerate(unittest.TestCase):
         self.assertIn('data-date-group data-date="2026-06-18"', html)
         self.assertIn('data-date-group data-date="2026-06-17" hidden', html)
         self.assertNotIn("Expired BuzzPost item", html)
+        self.assertIn('data-buzz-toolbar', html)
+        self.assertIn('data-translated-text', html)
+        self.assertIn("Claude Code エージェントが今日は至るところにいます。", html)
+        self.assertIn("原文を表示", html)
+        self.assertIn("Claude Code agents are everywhere", html)
         self.assertNotIn("本日の観測ポスト", html)
-        self.assertNotIn("Claude Code エージェントが今日は至るところにいます", html)
-        self.assertNotIn("Claude Code agents are everywhere", html)
-        self.assertNotIn("原文を表示", html)
-        self.assertNotIn("翻訳を表示", html)
         self.assertIn('class="x-embed-shell"', html)
         self.assertNotIn('class="buzz-side-rail"', html)
         self.assertNotIn("<aside", html)
@@ -394,7 +395,7 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("sortBuzzPosts", html)
         self.assertIn("Number(item.dataset.score || 0)", html)
         self.assertEqual(html.count("@example"), 0)
-        self.assertNotIn('class="x-discord-text-link"', html)
+        self.assertIn('class="x-discord-text-link"', html)
         self.assertNotIn('class="x-link-preview"', html)
         self.assertNotIn('src="https://example.com/preview.jpg"', html)
         self.assertNotIn("Example preview", html)
@@ -441,8 +442,7 @@ class TestGenerate(unittest.TestCase):
             "dropped_threshold": 12,
             "dropped_duplicate": 0,
             "degraded": 0,
-            "min_absolute_score": 25,
-            "min_velocity_score": 8.0,
+            "min_likes": 100,
         }
         try:
             with tempfile.TemporaryDirectory() as d:
@@ -454,8 +454,7 @@ class TestGenerate(unittest.TestCase):
 
         self.assertIn("<span>候補</span><b>12</b><small>件</small>", html)
         self.assertIn("<span>閾値未満</span><b>12</b><small>件</small>", html)
-        self.assertIn("absolute_score ≥ 25", html)
-        self.assertIn("velocity_score ≥ 8.0/h", html)
+        self.assertIn("likes ≥ 100", html)
         self.assertIn("収集は成功しています", html)
 
     def test_karte_index_has_feed_and_karte_update_badges(self):

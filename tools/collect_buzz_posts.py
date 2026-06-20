@@ -17,7 +17,8 @@ DATA = ROOT / "data"
 BUZZPOST_PATH = DATA / "buzz_posts.jsonl"
 BUZZPOST_STATS_PATH = DATA / "buzz_posts_stats.json"
 DEFAULT_X_RSS_DIR = ROOT.parent / "twitter-rss" / "output"
-BUZZPOST_MIN_ABSOLUTE_SCORE = int(os.environ.get("BUZZPOST_MIN_ABSOLUTE_SCORE", "25"))
+BUZZPOST_MIN_LIKES = int(os.environ.get("BUZZPOST_MIN_LIKES", "100"))
+BUZZPOST_MIN_ABSOLUTE_SCORE = int(os.environ.get("BUZZPOST_MIN_ABSOLUTE_SCORE", str(BUZZPOST_MIN_LIKES)))
 BUZZPOST_MIN_VELOCITY_SCORE = float(os.environ.get("BUZZPOST_MIN_VELOCITY_SCORE", "8"))
 BUZZPOST_EXCLUDED_HASHTAG_RE = re.compile(r"(?:[#＃]\s*AIイラスト|絵師)", re.IGNORECASE)
 BUZZPOST_PREVIEW_LIMIT = int(os.environ.get("BUZZPOST_PREVIEW_LIMIT", "2"))
@@ -330,13 +331,27 @@ def _observed_datetime(value: str | datetime | None = None) -> datetime:
 def _buzz_metrics(text: str) -> dict[str, int]:
     s = text.lower()
     metrics = {"likes": 0, "reposts": 0, "replies": 0, "quotes": 0}
-    for pattern, weight in (
-        (r"(\d+)\s*(?:likes?|いいね)", "likes"),
-        (r"(\d+)\s*(?:reposts?|retweets?|rt|リポスト)", "reposts"),
-        (r"(\d+)\s*(?:replies|reply|comments?|返信)", "replies"),
-        (r"(\d+)\s*(?:quotes?|引用)", "quotes"),
+    metric_label = r"(?:likes?|いいね|reposts?|retweets?|rt|リポスト|replies|reply|comments?|返信|quotes?|引用)"
+    for label, weight in (
+        (r"(?:likes?|いいね)", "likes"),
+        (r"(?:reposts?|retweets?|rt|リポスト)", "reposts"),
+        (r"(?:replies|reply|comments?|返信)", "replies"),
+        (r"(?:quotes?|引用)", "quotes"),
     ):
-        metrics[weight] += sum(int(m.group(1)) for m in re.finditer(pattern, s))
+        label_first: list[int] = []
+        for m in re.finditer(rf"{label}\s*(\d+)", s):
+            n = int(m.group(1))
+            prefix = s[:m.start()].rstrip()
+            prev_m = re.search(r"(?<![-A-Za-z0-9_])(\d+)$", prefix)
+            before_prev = prefix[:prev_m.start()].rstrip() if prev_m else ""
+            prev_is_metric_value = bool(re.search(rf"{metric_label}$", before_prev))
+            if prev_m and not prev_is_metric_value and int(prev_m.group(1)) >= n:
+                continue
+            label_first.append(n)
+        if label_first:
+            metrics[weight] = sum(label_first)
+            continue
+        metrics[weight] = sum(int(n) for n in re.findall(rf"(\d+)\s*{label}", s))
     return metrics
 
 
@@ -352,6 +367,16 @@ def _absolute_score(metrics: dict[str, int]) -> int:
 def _query_min_faves(source_query: str) -> int:
     match = re.search(r"\bmin_faves:(\d+)\b", source_query or "", flags=re.IGNORECASE)
     return int(match.group(1)) if match else 0
+
+
+def _like_count(row: dict) -> int:
+    engagement = row.get("engagement") if isinstance(row.get("engagement"), dict) else {}
+    likes = int(engagement.get("likes") or 0)
+    for key in ("text_original", "text"):
+        likes = max(likes, int(_buzz_metrics(str(row.get(key) or "")).get("likes", 0)))
+    if likes <= 0:
+        likes = _query_min_faves(str(row.get("source_query") or ""))
+    return likes
 
 
 def _velocity_score(score: int, published: datetime | None, observed_at: datetime) -> float:
@@ -389,10 +414,7 @@ def _publishable_buzz(row: dict) -> bool:
         return False
     if not _trend_relevant_buzz(row):
         return False
-    return (
-        int(row.get("absolute_score") or row.get("buzz_score") or 0) >= BUZZPOST_MIN_ABSOLUTE_SCORE
-        or float(row.get("velocity_score") or 0.0) >= BUZZPOST_MIN_VELOCITY_SCORE
-    )
+    return _like_count(row) >= BUZZPOST_MIN_LIKES
 
 
 def _excluded_buzzpost_text(text: str) -> bool:
@@ -488,7 +510,7 @@ def _parse_buzzpost_items(
                 translated = True
         media_urls = _extract_media_urls(content_html)
         published = _parse_rss_datetime(fields.get("pubdate") or fields.get("title") or "")
-        metrics = _buzz_metrics(text)
+        metrics = _buzz_metrics(text_original)
         absolute_score = _absolute_score(metrics)
         score_basis = "embedded_metrics"
         if absolute_score <= 0 and query_min_faves > 0:
@@ -646,6 +668,7 @@ def load_stats(path: Path = BUZZPOST_STATS_PATH) -> dict:
             "dropped_excluded": 0,
             "dropped_duplicate": 0,
             "degraded": 0,
+            "min_likes": BUZZPOST_MIN_LIKES,
             "min_absolute_score": BUZZPOST_MIN_ABSOLUTE_SCORE,
             "min_velocity_score": BUZZPOST_MIN_VELOCITY_SCORE,
             "history_days": BUZZPOST_HISTORY_DAYS,
@@ -653,6 +676,7 @@ def load_stats(path: Path = BUZZPOST_STATS_PATH) -> dict:
     loaded = json.loads(path.read_text(encoding="utf-8", errors="replace"))
     loaded.setdefault("min_absolute_score", BUZZPOST_MIN_ABSOLUTE_SCORE)
     loaded.setdefault("min_velocity_score", BUZZPOST_MIN_VELOCITY_SCORE)
+    loaded.setdefault("min_likes", BUZZPOST_MIN_LIKES)
     loaded.setdefault("dropped_excluded", 0)
     loaded.setdefault("history_days", BUZZPOST_HISTORY_DAYS)
     return loaded
@@ -713,6 +737,7 @@ def collect(
         "dropped_excluded": len([row for row in candidate_rows if row.get("drop_reason") == "excluded_hashtag"]),
         "dropped_duplicate": 0,
         "degraded": int(degraded),
+        "min_likes": BUZZPOST_MIN_LIKES,
         "min_absolute_score": BUZZPOST_MIN_ABSOLUTE_SCORE,
         "min_velocity_score": BUZZPOST_MIN_VELOCITY_SCORE,
         "history_days": BUZZPOST_HISTORY_DAYS,
