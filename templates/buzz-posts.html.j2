@@ -124,7 +124,7 @@
             <div class="buzz-empty-stat"><span>閾値未満</span><b>{{ s.dropped_threshold }}</b><small>件</small></div>
             <div class="buzz-empty-stat"><span>取得状態</span><b>{{ "注意" if s.degraded else "正常" }}</b><small>RSS</small></div>
           </div>
-          <p class="buzz-empty-note">掲載条件は <strong>likes ≥ {{ s.min_likes or 100 }}</strong> です。0点や弱い反応の投稿は、候補に入っても feed には表示しません。</p>
+          <p class="buzz-empty-note">掲載条件は <strong>likes ≥ {{ s.min_likes or 75 }}</strong> です。0点や弱い反応の投稿は、候補に入っても feed には表示しません。</p>
         {% else %}
           <strong>BuzzPost はまだ収集結果を持っていません。</strong>日次バッチが X RSS を生成すると、このページに生成AIコミュニティの話題投稿が表示されます。
           <p class="buzz-empty-note">未実行、RSS出力なし、または取得失敗の可能性があります。日次バッチの BuzzPost collect ログを確認してください。</p>

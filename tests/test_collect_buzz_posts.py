@@ -488,7 +488,7 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
 <rss version="2.0">
   <channel>
     <title>buzzpost-model</title>
-    <description>(Claude OR LLM) lang:ja min_faves:100 since:2026-06-08 -filter:replies</description>
+    <description>(Claude OR LLM) lang:ja min_faves:75 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/901</link>
@@ -505,7 +505,7 @@ def test_buzzpost_keeps_min_faves_search_hits_without_embedded_metrics(tmp_path)
 
     assert degraded is False
     assert [row["post_url"] for row in rows] == ["https://x.com/example/status/901"]
-    assert rows[0]["absolute_score"] == 100
+    assert rows[0]["absolute_score"] == 75
     assert rows[0]["score_basis"] == "query_min_faves"
 
 
@@ -516,7 +516,7 @@ def test_buzzpost_excludes_generic_daily_genai_usage_even_when_min_faves_query(t
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>buzzpost-model-ja</title>
-    <description>("LLM" OR "Claude Fable") lang:ja min_faves:100 since:2026-06-08 -filter:replies</description>
+    <description>("LLM" OR "Claude Fable") lang:ja min_faves:75 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/generic</link>
@@ -551,7 +551,7 @@ def test_buzzpost_excludes_ambiguous_short_terms_without_ai_context(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-media-ja</title>
-    <description>("Sora" OR "動画生成AI") lang:ja min_faves:100</description>
+    <description>("Sora" OR "動画生成AI") lang:ja min_faves:75</description>
     <item>
       <title>2026-06-19 09:10:00</title>
       <link>https://x.com/example/status/sora-stage</link>
@@ -572,7 +572,7 @@ def test_buzzpost_excludes_ambiguous_short_terms_without_ai_context(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-agent-ja</title>
-    <description>("MCP" OR "AIエージェント") lang:ja min_faves:100</description>
+    <description>("MCP" OR "AIエージェント") lang:ja min_faves:75</description>
     <item>
       <title>2026-06-19 09:14:00</title>
       <link>https://x.com/example/status/game-mcp</link>
@@ -597,7 +597,7 @@ def test_buzzpost_keeps_english_agentic_trend_post_and_translates(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-agent-en</title>
-    <description>("AI Control Roadmap" OR "agentic AI") lang:en min_faves:100 since:2026-06-08 -filter:replies</description>
+    <description>("AI Control Roadmap" OR "agentic AI") lang:en min_faves:75 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/roadmap</link>
@@ -630,7 +630,7 @@ def test_collect_preserves_same_post_url_across_observation_dates(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-model</title>
-    <description>(Claude OR LLM) lang:ja min_faves:100</description>
+    <description>(Claude OR LLM) lang:ja min_faves:75</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/repeat</link>
@@ -676,7 +676,7 @@ def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
 <rss version="2.0">
   <channel>
     <title>buzzpost-model</title>
-    <description>(Claude OR LLM) lang:ja min_faves:100 since:2026-06-08 -filter:replies</description>
+    <description>(Claude OR LLM) lang:ja min_faves:75 since:2026-06-08 -filter:replies</description>
     <item>
       <title>2026-06-18 09:50:00</title>
       <link>https://x.com/example/status/fast</link>
@@ -706,7 +706,7 @@ def test_buzzpost_adds_relative_score_for_min_faves_ties(tmp_path):
         "https://x.com/example/status/fast",
         "https://x.com/example/status/slow",
     ]
-    assert {row["absolute_score"] for row in rows} == {100}
+    assert {row["absolute_score"] for row in rows} == {75}
     assert rows[0]["relative_score"] > rows[1]["relative_score"]
     assert rows[0]["buzz_score"] > rows[1]["buzz_score"]
 
@@ -718,7 +718,7 @@ def test_buzzpost_excludes_ai_illustration_hashtag_even_when_score_is_high(tmp_p
 <rss version="2.0">
   <channel>
     <title>buzzpost-media</title>
-    <description>("画像生成AI") lang:ja min_faves:100</description>
+    <description>("画像生成AI") lang:ja min_faves:75</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/ai-illust</link>
@@ -751,7 +751,7 @@ def test_buzzpost_excludes_illustrator_keyword_even_when_score_is_high(tmp_path)
 <rss version="2.0">
   <channel>
     <title>buzzpost-media</title>
-    <description>("画像生成AI") lang:ja min_faves:100</description>
+    <description>("画像生成AI") lang:ja min_faves:75</description>
     <item>
       <title>2026-06-18 09:30:00</title>
       <link>https://x.com/example/status/illustrator</link>
@@ -925,7 +925,7 @@ def test_collect_writes_only_latest_seven_calendar_days(tmp_path):
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>buzzpost-model</title>
-    <description>(GPT-5 OR Claude) lang:ja min_faves:100</description>
+    <description>(GPT-5 OR Claude) lang:ja min_faves:75</description>
     <item>
       <title>2026-06-09 09:00:00</title>
       <link>https://x.com/example/status/new-9</link>

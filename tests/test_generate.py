@@ -442,7 +442,7 @@ class TestGenerate(unittest.TestCase):
             "dropped_threshold": 12,
             "dropped_duplicate": 0,
             "degraded": 0,
-            "min_likes": 100,
+            "min_likes": 75,
         }
         try:
             with tempfile.TemporaryDirectory() as d:
@@ -454,7 +454,7 @@ class TestGenerate(unittest.TestCase):
 
         self.assertIn("<span>候補</span><b>12</b><small>件</small>", html)
         self.assertIn("<span>閾値未満</span><b>12</b><small>件</small>", html)
-        self.assertIn("likes ≥ 100", html)
+        self.assertIn("likes ≥ 75", html)
         self.assertIn("収集は成功しています", html)
 
     def test_karte_index_has_feed_and_karte_update_badges(self):
