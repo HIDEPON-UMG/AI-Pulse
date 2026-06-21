@@ -70,6 +70,7 @@ tasks/.current.md.tmp.*
 .ai/harness/triage/*
 !.ai/harness/triage/.gitkeep
 .codex/*
+!.codex/config.toml
 .claude/.active-plan
 .claude/.plan-state/
 # repo-harness generated helper wrappers
@@ -122,4 +123,9 @@ scripts/repo-harness/
 .repo-harness/mcp.tokens.json
 .repo-harness/mcp.oauth.json
 .repo-harness/mcp.oauth-tokens.json
+.repo-harness/chatgpt-browser.local.json
+.repo-harness/chatgpt-browser.tokens.json
 .ai/harness/mcp/audit.log
+.ai/harness/chatgpt/browser-lock.json
+.ai/harness/chatgpt/tmp/
+.ai/harness/chatgpt/sessions/

@@ -2,6 +2,10 @@
 
 グローバル `CLAUDE.md` と `ProjectFolders/CLAUDE.md` の階層継承下で動く。重複は書かない。
 
+## ChatGPT consult repo-local 設定
+
+ChatGPT consult の共通運用は ProjectFolders の `AGENTS.md` / `CLAUDE.md` と global skill `tool-repo-harness-chatgpt-bridge` に従う。この repo には採用設定として `.codex/config.toml` と `.oracle/config.json` だけを置き、汎用 skill や Oracle wrapper を repo-local 正本として持たない。
+
 ## URL 偽造防止 (push 前必須ゲート)
 
 LLM (Claude セッション) は URL を記憶ベースで捏造する既知バグがある (News-Grasp 2026-06-03 三菱UFJ FX_Monthly 事故で 803 件中 33 件 = 約 4% が 404/410 と判明)。AI-Pulse でも `entity.history[].url` / `entity.modules.future[].url` / `event.source_url` に同じ経路で捏造混入し得る。境界 1 箇所集約 + 契約テスト + push gate の三段で構造的に弾く ([[feedback_llm_url_fabrication_ban]] と [[feedback_check_design_principles]] §2/§4)。

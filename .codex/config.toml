@@ -1,0 +1,34 @@
+[mcp_servers.repo_harness]
+command = "repo-harness"
+args = [
+  "mcp",
+  "serve",
+  "--repo",
+  ".",
+  "--transport",
+  "stdio",
+  "--profile",
+  "executor",
+  "--enable-chatgpt-browser"
+]
+enabled_tools = [
+  "harness_status",
+  "read_workflow_file",
+  "latest_handoff",
+  "latest_checks",
+  "prepare_codex_goal_from_sprint",
+  "write_codex_goal",
+  "run_workflow_check",
+  "run_chatgpt_browser_consult",
+  "read_chatgpt_browser_session",
+  "list_chatgpt_browser_sessions",
+  "open_chatgpt_browser_session",
+  "continue_chatgpt_browser_session"
+]
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.oracle_chatgpt]
+command = "oracle-mcp"
+args = []
+env = { ORACLE_ENGINE = "browser" }
+default_tools_approval_mode = "prompt"

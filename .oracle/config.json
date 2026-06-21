@@ -1,0 +1,12 @@
+{
+  "engine": "browser",
+  "browser": {
+    "attachRunning": true,
+    "manualLogin": false,
+    "modelStrategy": "current",
+    "archiveConversations": "auto",
+    "autoReattachDelayMs": 5000,
+    "autoReattachIntervalMs": 3000,
+    "autoReattachTimeoutMs": 60000
+  }
+}
