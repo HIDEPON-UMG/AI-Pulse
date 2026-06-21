@@ -42,6 +42,15 @@ def test_publish_daily_verifies_public_freshness_after_push() -> None:
     assert "--expected-date" in script
 
 
+def test_publish_daily_expected_date_comes_from_generated_site_meta() -> None:
+    """公開 freshness は実行日ではなく、生成済み HTML の更新日メタを期待値にする。"""
+    script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")
+    freshness_block = script.split('"public freshness gate"', maxsplit=1)[0]
+
+    assert "$ExpectedBuildDate = Get-GeneratedSiteBuildDate" in script
+    assert "$ExpectedBuildDate = Get-Date" not in freshness_block
+
+
 def test_publish_daily_runs_url_gate_before_no_change_skip() -> None:
     """既存公開 URL の link rot を、公開対象に変更が無い日でも検知する。"""
     script = Path("scripts/publish_daily.ps1").read_text(encoding="utf-8-sig")

@@ -75,6 +75,24 @@ function Invoke-GitCapture {
     return $Output
 }
 
+function Get-GeneratedSiteBuildDate {
+    $IndexPath = Join-Path $AiPulse 'site\index.html'
+    if (-not (Test-Path -LiteralPath $IndexPath)) {
+        throw "生成済み index.html が見つかりません: $IndexPath"
+    }
+    $Html = [System.IO.File]::ReadAllText($IndexPath, [System.Text.Encoding]::UTF8)
+    $Match = [regex]::Match($Html, '<script[^>]+id=["'']ssg-meta["''][^>]*>(.*?)</script>', 'Singleline')
+    if (-not $Match.Success) {
+        throw "生成済み index.html に ssg-meta がありません: $IndexPath"
+    }
+    $Meta = $Match.Groups[1].Value | ConvertFrom-Json
+    $Build = [string]$Meta.build
+    if ([string]::IsNullOrWhiteSpace($Build)) {
+        throw "生成済み index.html の ssg-meta build が空です: $IndexPath"
+    }
+    return $Build
+}
+
 Set-Location -LiteralPath $AiPulse
 
 try {
@@ -148,7 +166,7 @@ try {
         throw "push 後の remote HEAD 不一致: local=$LocalHead remote=$RemoteHead"
     }
 
-    $ExpectedBuildDate = Get-Date -Format 'yyyy-MM-dd'
+    $ExpectedBuildDate = Get-GeneratedSiteBuildDate
     Invoke-Native "public freshness gate" $PythonExe @(
         'tools\check_public_freshness.py',
         '--expected-date', $ExpectedBuildDate

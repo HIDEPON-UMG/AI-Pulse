@@ -119,6 +119,17 @@ def _default_build_date() -> dt.date:
     return dt.datetime.now(JST).date()
 
 
+def _default_update_date() -> dt.date:
+    """日次更新日を永続化済みデータから読む。無ければ JST 今日に fallback する。"""
+    latest = str(collect_buzz_posts.load_stats().get("latest") or "").strip()
+    if latest:
+        try:
+            return _d(latest)
+        except ValueError:
+            pass
+    return _default_build_date()
+
+
 def _rel_label(ref: dt.date, d: dt.date) -> str:
     """最新ニュース日(ref)を「本日」基準にした相対表記。"""
     days = (ref - d).days
@@ -723,10 +734,10 @@ def build_context(entities: list[dict], events: list[dict], *, build_date: dt.da
     """検証済み L1/L2 から全テンプレ用の文脈を組む（決定論変換の集約点）。
 
     フィードは「events 全体の最大 date と一致するデルタ」だけを表示する（=最新記事日）。
-    サイトの更新表示は生成実行日に合わせる。ユーザー要件 2026-06-08。
+    サイトの更新表示は、日次バッチが永続化した日本時間の更新日に合わせる。
     """
     ent_by_id = {e["entity_id"]: e for e in entities}
-    ref = build_date or _default_build_date()
+    ref = build_date or _default_update_date()
     latest_event_date = max((_d(e["date"]) for e in events), default=ref)
     latest_event_iso = latest_event_date.isoformat()
     all_events = sorted(events, key=lambda e: (e["date"], e["event_id"]), reverse=True)

@@ -108,7 +108,7 @@ class TestGenerate(unittest.TestCase):
             for e in past_published[:5]:  # 抽出して確認
                 self.assertNotIn(e["headline"], idx)
 
-    def test_build_date_uses_generation_day_not_latest_event_day(self):
+    def test_build_date_uses_supplied_update_day_not_latest_event_day(self):
         ent = {
             "entity_id": "x", "name": "X", "kind": "model", "domain": "language",
             "offering": "oss", "vendor": "V", "category": "model",
@@ -124,6 +124,15 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("2026-06-08", ctx["ref_date_label"])
         self.assertEqual(ctx["feed_count"], 1)
         self.assertEqual(ctx["feed"][0]["date_rel"], "1日前")
+
+    def test_default_update_date_uses_persisted_buzzpost_latest(self):
+        """GitHub Pages 再生成日の clock ではなく、日次バッチが永続化した更新日を使う。"""
+        original_load_stats = gp.collect_buzz_posts.load_stats
+        try:
+            gp.collect_buzz_posts.load_stats = lambda: {"latest": "2026-06-21"}
+            self.assertEqual(gp._default_update_date(), dt.date(2026, 6, 21))
+        finally:
+            gp.collect_buzz_posts.load_stats = original_load_stats
 
     def test_default_build_date_uses_jst_for_github_actions(self):
         """GitHub Actions の UTC 夜でも、日本時間の更新日を表示する。"""
