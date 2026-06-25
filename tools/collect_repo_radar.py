@@ -491,7 +491,8 @@ def _local_name(tag: str) -> str:
 def _parse_x_rss_items(xml_text: str, *, source_name: str) -> list[dict]:
     root = ET.fromstring(xml_text)
     rows: list[dict] = []
-    cutoff = datetime.now(timezone.utc) - timedelta(days=10)
+    # X RSS は外部生成ファイルの取り込みが数日遅れることがあるため、日次 API より広めに見る。
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     for item in root.iter():
         if _local_name(item.tag) != "item":
             continue

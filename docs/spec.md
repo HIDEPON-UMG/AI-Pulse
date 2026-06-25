@@ -10,26 +10,59 @@ AI-Pulse は、生成AI領域の重要な動きを「ニュース断片」では
 
 このプロダクトの中心価値は、毎日のニュース収集、エンティティ別カルテ、イベント履歴、比較軸、公開サイト、運用ログをつなぎ、短時間で「何が起きたか」「なぜ重要か」「どのプレイヤーに効くか」を判断できることにある。単なる RSS 集約や話題一覧ではなく、継続的に更新される生成AI産業の地図を作る。
 
+## Human Commitment
+
+| Field | Value |
+|---|---|
+| approval_status | Committed |
+| committed_by_human | true |
+| approved_goal_statement | 生成AI領域の重要変化を、ニュース断片ではなく、企業・モデル・制度・イベントの継続的なカルテとして読める知識ベースにする。 |
+| approved_by_user_text | 以下対応を実施の上で承認する。 |
+| approval_evidence_ref | Current conversation, user answer on 2026-06-25. |
+| approved_at | 2026-06-25 |
+| commitment_version | 1 |
+| commitment_scope | Product Constitution, Goal Quality Contract, Core / Why / What / How, Definition of Done, Feature/Test Traceability, SDD/TDD Quality Contract. |
+| open_questions | None. |
+
+AI はこの Human Commitment を自己判断で変更してはならない。`Committed` の変更、scope 拡大、または例外経路の追加は、人間の明示承認と `approved_by_user_text` の更新を必要とする。
+
+## User Answer Provenance
+
+- source_status=UserConfirmed
+- user_answer_text: AI-Pulse の core_goal は「生成AI領域の重要変化を、ニュース断片ではなく、企業・モデル・制度・イベントの継続的なカルテとして読める知識ベースにする」。success_condition は日次/週次収集、entity/event 更新、URL gate、site generation、public freshness がつながり、短時間で「何が起きたか / なぜ重要か / どのプレイヤーに効くか」を判断できること。non_goal_boundary は汎用ニュースサイト化しない、出典未確認 URL を載せない、ChatGPT/LLM review を完了証跡にしない、全AIニュース網羅を目的にしないこと。learning_loop は coverage gap、entity 偏り、URL freshness、公開鮮度、UI usability、batch recoverability を継続的に見直すこと。Human Commitment は以下対応を実施の上で承認する。
+
+## Goal Quality Contract
+
+| Field | Value |
+|---|---|
+| core_goal | 生成AI領域の重要変化を、ニュース断片ではなく、企業・モデル・制度・イベントの継続的なカルテとして読める知識ベースにする。 |
+| target_user_or_operator | 生成AIの技術・事業・政策変化を追う実務者、企画者、調査担当者、投資・事業開発の意思決定者、および AI-Pulse の収集・公開・品質管理を担う運用者。 |
+| user_state_change | ユーザーは、生成AI領域の断片的なニュースを追う状態から、企業・モデル・制度・イベントの関係と変化を短時間で判断できる状態になる。運用者は coverage gap、URL freshness、公開鮮度、batch recoverability を追跡できる。 |
+| business_or_operational_value | 生成AI産業の変化を継続的な知識ベースとして蓄積し、調査・企画・投資・事業開発の意思決定品質と運用再現性を高める。 |
+| success_condition | 日次/週次収集、entity/event 更新、URL gate、site generation、public freshness がつながり、短時間で「何が起きたか / なぜ重要か / どのプレイヤーに効くか」を判断できる。 |
+| non_goal_boundary | 汎用ニュースサイト化しない。出典未確認 URL を載せない。ChatGPT/LLM review を完了証跡にしない。全AIニュース網羅を目的にしない。 |
+| learning_loop | coverage gap、entity 偏り、URL freshness、公開鮮度、UI usability、batch recoverability を継続的に見直す。 |
+
 ## Current Reality Snapshot
 
-この spec は 2026-06-22 時点の実データを前提にする。
+この spec は 2026-06-25 時点の実データを前提にする。
 
 | Item | Current state | Spec implication |
 |---|---|---|
 | Entities | 32 entities | カルテはデモ段階を超え、カテゴリ横断の継続運用対象として扱う。 |
-| Events | 440 events | 主課題は「初期記事不足」ではなく、継続収集、品質維持、公開鮮度、entity 間の偏り補正である。 |
+| Events | 498 events | 主課題は「初期記事不足」ではなく、継続収集、品質維持、公開鮮度、entity 間の偏り補正である。 |
 | Categories | model 7 / editor 5 / media 5 / physical 4 / agent 6 / infra 3 / policy 2 | 新規機能は 7 lens のどれに効くか、または lens 横断かを明示する。 |
 | Event gaps | `wai-series` has 0 linked events | カルテは存在するが event coverage が薄い entity を、収集・手動補完・除外判断の対象として扱う。 |
-| Localization | `headline_ja` exists for 415 / 440 events | 全 event 完了済みとは扱わず、欠落分は品質改善 backlog とする。 |
-| Visual assets | `thumb` exists for 426 / 440 events | UI 表示の欠落 fallback と補完方針を維持する。 |
+| Localization | `headline_ja` exists for 473 / 498 events | 全 event 完了済みとは扱わず、欠落分は品質改善 backlog とする。 |
+| Visual assets | `thumb` exists for 482 / 498 events | UI 表示の欠落 fallback と補完方針を維持する。 |
 
 ## Core / Why / What / How
 
 | Layer | Definition |
 |---|---|
 | Core | 生成AIの変化を、実務判断に耐える継続的な知識ベースとして届ける。日次運用、カルテ、公開サイト、品質監査が一体で回る状態を作る。 |
-| Why | 生成AI領域はモデル、開発ツール、物理AI、メディア生成、エージェント、インフラ、政策が同時に動き、単発記事だけでは変化の意味を追いにくい。実務者は短時間で重要度、影響、プレイヤー間の関係を把握したい。既に 440 events あるため、単純増量より、偏り、鮮度、根拠、継続運用の品質が重要である。 |
-| What | `data/entities.jsonl` の 32 entity カルテ、`data/events.jsonl` の 440 event、日次/週次バッチ、品質監査、GitHub Pages 公開サイト、BuzzPost / Repo Radar などの周辺ビューを提供する。 |
+| Why | 生成AI領域はモデル、開発ツール、物理AI、メディア生成、エージェント、インフラ、政策が同時に動き、単発記事だけでは変化の意味を追いにくい。実務者は短時間で重要度、影響、プレイヤー間の関係を把握したい。既に 498 events あるため、単純増量より、偏り、鮮度、根拠、継続運用の品質が重要である。 |
+| What | `data/entities.jsonl` の 32 entity カルテ、`data/events.jsonl` の 498 event、日次/週次バッチ、品質監査、GitHub Pages 公開サイト、BuzzPost / Repo Radar などの周辺ビューを提供する。 |
 | How | RSS / Google News / 補助 LLM / ローカル LLM / URL 検証 / schema / quality audit / static site generation / publish script / scheduled task を、失敗時に追跡可能なログとテストでつなぐ。ChatGPT consult は要件レビュー補助であり、repo-local tests と公開確認を置き換えない。 |
 
 ## Definition of Done
@@ -62,15 +95,22 @@ AI-Pulse は、生成AI領域の重要な動きを「ニュース断片」では
 
 ## Feature / Test Traceability Matrix
 
-| Feature | Expected outcome | Verification command |
-|---|---|---|
-| Daily pipeline | RSS / related updates / site regeneration / publish handoff が途中失敗を隠さない | `PYTHONUTF8=1 python -m pytest tests/test_run_daily.py tests/test_run_daily_quality_audit.py tests/test_batch_failure_exit.py -q --tb=short` |
-| Event quality | event extras、rationale、headline_ja、editorial lint が品質基準を満たす | `PYTHONUTF8=1 python -m pytest tests/test_schema.py tests/test_quality_audit.py tests/test_editorial_lint.py tests/test_collect_rss_editorial_lint.py -q --tb=short` |
-| URL fabrication prevention | entity / event URL が推測混入せず、直近 URL gate を通る | `PYTHONUTF8=1 python tools/audit_urls.py --gate` |
-| Site generation | feed / archive / karte / assets が生成でき、主要 UI 契約を満たす | `PYTHONUTF8=1 python -m pytest tests/test_generate.py tests/test_branding.py tests/test_entity_logos.py -q --tb=short` |
-| Publish flow | commit/push 対象と freshness/public state を確認できる | `PYTHONUTF8=1 python -m pytest tests/test_publish_daily.py tests/test_check_public_freshness.py -q --tb=short` |
-| BuzzPost / Repo Radar | 周辺ビューが AI-Pulse の目的から外れず収集・表示できる | `PYTHONUTF8=1 python -m pytest tests/test_collect_buzz_posts.py tests/test_collect_repo_radar.py tests/test_repo_radar_obsidian.py -q --tb=short` |
-| Product spec governance | spec が実データ、既知 gap、検証コマンド、ChatGPT 境界を反映する | `PYTHONUTF8=1 python -m pytest tests/test_product_spec_contract.py -q --tb=short` |
+| Spec Item | User/Operator Outcome | Concrete Acceptance Example | Red Signal | Green Verification | Evidence Plan |
+|---|---|---|---|---|---|
+| Daily pipeline | RSS / related updates / site regeneration / publish handoff が途中失敗を隠さない | Given daily sources are available, When the daily pipeline runs, Then accepted events pass schema / quality / URL gates and the site is regenerated | batch failure is hidden, partial data is saved without typed status, or publish handoff is stale | `PYTHONUTF8=1 python -m pytest tests/test_run_daily.py tests/test_run_daily_quality_audit.py tests/test_batch_failure_exit.py -q --tb=short` | pytest output, `_logs/daily_YYYYMMDD.log`, publish handoff state |
+| Event quality | event extras、rationale、headline_ja、editorial lint が品質基準を満たす | Given a candidate event is collected, When schema and editorial gates run, Then invalid URL, weak rationale, or missing required quality fields are rejected or repaired | event with weak rationale, fabricated URL, or missing quality field is accepted | `PYTHONUTF8=1 python -m pytest tests/test_schema.py tests/test_quality_audit.py tests/test_editorial_lint.py tests/test_collect_rss_editorial_lint.py -q --tb=short` | pytest output and quality audit log |
+| URL fabrication prevention | entity / event URL が推測混入せず、直近 URL gate を通る | Given new entity/event URLs are introduced, When URL gate runs, Then only live or typed-ambiguous URLs remain | guessed URL, 404/410 URL, or fabricated host enters data | `PYTHONUTF8=1 python tools/audit_urls.py --gate` | audit output with checked URL counts and fatal count |
+| Site generation | feed / archive / karte / assets が生成でき、主要 UI 契約を満たす | Given updated data exists, When site generation runs, Then feed / archive / karte remain readable on desktop and mobile | generated site misses core pages, logos, or UI contract | `PYTHONUTF8=1 python -m pytest tests/test_generate.py tests/test_branding.py tests/test_entity_logos.py -q --tb=short` | pytest output and generated site inventory |
+| Publish flow | commit/push 対象と freshness/public state を確認できる | Given data or site output changes, When publish flow runs, Then remote HEAD and public freshness reflect the intended build | git push is treated as public proof, or public freshness remains stale | `PYTHONUTF8=1 python -m pytest tests/test_publish_daily.py tests/test_check_public_freshness.py -q --tb=short` | pytest output, remote HEAD, public freshness result |
+| BuzzPost / Repo Radar | 周辺ビューが AI-Pulse の目的から外れず収集・表示できる | Given related social/repo signals exist, When surrounding views are collected, Then they support AI-Pulse's entity/event knowledge map | surrounding views become unrelated trend lists or break entity linkage | `PYTHONUTF8=1 python -m pytest tests/test_collect_buzz_posts.py tests/test_collect_repo_radar.py tests/test_repo_radar_obsidian.py -q --tb=short` | pytest output and collected view artifacts |
+| Product spec governance | spec が実データ、既知 gap、検証コマンド、ChatGPT 境界を反映する | Given a non-trivial change is planned, When spec audit runs, Then Goal Quality / Human Commitment / SDD-TDD traceability remain aligned | ChatGPT/LLM review is treated as completion proof, or spec omits current data reality | `PYTHONUTF8=1 python -m pytest tests/test_product_spec_contract.py -q --tb=short` | pytest output and strict SDD audit result |
+
+## SDD / TDD Quality Contract
+
+- SDD lifecycle: Spec -> Spec Questions -> Acceptance Matrix -> Plan -> Review -> Implementation -> Evidence -> Drift review
+- TDD lifecycle: Red -> Green -> Refactor -> Evidence -> Completion
+- 非自明な変更は、少なくとも 1 つの `Spec Item` を `User/Operator Outcome`、`Concrete Acceptance Example`、`Red Signal`、`Green Verification`、`Evidence Plan` に対応させる。
+- ChatGPT / LLM review は plan gate または要件レビュー補助であり、実装完了証跡ではない。AI-Pulse の完了証跡は repo-local tests、URL gate、site generation、public freshness、publish state で示す。
 
 ## Acceptance Scenarios
 
