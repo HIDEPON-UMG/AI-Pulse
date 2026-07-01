@@ -1,9 +1,9 @@
 {
-  "latest": "2026-07-01",
-  "candidate_count": 232,
-  "collected": 129,
+  "latest": "2026-07-02",
+  "candidate_count": 233,
+  "collected": 123,
   "written": 160,
-  "dropped_threshold": 97,
+  "dropped_threshold": 104,
   "dropped_excluded": 6,
   "dropped_duplicate": 0,
   "degraded": 0,
