@@ -34,12 +34,6 @@ def _ollama_options(*, temperature: float) -> dict:
     return {"temperature": temperature, "num_gpu": config.OLLAMA_NUM_GPU}
 
 
-def _system_prompt(base: str = "") -> str:
-    """既存 system prompt に AI-Pulse の事実性 guard を足す。"""
-    parts = [part.strip() for part in (base, config.OLLAMA_SYSTEM_PROMPT) if part and part.strip()]
-    return "\n\n".join(parts)
-
-
 def _call_once(article_text: str, meta: dict, *, extra_instruction: str = "") -> dict:
     """Ollama /api/chat に 1 回投げて JSON を取り出す。shape チェックは呼び出し側で実施。"""
     sys_text, _ = llm_gemini._load_prompt()
@@ -49,7 +43,7 @@ def _call_once(article_text: str, meta: dict, *, extra_instruction: str = "") ->
     req = {
         "model": config.OLLAMA_MODEL,
         "messages": [
-            {"role": "system", "content": _system_prompt(sys_text)},
+            {"role": "system", "content": sys_text},
             {"role": "user", "content": user},
         ],
         "think": False,  # qwen3 は thinking モデル。false にしないと本文（JSON）が出ない
@@ -201,10 +195,7 @@ def generate_carte_fields(entity: dict, recent_events: list[dict]) -> dict:
     for attempt in range(1, attempts + 1):
         req = {
             "model": config.OLLAMA_MODEL,
-            "messages": [
-                {"role": "system", "content": _system_prompt()},
-                {"role": "user", "content": user + (("\n\n" + extra) if extra else "")},
-            ],
+            "messages": [{"role": "user", "content": user + (("\n\n" + extra) if extra else "")}],
             "think": False,
             "format": carte_schema,
             "stream": False,
@@ -343,10 +334,7 @@ def regenerate_rationale(
         attempt += 1
         req = {
             "model": config.OLLAMA_MODEL,
-            "messages": [
-                {"role": "system", "content": _system_prompt()},
-                {"role": "user", "content": user + (("\n\n" + extra) if extra else "")},
-            ],
+            "messages": [{"role": "user", "content": user + (("\n\n" + extra) if extra else "")}],
             "think": False,
             "format": rationale_schema,
             "stream": False,
@@ -433,10 +421,7 @@ def translate_headline_ja(
     )
     req = {
         "model": config.OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": _system_prompt()},
-            {"role": "user", "content": user},
-        ],
+        "messages": [{"role": "user", "content": user}],
         "think": False,
         "stream": False,
         "options": _ollama_options(temperature=0.2),
@@ -471,10 +456,7 @@ def translate_buzzpost_text_ja(text: str) -> str:
     )
     req = {
         "model": config.OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": _system_prompt()},
-            {"role": "user", "content": user},
-        ],
+        "messages": [{"role": "user", "content": user}],
         "think": False,
         "stream": False,
         "options": _ollama_options(temperature=0.2),

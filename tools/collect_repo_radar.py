@@ -738,10 +738,7 @@ def _ollama_chat_json(
 def _call_ollama(prompt: str) -> dict:
     req = {
         "model": config.OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": config.OLLAMA_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
+        "messages": [{"role": "user", "content": prompt}],
         "think": False,
         "format": REPO_RADAR_SCHEMA,
         "stream": False,

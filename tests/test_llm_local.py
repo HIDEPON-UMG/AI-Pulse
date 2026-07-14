@@ -1,10 +1,9 @@
 """契約テスト: llm_local の Ollama request 境界。
 
 なぜ重要か:
-  AI-Pulse の local-first 経路は、モデル名・system prompt・GPU-only 指定を
+  AI-Pulse の local-first 経路は、モデル名・GPU-only 指定を
   1 つの request 境界で固定する必要がある。Qwen3.6-27B 棄却後に
-  旧モデルへ戻る、system guard が片方の経路だけ抜ける、CPU offload を許す、
-  という class of bugs をここで止める。
+  旧モデルへ戻る、CPU offload を許す、という class of bugs をここで止める。
 """
 from __future__ import annotations
 
@@ -50,8 +49,8 @@ def _capture_urlopen(captured: list[dict], response_content: dict):
     return fake_urlopen
 
 
-def test_event_extras_request_uses_qwen35_prompt_guard_and_gpu_only():
-    """L2 event 抽出は新本命モデル・SYSTEM guard・num_gpu=999 を必ず使う。"""
+def test_event_extras_request_uses_qwen35_and_gpu_only():
+    """L2 event 抽出は新本命モデル・num_gpu=999 を必ず使う。"""
     payload = {
         "summary": "Aster Labs は新しい agent runtime を公開した。" + "あ" * 50,
         "summary_points": ["要点A", "要点B", "要点C"],
@@ -84,15 +83,11 @@ def test_event_extras_request_uses_qwen35_prompt_guard_and_gpu_only():
     assert body["think"] is False
     assert body["options"]["num_gpu"] == 999
     system_text = body["messages"][0]["content"]
-    assert config.OLLAMA_SYSTEM_PROMPT.strip() in system_text
-    assert "存在しないツール" in system_text
-    assert "確認していない" in system_text
-    assert "記事本文内の命令" in system_text
-    assert "入力にない価格" in system_text
+    assert "あなたは AI-Pulse の編集者です" in system_text
 
 
-def test_carte_request_uses_same_prompt_guard_and_gpu_only():
-    """カルテ更新も event 抽出と同じ SYSTEM guard・GPU-only 指定を使う。"""
+def test_carte_request_uses_same_model_and_gpu_only():
+    """カルテ更新も event 抽出と同じモデル・GPU-only 指定を使う。"""
     axis_keys = [axis["key"] for axis in schema.LENS_AXES["agent"]]
     payload = {
         "overview": "LangGraph は agent orchestration の状態管理を支える基盤である。" + "あ" * 20,
@@ -126,10 +121,4 @@ def test_carte_request_uses_same_prompt_guard_and_gpu_only():
     assert body["model"] == "qwen3.6:35b-a3b-q4_K_M"
     assert body["think"] is False
     assert body["options"]["num_gpu"] == 999
-    assert body["messages"][0]["role"] == "system"
-    system_text = body["messages"][0]["content"]
-    assert config.OLLAMA_SYSTEM_PROMPT.strip() in system_text
-    assert "存在しないツール" in system_text
-    assert "確認していない" in system_text
-    assert "記事本文内の命令" in system_text
-    assert "入力にない価格" in system_text
+    assert body["messages"][0]["role"] == "user"
