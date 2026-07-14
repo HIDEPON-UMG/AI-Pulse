@@ -377,6 +377,7 @@ def fetch_x_rss_candidates(
     rss_paths: str | None = None,
     request_text=_request_text,
     limit: int = 80,
+    now: datetime | None = None,
 ) -> tuple[list[dict], bool]:
     """book000/twitter-rss が生成した RSS XML から GitHub repo 候補を収集する。
 
@@ -392,7 +393,7 @@ def fetch_x_rss_candidates(
     for location in locations:
         try:
             for name, xml_text in _iter_rss_xml(location, request_text=request_text):
-                items.extend(_parse_x_rss_items(xml_text, source_name=f"x-rss:{name}"))
+                items.extend(_parse_x_rss_items(xml_text, source_name=f"x-rss:{name}", now=now))
         except Exception:
             degraded = True
             continue
@@ -488,11 +489,16 @@ def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1].lower()
 
 
-def _parse_x_rss_items(xml_text: str, *, source_name: str) -> list[dict]:
+def _parse_x_rss_items(
+    xml_text: str,
+    *,
+    source_name: str,
+    now: datetime | None = None,
+) -> list[dict]:
     root = ET.fromstring(xml_text)
     rows: list[dict] = []
     # X RSS は外部生成ファイルの取り込みが数日遅れることがあるため、日次 API より広めに見る。
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc) - timedelta(days=30)
     for item in root.iter():
         if _local_name(item.tag) != "item":
             continue
@@ -732,11 +738,14 @@ def _ollama_chat_json(
 def _call_ollama(prompt: str) -> dict:
     req = {
         "model": config.OLLAMA_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [
+            {"role": "system", "content": config.OLLAMA_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
         "think": False,
         "format": REPO_RADAR_SCHEMA,
         "stream": False,
-        "options": {"temperature": config.OLLAMA_TEMPERATURE},
+        "options": {"temperature": config.OLLAMA_TEMPERATURE, "num_gpu": config.OLLAMA_NUM_GPU},
     }
     data = json.dumps(req).encode("utf-8")
     url = f"{config.OLLAMA_HOST}/api/chat"

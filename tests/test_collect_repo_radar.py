@@ -1,5 +1,6 @@
 import json
 import ast
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -177,7 +178,10 @@ def test_x_rss_candidates_parse_content_encoded(tmp_path):
 """,
         encoding="utf-8",
     )
-    items, degraded = radar.fetch_x_rss_candidates(rss_paths=str(rss))
+    items, degraded = radar.fetch_x_rss_candidates(
+        rss_paths=str(rss),
+        now=datetime(2026, 6, 14, tzinfo=timezone.utc),
+    )
     assert degraded is False
     assert radar.merge_signals(items)["acme/mangled-repo"]["repo"] == "acme/mangled-repo"
 

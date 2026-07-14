@@ -50,19 +50,19 @@ AI はこの Human Commitment を自己判断で変更してはならない。`C
 | Item | Current state | Spec implication |
 |---|---|---|
 | Entities | 32 entities | カルテはデモ段階を超え、カテゴリ横断の継続運用対象として扱う。 |
-| Events | 498 events | 主課題は「初期記事不足」ではなく、継続収集、品質維持、公開鮮度、entity 間の偏り補正である。 |
+| Events | 750 events | 主課題は「初期記事不足」ではなく、継続収集、品質維持、公開鮮度、entity 間の偏り補正である。 |
 | Categories | model 7 / editor 5 / media 5 / physical 4 / agent 6 / infra 3 / policy 2 | 新規機能は 7 lens のどれに効くか、または lens 横断かを明示する。 |
 | Event gaps | `wai-series` has 0 linked events | カルテは存在するが event coverage が薄い entity を、収集・手動補完・除外判断の対象として扱う。 |
-| Localization | `headline_ja` exists for 473 / 498 events | 全 event 完了済みとは扱わず、欠落分は品質改善 backlog とする。 |
-| Visual assets | `thumb` exists for 482 / 498 events | UI 表示の欠落 fallback と補完方針を維持する。 |
+| Localization | `headline_ja` exists for 724 / 750 events | 全 event 完了済みとは扱わず、欠落分は品質改善 backlog とする。 |
+| Visual assets | `thumb` exists for 730 / 750 events | UI 表示の欠落 fallback と補完方針を維持する。 |
 
 ## Core / Why / What / How
 
 | Layer | Definition |
 |---|---|
 | Core | 生成AIの変化を、実務判断に耐える継続的な知識ベースとして届ける。日次運用、カルテ、公開サイト、品質監査が一体で回る状態を作る。 |
-| Why | 生成AI領域はモデル、開発ツール、物理AI、メディア生成、エージェント、インフラ、政策が同時に動き、単発記事だけでは変化の意味を追いにくい。実務者は短時間で重要度、影響、プレイヤー間の関係を把握したい。既に 498 events あるため、単純増量より、偏り、鮮度、根拠、継続運用の品質が重要である。 |
-| What | `data/entities.jsonl` の 32 entity カルテ、`data/events.jsonl` の 498 event、日次/週次バッチ、品質監査、GitHub Pages 公開サイト、BuzzPost / Repo Radar などの周辺ビューを提供する。 |
+| Why | 生成AI領域はモデル、開発ツール、物理AI、メディア生成、エージェント、インフラ、政策が同時に動き、単発記事だけでは変化の意味を追いにくい。実務者は短時間で重要度、影響、プレイヤー間の関係を把握したい。既に 750 events あるため、単純増量より、偏り、鮮度、根拠、継続運用の品質が重要である。 |
+| What | `data/entities.jsonl` の 32 entity カルテ、`data/events.jsonl` の 750 event、日次/週次バッチ、品質監査、GitHub Pages 公開サイト、BuzzPost / Repo Radar などの周辺ビューを提供する。 |
 | How | RSS / Google News / 補助 LLM / ローカル LLM / URL 検証 / schema / quality audit / static site generation / publish script / scheduled task を、失敗時に追跡可能なログとテストでつなぐ。ChatGPT consult は要件レビュー補助であり、repo-local tests と公開確認を置き換えない。 |
 
 ## Definition of Done
