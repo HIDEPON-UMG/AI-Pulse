@@ -1,6 +1,9 @@
 param([ValidateSet('Status','Migrate')][string]$Mode='Status')
 
 $ErrorActionPreference='Stop'
+$OutputEncoding=[Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 $repoRoot=Split-Path -Parent $PSScriptRoot
 $launcher=Join-Path $PSScriptRoot 'ai_pulse_task_launcher.pyw'
 $pythonw=Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Programs\Python') -Filter pythonw.exe -Recurse -ErrorAction SilentlyContinue |

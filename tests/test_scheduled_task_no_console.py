@@ -10,5 +10,6 @@ def test_scheduled_tasks_use_pythonw_launcher() -> None:
     assert "pythonw.exe" in installer
     assert "ai_pulse_task_launcher.pyw" in installer
     assert "powershell.exe" not in installer
+    assert "[Console]::OutputEncoding" in installer
     assert "CREATE_NO_WINDOW" in launcher
     assert "--probe" in launcher
